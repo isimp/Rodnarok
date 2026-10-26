@@ -96,8 +96,8 @@ namespace Rodnarok
         {
             if (!Running) return;
             _write("STOPPED during " + (_current?.Name ?? "the start") + ", " + _waiting.Count + " not run");
+            Close();
             _current = null;
-            _steps = null;
             _waiting.Clear();
         }
 
@@ -115,8 +115,23 @@ namespace Rodnarok
                 Failed++;
                 _write("FAIL " + _current.Name + ": " + string.Join("; ", failures));
             }
+            Close();
             _current = null;
+        }
+
+        /// <summary>Ends the scenario's body where it is, so what it set out to put back afterwards is put back.</summary>
+        private void Close()
+        {
+            var steps = _steps;
             _steps = null;
+            try
+            {
+                (steps as IDisposable)?.Dispose();
+            }
+            catch (Exception ex) when (Survivable(ex))
+            {
+                _write("FAIL " + (_current?.Name ?? "a scenario") + " while putting things back: " + ex.GetType().Name + ": " + ex.Message);
+            }
         }
     }
 }

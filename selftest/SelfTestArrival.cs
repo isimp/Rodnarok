@@ -13,8 +13,9 @@ namespace Rodnarok
     /// character, and the school the bait draws must come, match the bait and the world's group
     /// size, wear its stars as the game sizes them, have one of it take the bait, scatter when
     /// that one is hooked, and leave once the float is gone, while no fish of the world's own is
-    /// taken away. Needs a character holding a fishing rod beside water at least 3.5 m deep; the
-    /// float, the hook and everything the school was are taken away again.
+    /// taken away. Needs a character beside water at least 3.5 m deep. A fishing rod is put in
+    /// its hands for the run (<see cref="SelfTestGear"/>) and its gear put back after; the float,
+    /// the hook and everything the school was are taken away again.
     /// </summary>
     internal static class SelfTestArrival
     {
@@ -77,9 +78,6 @@ namespace Rodnarok
         private static IEnumerable SchoolComesAndGoes(ScenarioCheck check)
         {
             var player = Player.m_localPlayer;
-            var rod = player.GetCurrentWeapon();
-            check.That(rod?.m_dropPrefab != null && rod.m_dropPrefab.name == "FishingRod", "the character holds a fishing rod (equip one, then run again); in hand: " + (rod?.m_dropPrefab != null ? rod.m_dropPrefab.name : rod?.m_shared.m_name ?? "nothing"));
-            if (rod?.m_dropPrefab == null || rod.m_dropPrefab.name != "FishingRod") yield break;
             var spot = DeepWaterBeside(player.transform.position, 3.5f);
             check.That(spot.HasValue, "water at least 3.5 m deep within 6 to 14 m of the character (stand at a deep shore or on a dock)");
             if (!spot.HasValue) yield break;
@@ -90,10 +88,23 @@ namespace Rodnarok
             check.That(floatPrefab != null && baitPrefab != null, "the float and the bait prefabs are there");
             if (floatPrefab == null || baitPrefab == null) yield break;
 
-            Schools.RulesForTest = Settings.Rules.With(waitMin: 1f, waitMax: 1f, schools: true, leaveSeconds: 2f);
+            // The game's float stays only while its caster holds a rod, so one is put in hand and everything put back after.
+            var gear = SelfTestGear.RodInHand(player);
             FishingFloat ff = null;
             try
             {
+                check.That(gear.Rod != null, "a fishing rod is in hand: " + gear.Trouble);
+                if (gear.Rod == null) yield break;
+                var tipShown = false;
+                for (var waited = 0f; waited < 3f && !tipShown; waited += Time.deltaTime)
+                {
+                    tipShown = Utils.FindChild(player.transform, "_RodTop") != null;
+                    yield return null;
+                }
+                check.That(tipShown, "the rod in hand shows its tip within 3 s");
+                if (!tipShown) yield break;
+
+                Schools.RulesForTest = Settings.Rules.With(waitMin: 1f, waitMax: 1f, schools: true, leaveSeconds: 2f);
                 var bait = baitPrefab.GetComponent<ItemDrop>().m_itemData.Clone();
                 bait.m_dropPrefab = baitPrefab;
                 var go = UnityEngine.Object.Instantiate(floatPrefab, spot.Value, Quaternion.identity);
@@ -175,6 +186,7 @@ namespace Rodnarok
             {
                 Schools.RulesForTest = null;
                 if (ff != null) ZNetScene.instance.Destroy(ff.gameObject);
+                gear.PutBack();
             }
         }
 

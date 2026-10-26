@@ -95,6 +95,51 @@ namespace Rodnarok.Tests
             Assert.Contains(log, l => l.StartsWith("STOPPED", StringComparison.Ordinal));
         }
 
+        [Fact]
+        public void AStoppedScenarioStillPutsBackWhatItChanged()
+        {
+            var putBack = false;
+            var runner = new ScenarioRunner(new[] { new Scenario("ChangesGear", check => Restoring(100, () => putBack = true)) }, _ => { });
+            runner.Step();
+            runner.Step();
+            runner.Stop();
+            Assert.True(putBack);
+        }
+
+        [Fact]
+        public void AScenarioThatEndsEarlyStillPutsBackWhatItChanged()
+        {
+            var putBack = false;
+            var runner = new ScenarioRunner(new[] { new Scenario("GivesUp", check => GivingUp(() => putBack = true)) }, _ => { });
+            RunOut(runner);
+            Assert.True(putBack);
+        }
+
+        private static IEnumerable Restoring(int frames, Action putBack)
+        {
+            try
+            {
+                for (var i = 0; i < frames; i++) yield return null;
+            }
+            finally
+            {
+                putBack();
+            }
+        }
+
+        private static IEnumerable GivingUp(Action putBack)
+        {
+            try
+            {
+                yield return null;
+                yield break;
+            }
+            finally
+            {
+                putBack();
+            }
+        }
+
         private static IEnumerable Frames(int count, Action each)
         {
             for (var i = 0; i < count; i++)
