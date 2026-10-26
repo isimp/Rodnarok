@@ -39,6 +39,11 @@ namespace Rodnarok
             var view = View(fish);
             if (view == null || !view.IsValid()) return;
             var zdo = view.GetZDO();
+
+            // The game saves a struggle's length as a decimal number but its end as a whole 0, which is
+            // kept apart, so the decimal stays and every game, the game's own splashes included, goes on
+            // reading a struggle. The game owning the fish saves the end as a decimal too.
+            if (view.IsOwner() && !fish.IsEscaping() && zdo.GetFloat(ZDOVars.s_escape) > 0f) zdo.Set(ZDOVars.s_escape, 0f);
             if (zdo.GetInt(ZDOVars.s_hooked) != 1 || zdo.GetFloat(ZDOVars.s_escape) <= 0f || fish.IsOutOfWater())
             {
                 NextSplash.Remove(fish);

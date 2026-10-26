@@ -44,6 +44,7 @@ namespace Rodnarok
             toWater.y = 0f;
             var facing = Quaternion.LookRotation(toWater.sqrMagnitude < 0.01f ? player.transform.forward : toWater.normalized);
             var gear = SelfTestGear.RodInHand(player);
+            var standing = HeadHeight(player);
             GameObject chair = null;
             try
             {
@@ -59,10 +60,12 @@ namespace Rodnarok
                 yield return null;
                 var used = seat.Interact(player, false, false);
                 for (var waited = 0f; waited < 1.5f; waited += Time.deltaTime) yield return null;
-                check.That(player.IsAttached() && player.IsSitting(), "the character sits on the chair in the sitting pose; used: " + used + ", attached: " + player.IsAttached() + ", sitting pose: " + player.IsSitting());
+                check.That(player.IsAttached() && Seated(player, standing), "the character sits on the chair, its head lowered as seated; used: " + used + ", attached: " + player.IsAttached() + ", head " + Heads(player, standing));
+                Picture(check, "sitting-chair-seated");
+                yield return null;
                 if (player.IsAttached())
                 {
-                    foreach (var step in CastAndReel(check, player, water.Value, "chair", () => player.IsAttached(), () => player.IsSitting())) yield return step;
+                    foreach (var step in CastAndReel(check, player, water.Value, "chair", () => player.IsAttached(), () => Seated(player, standing), () => Heads(player, standing))) yield return step;
                 }
                 player.AttachStop();
                 ZNetScene.instance.Destroy(chair);
@@ -74,10 +77,12 @@ namespace Rodnarok
                 yield return null;
                 var sat = player.StartEmote("sit", oneshot: false);
                 for (var waited = 0f; waited < 1.5f; waited += Time.deltaTime) yield return null;
-                check.That(SeatedFishing.SitsOnTheGround(player) && EmotePose(player), "the character sits on the ground in the sit emote's pose; emote started: " + sat + ", in the sit emote: " + SeatedFishing.SitsOnTheGround(player) + ", emote pose: " + EmotePose(player));
+                check.That(SeatedFishing.SitsOnTheGround(player) && Seated(player, standing), "the character sits on the ground, its head lowered as seated; emote started: " + sat + ", in the sit emote: " + SeatedFishing.SitsOnTheGround(player) + ", head " + Heads(player, standing));
+                Picture(check, "sitting-ground-seated");
+                yield return null;
                 if (SeatedFishing.SitsOnTheGround(player))
                 {
-                    foreach (var step in CastAndReel(check, player, water.Value, "ground", () => SeatedFishing.SitsOnTheGround(player), () => EmotePose(player))) yield return step;
+                    foreach (var step in CastAndReel(check, player, water.Value, "ground", () => SeatedFishing.SitsOnTheGround(player), () => Seated(player, standing), () => Heads(player, standing))) yield return step;
                 }
             }
             finally
@@ -99,7 +104,7 @@ namespace Rodnarok
         }
 
         /// <summary>Draws a cast toward the water, casts, and reels in, checking the character stays seated throughout.</summary>
-        private static IEnumerable<object> CastAndReel(ScenarioCheck check, Player player, Vector3 water, string seat, System.Func<bool> seated, System.Func<bool> posed)
+        private static IEnumerable<object> CastAndReel(ScenarioCheck check, Player player, Vector3 water, string seat, System.Func<bool> seated, System.Func<bool> posed, System.Func<string> heads)
         {
             foreach (var ff in OwnFloats()) ZNetScene.instance.Destroy(ff.gameObject);
             var look = water + Vector3.up * 3f - player.GetEyePoint();
@@ -112,16 +117,19 @@ namespace Rodnarok
             var drew = false;
             var pictured = false;
             var stayed = true;
+            var lowered = true;
             for (var waited = 0f; waited < 1.5f; waited += Time.deltaTime)
             {
                 drew |= player.IsDrawingBow();
                 stayed &= seated();
+                if (waited >= 0.5f) lowered &= posed();
                 if (waited >= 1f && !pictured) pictured = Picture(check, "sitting-" + seat + "-drawing");
                 yield return null;
             }
             SelfTestDraw.Drawing = false;
             check.That(drew, "sitting on the " + seat + ", the rod draws");
             check.That(stayed, "the character stayed seated on the " + seat + " while drawing");
+            check.That(lowered, "drawing on the " + seat + ", the character's head stays lowered as seated; at the end " + heads());
 
             FishingFloat cast = null;
             for (var waited = 0f; waited < 3f && cast == null; waited += Time.deltaTime)
@@ -132,7 +140,7 @@ namespace Rodnarok
             check.That(cast != null, "sitting on the " + seat + ", the rod casts");
             check.That(seated(), "the character is still seated on the " + seat + " after the cast");
             for (var waited = 0f; waited < 1.5f; waited += Time.deltaTime) yield return null;
-            check.That(posed(), "a moment after the cast the character is back in the seated pose on the " + seat);
+            check.That(posed(), "a moment after the cast the character's head is lowered as seated on the " + seat + ", " + heads());
             Picture(check, "sitting-" + seat + "-cast");
             yield return null;
             if (cast == null) yield break;
@@ -153,14 +161,24 @@ namespace Rodnarok
             yield return null;
         }
 
-        /// <summary>
-        /// Whether the character shows an emote's pose. The game marks a chair's pose as sitting and
-        /// the sit emote's as an emote, so sitting on the ground is seen here.
-        /// </summary>
-        private static bool EmotePose(Player player) => CurrentPose != null && (int)CurrentPose.Invoke(player, null) == EmoteTag;
+        /// <summary>How much lower than standing the head must be for the character to be seen seated, in metres.</summary>
+        private const float SeatedDrop = 0.3f;
 
-        private static readonly System.Reflection.MethodInfo CurrentPose = AccessTools.Method(typeof(Character), "GetCurrentAnimHash");
-        private static readonly int EmoteTag = ZSyncAnimation.GetHash("emote");
+        /// <summary>
+        /// How high the character's head is above the ground beneath it. The game's own pose labels
+        /// say seated while a held rod stands the body up, so a seat is judged by what is seen: the
+        /// head lowered.
+        /// </summary>
+        private static float HeadHeight(Player player)
+        {
+            var head = player.GetHeadPoint();
+            return ZoneSystem.instance.GetSolidHeight(head, out var ground) ? head.y - ground : head.y - player.transform.position.y;
+        }
+
+        private static bool Seated(Player player, float standing) => HeadHeight(player) < standing - SeatedDrop;
+
+        private static string Heads(Player player, float standing) =>
+            HeadHeight(player).ToString("0.00", CultureInfo.InvariantCulture) + " m up, standing " + standing.ToString("0.00", CultureInfo.InvariantCulture) + " m";
 
         /// <summary>Stands the character at a place, as if it had walked there.</summary>
         private static void MoveTo(Player player, Vector3 place)
