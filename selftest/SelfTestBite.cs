@@ -29,18 +29,23 @@ namespace Rodnarok
         private static readonly System.Reflection.MethodInfo TryToHook = AccessTools.Method(typeof(FishingFloat), "TryToHook");
         private static readonly System.Reflection.MethodInfo SetCatch = AccessTools.Method(typeof(FishingFloat), "SetCatch");
 
-        private static bool RingShown() => Hud.instance != null && Hud.instance.m_crosshairBow.gameObject.activeSelf;
+        private static UnityEngine.UI.Image Ring => CrosshairRing.ImageForTest;
 
-        /// <summary>Whether the ring shows a struggle (wide and red) or a rest (small and yellow).</summary>
+        private static bool RingShown() => Ring != null && Ring.gameObject.activeSelf;
+
+        /// <summary>Whether the ring shows a struggle (whole and red) or a rest (whole and yellow), at its one size.</summary>
         private static bool RingIs(bool red)
         {
             if (!RingShown()) return false;
-            var ring = Hud.instance.m_crosshairBow;
-            var scale = ring.transform.localScale.x;
-            return red
-                ? ring.color.r > 0.8f && ring.color.g < 0.4f && scale > 0.6f
-                : ring.color.r > 0.9f && ring.color.g > 0.8f && ring.color.b < 0.1f && scale < 0.4f;
+            var ring = Ring;
+            var whole = ring.fillAmount > 0.99f && Mathf.Abs(ring.transform.localScale.x - RingSize) < 0.01f;
+            return whole && (red
+                ? ring.color.r > 0.8f && ring.color.g < 0.4f
+                : ring.color.r > 0.9f && ring.color.g > 0.8f && ring.color.b < 0.1f);
         }
+
+        /// <summary>The ring's one size, as the ring is drawn the moment after a bite.</summary>
+        private static float RingSize = -1f;
 
         /// <summary>Takes a picture of the screen for looking at; notes why when none can be taken.</summary>
         private static bool Picture(ScenarioCheck check, string what)
@@ -108,6 +113,7 @@ namespace Rodnarok
                 var late = 0f;
                 Color? ringEarly = null;
                 var scaleEarly = 0f;
+                var fillEarly = 0f;
                 var pictured = false;
                 for (var waited = 0f; waited < 1f; waited += Time.deltaTime)
                 {
@@ -116,8 +122,10 @@ namespace Rodnarok
                     if (waited >= 0.8f && late == 0f) late = under;
                     if (waited >= 0.1f && ringEarly == null && RingShown())
                     {
-                        ringEarly = Hud.instance.m_crosshairBow.color;
-                        scaleEarly = Hud.instance.m_crosshairBow.transform.localScale.x;
+                        ringEarly = Ring.color;
+                        scaleEarly = Ring.transform.localScale.x;
+                        fillEarly = Ring.fillAmount;
+                        RingSize = scaleEarly;
                     }
                     if (waited >= 0.3f && !pictured)
                     {
@@ -131,9 +139,11 @@ namespace Rodnarok
                 check.That(ringEarly != null, "the crosshair ring showed right after the bite");
                 if (ringEarly != null)
                 {
-                    var now = Hud.instance.m_crosshairBow;
-                    check.That(ringEarly.Value.b > 0.6f && scaleEarly > 0.75f, "right after the bite the ring is wide and white, scale " + scaleEarly.ToString("0.00", CultureInfo.InvariantCulture) + ", blue " + ringEarly.Value.b.ToString("0.00", CultureInfo.InvariantCulture));
-                    check.That(RingShown() && now.transform.localScale.x < scaleEarly - 0.2f && now.color.b < ringEarly.Value.b - 0.2f, "a second after the bite the ring is smaller and yellower, scale " + now.transform.localScale.x.ToString("0.00", CultureInfo.InvariantCulture) + ", blue " + now.color.b.ToString("0.00", CultureInfo.InvariantCulture));
+                    var now = Ring;
+                    check.That(ringEarly.Value.b > 0.6f && fillEarly > 0.8f, "right after the bite the ring's arc is near full and white, arc " + fillEarly.ToString("0.00", CultureInfo.InvariantCulture) + ", blue " + ringEarly.Value.b.ToString("0.00", CultureInfo.InvariantCulture));
+                    check.That(RingShown() && now.fillAmount < fillEarly - 0.4f && now.color.b < ringEarly.Value.b - 0.2f, "a second after the bite the arc has drained and turned yellower, arc " + now.fillAmount.ToString("0.00", CultureInfo.InvariantCulture) + ", blue " + now.color.b.ToString("0.00", CultureInfo.InvariantCulture));
+                    check.That(Mathf.Abs(now.transform.localScale.x - scaleEarly) < 0.01f, "the ring keeps its size while the arc drains, " + scaleEarly.ToString("0.00", CultureInfo.InvariantCulture) + " then " + now.transform.localScale.x.ToString("0.00", CultureInfo.InvariantCulture));
+                    check.That(!Hud.instance.m_crosshairBow.gameObject.activeSelf || Hud.instance.m_crosshairBow.color.a < 0.05f, "the game's bow ring is not shown beside it");
                 }
 
                 // Reeling after the hook window hooks nothing; within it, past the game's half second, it hooks.
@@ -201,7 +211,7 @@ namespace Rodnarok
                 if (restTime > 0.5f) check.That(restSplashes == 0, "a resting fish splashes no more than the game has it, " + restSplashes.ToString(CultureInfo.InvariantCulture) + " extra splashes at rest");
                 if (struggleTime > 0.5f)
                     check.That(splashes / struggleTime >= 2f, "a struggling fish splashes at least twice a second, " + (splashes / struggleTime).ToString("0.0", CultureInfo.InvariantCulture) + " a second");
-                check.That(ringWrong <= 2, ringWrong.ToString(CultureInfo.InvariantCulture) + " frames of the fight showed the ring wrong: a struggle draws it wide and red, a rest small and yellow");
+                check.That(ringWrong <= 2, ringWrong.ToString(CultureInfo.InvariantCulture) + " frames of the fight showed the ring wrong: a struggle draws the whole ring red, a rest yellow, both at the bite's size");
                 check.That(struggleTime >= 0.5f, "the fish struggled at least half a second while the line was held, " + struggleTime.ToString("0.0", CultureInfo.InvariantCulture) + " s");
                 if (struggleTime > 0f)
                 {

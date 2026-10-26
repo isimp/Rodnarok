@@ -16,7 +16,7 @@ namespace Rodnarok
     {
         /// <summary>How far under the surface a struggling fish is held, its back just breaking the water, and how hard it is pushed up.</summary>
         private const float UnderSurface = 0.05f;
-        private const float PushUp = 15f;
+        private const float PushUp = 30f;
 
         /// <summary>Seconds between a struggling fish's splashes, varied a little.</summary>
         private const float SplashEveryMin = 0.25f;
@@ -44,20 +44,18 @@ namespace Rodnarok
             // kept apart, so the decimal stays and every game, the game's own splashes included, goes on
             // reading a struggle. The game owning the fish saves the end as a decimal too.
             if (view.IsOwner() && !fish.IsEscaping() && zdo.GetFloat(ZDOVars.s_escape) > 0f) zdo.Set(ZDOVars.s_escape, 0f);
-            if (zdo.GetInt(ZDOVars.s_hooked) != 1 || zdo.GetFloat(ZDOVars.s_escape) <= 0f || fish.IsOutOfWater())
+            if (zdo.GetInt(ZDOVars.s_hooked) != 1 || zdo.GetFloat(ZDOVars.s_escape) <= 0f)
             {
                 NextSplash.Remove(fish);
                 return;
             }
 
+            // A struggle splashes the moment it starts, then again and again, its back breaking the water or not.
             var now = Time.time;
             if (!NextSplash.TryGetValue(fish, out var at) || now >= at)
             {
-                if (NextSplash.ContainsKey(fish))
-                {
-                    fish.m_jumpEffects.Create(fish.transform.position, Quaternion.identity, fish.transform);
-                    SplashesForTest++;
-                }
+                fish.m_jumpEffects.Create(fish.transform.position, Quaternion.identity, fish.transform);
+                SplashesForTest++;
                 NextSplash[fish] = now + Random.Range(SplashEveryMin, SplashEveryMax);
             }
 

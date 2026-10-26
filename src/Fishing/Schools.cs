@@ -238,9 +238,10 @@ namespace Rodnarok
         /// Takes away at once any of the schools' fish this game owns that lies on land: out of the
         /// water and not on a line, with the ground right beneath it, or never in the water at all a
         /// while after it was made. A leaping fish is out of the water too, but above water, and the
-        /// game ends a leap on touching anything, the float or another fish included, so the ground
-        /// beneath tells land from a leap. The game lets a fish out of the water be picked up, and
-        /// the schools' fish are drawn by the bait, not won from the water.
+        /// game ends a leap on touching anything, the float or another fish included, so what lies
+        /// beneath tells land from a leap: dry ground, however high a fish flops above it. The game
+        /// lets a fish out of the water be picked up, and the schools' fish are drawn by the bait,
+        /// not won from the water.
         /// </summary>
         private static void KeepOffLand()
         {
@@ -255,7 +256,7 @@ namespace Rodnarok
                 }
                 if (fish.IsHooked()) continue;
                 var stuck = !WetOnce.Contains(fish) && MadeAt.TryGetValue(fish, out var made) && Time.time - made >= FirstWetGrace;
-                if (!stuck && !OnGround(fish)) continue;
+                if (!stuck && !OverDryGround(fish)) continue;
                 var view = fish.GetComponent<ZNetView>();
                 if (view == null || !view.IsValid() || !view.IsOwner()) continue;
                 LandedForTest++;
@@ -423,14 +424,14 @@ namespace Rodnarok
             LeaptAt.Remove(fish);
         }
 
-        /// <summary>How near the ground beneath a fish must be for it to lie on land, in metres.</summary>
-        private const float GroundBeneath = 0.6f;
+        /// <summary>How far under the water the ground beneath a fish may lie and still count as the shore, in metres.</summary>
+        private const float ShoreDepth = 0.3f;
 
-        /// <summary>Whether the ground lies right beneath a fish, which is so on land and never in the air of a leap over water.</summary>
-        private static bool OnGround(Fish fish)
+        /// <summary>Whether the ground beneath a fish is dry land or the shore's edge, which is so for a fish on land however it flops, and never for one leaping over water.</summary>
+        private static bool OverDryGround(Fish fish)
         {
             var p = fish.transform.position;
-            return ZoneSystem.instance.GetSolidHeight(p, out var ground) && p.y - ground <= GroundBeneath;
+            return ZoneSystem.instance.GetSolidHeight(p, out var ground) && ground >= ZoneSystem.instance.m_waterLevel - ShoreDepth;
         }
 
         /// <summary>What a fish was doing, as far as the schools know: for telling how one came to land.</summary>
