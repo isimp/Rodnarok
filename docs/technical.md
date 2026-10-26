@@ -24,9 +24,15 @@ Holding the line while the fish rests reels it in at the game's speed and cost. 
 
 The calm-water piece lowers the waves through the corner values the game keeps for each 64 m water tile. The game shapes the waves of what floats and draws the water from the same four values, so both stay calm together, and a corner is lowered by where it is alone, so two tiles meeting at it always agree and no seam shows (`CalmWater`). The calmed area follows the tiles' corners and fades across a tile.
 
+## How the arrival works
+
+When a float the player's own game cast lies in the water, the wait is rolled (`Schools`). When it is over, the school appears up to 14 m out, where the water is deep enough for the fish there, halfway and at the float, and the float is made its home: each fish circles it within 4 m, picking a new place to swim every 1.5 to 3 seconds, near the top of the depth it swims at. Its stars and size come from the game's own level-up roll for that fish beside the float. A fish of a quality the game lets leap (`m_jumpMaxLevel`) leaps a few times on its way in. Once half the school is near the float, or 20 seconds have passed, one fish is picked and let go for the bait a couple of seconds later; from there the game's own nibble and bite follow. No other fish of the school goes for any float. When the picked fish is hooked, the rest make a place 30 m away their home and swim there at the game's flee speed. When the float is gone, all of them do, and they are taken away after `LeaveSeconds`.
+
+A school is steered by the game that spawned it. Should another player's game take a fish over, as happens when the one fishing walks far off, it swims as the game would swim it around the float; any game owning a marked fish whose float is gone takes it away. A cave fish, which the world never spawns in groups, rolls its stars by the world's general rule.
+
 ## Limits
 
-A fish needs water as deep as its own swimming depth: the Tuna swims no shallower than 4 m. The Frosty bait is made from a Drake trophy, so the Northern Salmon is open from the Mountain on. Fish that come to a float belong to the game of the player fishing, and others see them as ordinary fish.
+A fish needs water as deep as its own swimming depth: the Tuna swims no shallower than 4 m, and no school comes where the water by the float is shallower than its fish swim. The Frosty bait is made from a Drake trophy, so the Northern Salmon is open from the Mountain on. Fish that come to a float belong to the game of the player fishing, and others see them as ordinary fish.
 
 ## Settings
 

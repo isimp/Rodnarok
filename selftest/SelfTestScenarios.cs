@@ -21,6 +21,7 @@ namespace Rodnarok
             yield return new Scenario("EveryFishOfTheGameComesToABaitTheRodCasts", EveryFishComesToABait);
             yield return new Scenario("TheFishingFloatReelsAsTheRulesAssume", FloatAsTheRulesAssume);
             yield return new Scenario("WaterTilesBlendTheirCornersInTheModelsOrder", WaterCornersInOrder);
+            foreach (var scenario in SelfTestArrival.All()) yield return scenario;
         }
 
         /// <summary>Every fish prefab takes some bait, the bait table built from them reaches every one, and each bait is ammunition the fishing rod casts.</summary>

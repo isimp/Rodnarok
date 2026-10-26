@@ -54,9 +54,11 @@ namespace Rodnarok
             float? calmReach = null,
             float? calmKeep = null,
             bool? schools = null,
-            bool? bumps = null)
+            bool? bumps = null,
+            float? leaveSeconds = null)
         {
             var copy = (FishingRules)MemberwiseClone();
+            copy.LeaveSeconds = leaveSeconds ?? LeaveSeconds;
             copy.Schools = schools ?? Schools;
             copy.Bumps = bumps ?? Bumps;
             copy.HookWindow = hookWindow ?? HookWindow;
