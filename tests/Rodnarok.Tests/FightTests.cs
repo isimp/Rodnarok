@@ -69,6 +69,23 @@ namespace Rodnarok.Tests
             Assert.Equal(0f, Fight.Hold(struggling: true, seconds: 1f, skill: 0f, Salmon, rules).Stamina);
         }
 
+        [Theory]
+        [InlineData(1)]
+        [InlineData(3)]
+        [InlineData(5)]
+        public void TheGamesReelCostDuringAStruggleComesOutAsTheStallCostWhateverTheQuality(int quality)
+        {
+            // The game charges the fish's stamina figure times its quality; Rodnarok hands it a figure for which that is the stall cost.
+            var rules = FishingRules.Default;
+            Assert.Equal(rules.StallStaminaPerSecond, Fight.StaminaFigureWhileStruggling(rules, quality) * quality, 4);
+        }
+
+        [Fact]
+        public void AFishOfNoQualityCountsAsQualityOne()
+        {
+            Assert.Equal(FishingRules.Default.StallStaminaPerSecond, Fight.StaminaFigureWhileStruggling(FishingRules.Default, 0), 4);
+        }
+
         [Fact]
         public void AStepScalesWithItsLength()
         {

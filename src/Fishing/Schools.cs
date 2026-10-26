@@ -74,11 +74,7 @@ namespace Rodnarok
         [ForTest]
         public static int LandedForTest { get; private set; }
 
-        /// <summary>Rules the self-test sets for its run in place of the settings.</summary>
-        [ForTest]
-        public static FishingRules RulesForTest { get; set; }
-
-        private static FishingRules Rules => RulesForTest ?? Settings.Rules;
+        private static FishingRules Rules => PlayRules.Now;
 
         /// <summary>Whether this game steers a fish as one of a school.</summary>
         public static bool IsOurs(Fish fish) => fish != null && Ours.Contains(fish);

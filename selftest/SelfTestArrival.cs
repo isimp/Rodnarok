@@ -105,7 +105,7 @@ namespace Rodnarok
                 check.That(tipShown, "the rod in hand shows its tip within 3 s");
                 if (!tipShown) yield break;
 
-                Schools.RulesForTest = Settings.Rules.With(waitMin: 1f, waitMax: 1f, schools: true, leaveSeconds: 2f);
+                PlayRules.ForTest = Settings.Rules.With(waitMin: 1f, waitMax: 1f, schools: true, leaveSeconds: 2f);
                 var bait = baitPrefab.GetComponent<ItemDrop>().m_itemData.Clone();
                 bait.m_dropPrefab = baitPrefab;
                 var go = UnityEngine.Object.Instantiate(floatPrefab, spot.Value, Quaternion.identity);
@@ -207,7 +207,7 @@ namespace Rodnarok
             }
             finally
             {
-                Schools.RulesForTest = null;
+                PlayRules.ForTest = null;
                 if (ff != null) ZNetScene.instance.Destroy(ff.gameObject);
                 gear.PutBack();
             }
@@ -235,7 +235,7 @@ namespace Rodnarok
         private static float Across(Vector3 a, Vector3 b) => Vector2.Distance(new Vector2(a.x, a.z), new Vector2(b.x, b.z));
 
         /// <summary>A place on the water 6 to 14 m from the character where the water is at least this deep.</summary>
-        private static Vector3? DeepWaterBeside(Vector3 from, float depth)
+        internal static Vector3? DeepWaterBeside(Vector3 from, float depth)
         {
             var water = ZoneSystem.instance.m_waterLevel;
             for (var distance = 6f; distance <= 14f; distance += 2f)

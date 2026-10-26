@@ -46,6 +46,12 @@ namespace Rodnarok
             return new ReelStep(speed * seconds, fish.RestStamina * fish.Quality * cheaper * seconds);
         }
 
+        /// <summary>
+        /// The stamina figure a struggling fish gives the game, which charges that figure times the
+        /// fish's quality a second (then lowers it with skill), so that the charge is the stall cost.
+        /// </summary>
+        public static float StaminaFigureWhileStruggling(FishingRules rules, int quality) => rules.StallStaminaPerSecond / System.Math.Max(1, quality);
+
         private static float Lerp(float from, float to, float t)
         {
             if (t < 0f) t = 0f;
