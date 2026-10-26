@@ -22,7 +22,9 @@ A bite needs the fish within reach of the hook through all three axes (`Bite`): 
 
 Holding the line while the fish rests reels it in at the game's speed and cost. A struggling fish shows it at the surface (`Thrash`): the game wiggles it and now and then splashes with it, mostly unseen under the water; Rodnarök holds it just under the surface and draws the game's splash for it about three times a second, on every player's screen, and lets it sink back when it rests. While it struggles the line stalls: no line is gained, and it costs the `StallStamina` setting a second, the same for every fish, lowered by Fishing skill as reeling is (`Fight`).
 
-The calm-water piece lowers the waves through the corner values the game keeps for each 64 m water tile. The game shapes the waves of what floats and draws the water from the same four values, so both stay calm together, and a corner is lowered by where it is alone, so two tiles meeting at it always agree and no seam shows (`CalmWater`). The calmed area follows the tiles' corners and fades across a tile.
+The calm-water piece is the serpent post (`SerpentPost`): the game's darkwood pole with a Serpent trophy's head on top, built with the hammer for the pole's own cost and a Serpent trophy, which it gives back when taken down. It is made from the game's own prefabs as a world starts and given to the prefab list and the hammer; a building ghost calms nothing. Its name is plain text, since the game takes new words only through a private table it clears on a language change. A dedicated server runs no patches and does not know the post as a prefab; the post is kept there as saved data like any piece.
+
+The post lowers the waves through the corner values the game keeps for each 64 m water tile. The game shapes the waves of what floats and draws the water from the same four values, so both stay calm together, and a corner is lowered by where it is alone, so two tiles meeting at it always agree and no seam shows (`CalmWater`). The calmed area follows the tiles' corners and fades across a tile.
 
 ## How the arrival works
 
