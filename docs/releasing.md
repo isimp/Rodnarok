@@ -59,8 +59,8 @@ For authorization the script tries `Bearer` first and falls back to `Token`, pri
 It can also be run by hand:
 
 ```bash
-HEXIUM_TOKEN=... python3 tools/publish.py dist/hexium/Rodnarok-0.1.0.zip --store hexium --team isimp --categories "Quality of Life,Open Source,Valheim 1.0"
-THUNDERSTORE_TOKEN=... python3 tools/publish.py dist/thunderstore/Rodnarok-0.1.0.zip --store thunderstore --team isimp --categories "ai-generated,mods,client-side,deep-north-update"
+HEXIUM_TOKEN=... python3 tools/publish.py dist/hexium/Rodnarok-0.1.0.zip --store hexium --team isimp --categories "Mechanics,Quality of Life,Pieces,Client & Server,Open Source,Valheim 1.0"
+THUNDERSTORE_TOKEN=... python3 tools/publish.py dist/thunderstore/Rodnarok-0.1.0.zip --store thunderstore --team isimp --categories "ai-generated,mods,tweaks,client-side,server-side,deep-north-update"
 python3 tools/publish.py dist/hexium/Rodnarok-0.1.0.zip --check-only   # validate only
 ```
 
