@@ -62,7 +62,7 @@ namespace Rodnarok
                 check.That(player.IsAttached() && player.IsSitting(), "the character sits on the chair in the sitting pose; used: " + used + ", attached: " + player.IsAttached() + ", sitting pose: " + player.IsSitting());
                 if (player.IsAttached())
                 {
-                    foreach (var step in CastAndReel(check, player, water.Value, "chair", () => player.IsAttached())) yield return step;
+                    foreach (var step in CastAndReel(check, player, water.Value, "chair", () => player.IsAttached(), () => player.IsSitting())) yield return step;
                 }
                 player.AttachStop();
                 ZNetScene.instance.Destroy(chair);
@@ -74,10 +74,10 @@ namespace Rodnarok
                 yield return null;
                 var sat = player.StartEmote("sit", oneshot: false);
                 for (var waited = 0f; waited < 1.5f; waited += Time.deltaTime) yield return null;
-                check.That(SeatedFishing.SitsOnTheGround(player) && player.IsSitting(), "the character sits on the ground in the sitting pose; emote started: " + sat + ", in the sit emote: " + SeatedFishing.SitsOnTheGround(player) + ", sitting pose: " + player.IsSitting());
+                check.That(SeatedFishing.SitsOnTheGround(player) && EmotePose(player), "the character sits on the ground in the sit emote's pose; emote started: " + sat + ", in the sit emote: " + SeatedFishing.SitsOnTheGround(player) + ", emote pose: " + EmotePose(player));
                 if (SeatedFishing.SitsOnTheGround(player))
                 {
-                    foreach (var step in CastAndReel(check, player, water.Value, "ground", () => SeatedFishing.SitsOnTheGround(player))) yield return step;
+                    foreach (var step in CastAndReel(check, player, water.Value, "ground", () => SeatedFishing.SitsOnTheGround(player), () => EmotePose(player))) yield return step;
                 }
             }
             finally
@@ -99,7 +99,7 @@ namespace Rodnarok
         }
 
         /// <summary>Draws a cast toward the water, casts, and reels in, checking the character stays seated throughout.</summary>
-        private static IEnumerable<object> CastAndReel(ScenarioCheck check, Player player, Vector3 water, string seat, System.Func<bool> seated)
+        private static IEnumerable<object> CastAndReel(ScenarioCheck check, Player player, Vector3 water, string seat, System.Func<bool> seated, System.Func<bool> posed)
         {
             foreach (var ff in OwnFloats()) ZNetScene.instance.Destroy(ff.gameObject);
             var look = water + Vector3.up * 3f - player.GetEyePoint();
@@ -132,7 +132,7 @@ namespace Rodnarok
             check.That(cast != null, "sitting on the " + seat + ", the rod casts");
             check.That(seated(), "the character is still seated on the " + seat + " after the cast");
             for (var waited = 0f; waited < 1.5f; waited += Time.deltaTime) yield return null;
-            check.That(player.IsSitting(), "a moment after the cast the character is back in the sitting pose on the " + seat);
+            check.That(posed(), "a moment after the cast the character is back in the seated pose on the " + seat);
             Picture(check, "sitting-" + seat + "-cast");
             yield return null;
             if (cast == null) yield break;
@@ -152,6 +152,15 @@ namespace Rodnarok
             if (cast != null) ZNetScene.instance.Destroy(cast.gameObject);
             yield return null;
         }
+
+        /// <summary>
+        /// Whether the character shows an emote's pose. The game marks a chair's pose as sitting and
+        /// the sit emote's as an emote, so sitting on the ground is seen here.
+        /// </summary>
+        private static bool EmotePose(Player player) => CurrentPose != null && (int)CurrentPose.Invoke(player, null) == EmoteTag;
+
+        private static readonly System.Reflection.MethodInfo CurrentPose = AccessTools.Method(typeof(Character), "GetCurrentAnimHash");
+        private static readonly int EmoteTag = ZSyncAnimation.GetHash("emote");
 
         /// <summary>Stands the character at a place, as if it had walked there.</summary>
         private static void MoveTo(Player player, Vector3 place)

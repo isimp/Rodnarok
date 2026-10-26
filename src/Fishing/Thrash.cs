@@ -7,10 +7,10 @@ namespace Rodnarok
     /// <summary>
     /// A hooked fish shows its struggle at the surface. The game already wiggles a struggling fish
     /// and now and then splashes with it, mostly unseen under the water. While it struggles, the
-    /// game that owns it pushes it up until its back breaks the surface, and every game draws its splash
-    /// about three times a second; while it rests it sinks back and splashes no more than the game
-    /// has it. The struggle is read from the fish's saved state, as the game reads it, so every
-    /// player sees it.
+    /// game that owns it pushes it up until its back breaks the surface, and every game draws its
+    /// splash about three times a second; while it rests it splashes no more than the game has it.
+    /// The struggle is read from the fish's saved state, as the game reads it, so every player
+    /// sees it.
     /// </summary>
     internal static class Thrash
     {

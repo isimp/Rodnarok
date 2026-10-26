@@ -74,6 +74,13 @@ namespace Rodnarok
         [ForTest]
         public static int LandedForTest { get; private set; }
 
+        /// <summary>What the last fish found on land was doing, for the self-test.</summary>
+        [ForTest]
+        public static string LastLandingForTest { get; private set; } = "";
+
+        /// <summary>When each fish last leapt.</summary>
+        private static readonly Dictionary<Fish, float> LeaptAt = new Dictionary<Fish, float>();
+
         private static FishingRules Rules => PlayRules.Now;
 
         /// <summary>Whether this game steers a fish as one of a school.</summary>
@@ -249,7 +256,8 @@ namespace Rodnarok
                 var view = fish.GetComponent<ZNetView>();
                 if (view == null || !view.IsValid() || !view.IsOwner()) continue;
                 LandedForTest++;
-                Log.Warning("A " + Utils.GetPrefabName(fish.gameObject) + " of a school lay on land and was taken away.");
+                LastLandingForTest = Doing(fish);
+                Log.Warning("A " + Utils.GetPrefabName(fish.gameObject) + " of a school lay on land and was taken away; " + LastLandingForTest + ".");
                 ZNetScene.instance.Destroy(fish.gameObject);
                 Drop(fish);
             }
@@ -294,6 +302,7 @@ namespace Rodnarok
             if (item != null && item.m_itemData.m_quality > fish.m_jumpMaxLevel) return;
             if (!DeepAhead(fish, home.y)) return;
             Jump(fish);
+            LeaptAt[fish] = Time.time;
         }
 
         /// <summary>Whether the water stays deep enough for the fish all the way a leap could carry it.</summary>
@@ -408,6 +417,21 @@ namespace Rodnarok
             Fled.Remove(fish);
             WetOnce.Remove(fish);
             MadeAt.Remove(fish);
+            LeaptAt.Remove(fish);
+        }
+
+        /// <summary>What a fish was doing, as far as the schools know: for telling how one came to land.</summary>
+        private static string Doing(Fish fish)
+        {
+            var now = Time.time;
+            var parts = new List<string>();
+            parts.Add(GoneSince.ContainsKey(fish) ? "leaving" : Fled.Contains(fish) ? "fleeing" : CastOf.ContainsKey(fish) ? "circling its float" : "found by the sweep");
+            if (CastOf.TryGetValue(fish, out var cast) && cast.Float != null)
+                parts.Add(Across(fish.transform.position, cast.Float.transform.position).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " m from its float");
+            if (LeaptAt.TryGetValue(fish, out var leapt)) parts.Add("leapt " + (now - leapt).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " s before");
+            if (MadeAt.TryGetValue(fish, out var made)) parts.Add("made " + (now - made).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " s before");
+            parts.Add(WetOnce.Contains(fish) ? "had been in the water" : "never in the water");
+            return string.Join(", ", parts);
         }
 
         /// <summary>Lets go of everything on leaving a world; the marks in the save stay, for the sweep of whoever comes next.</summary>
@@ -422,6 +446,7 @@ namespace Rodnarok
             Fled.Clear();
             WetOnce.Clear();
             MadeAt.Clear();
+            LeaptAt.Clear();
         }
 
         private static Vector3 Flat(Vector3 v)

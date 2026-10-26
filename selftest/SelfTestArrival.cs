@@ -171,7 +171,7 @@ namespace Rodnarok
                 biter.OnHooked(null);
 
                 // Coming, circling, biting and scattering, no fish of the school ever reached land.
-                check.That(Schools.LandedForTest == landedBefore, (Schools.LandedForTest - landedBefore).ToString(CultureInfo.InvariantCulture) + " fish of the school reached land on their own");
+                check.That(Schools.LandedForTest == landedBefore, (Schools.LandedForTest - landedBefore).ToString(CultureInfo.InvariantCulture) + " fish of the school reached land on their own, the last " + Schools.LastLandingForTest);
 
                 // One put on land beside the character is taken away before anyone can pick it up.
                 var stray = others.FirstOrDefault(f => f != null);

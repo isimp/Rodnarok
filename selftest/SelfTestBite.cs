@@ -155,7 +155,9 @@ namespace Rodnarok
                 float struggleTime = 0f, struggleStamina = 0f, struggleLine = 0f, restTime = 0f, restLine = 0f;
                 var ringWrong = 0;
                 float struggleDepth = 0f, restDepth = 0f;
+                var splashesThen = Thrash.SplashesForTest;
                 var splashesBefore = Thrash.SplashesForTest;
+                var restSplashes = 0;
                 var picturedStruggle = false;
                 var picturedRest = false;
                 SelfTestHold.Holding = true;
@@ -168,6 +170,8 @@ namespace Rodnarok
                     yield return null;
                     if (ff == null || ff.GetCatch() != fish) break;
                     var depth = WaterLevel(fish) - fish.transform.position.y;
+                    var splashesAtStep = splashesThen;
+                    splashesThen = Thrash.SplashesForTest;
                     if (struggled && fish.IsEscaping())
                     {
                         struggleDepth += depth * Time.deltaTime;
@@ -181,6 +185,7 @@ namespace Rodnarok
                     {
                         restDepth += depth * Time.deltaTime;
                         restTime += Time.deltaTime;
+                        restSplashes += Thrash.SplashesForTest - splashesAtStep;
                         restLine += line - LineLength(ff);
                         if (!RingIs(red: false)) ringWrong++;
                         if (!picturedRest && restTime > 0.3f) picturedRest = Picture(check, "ring-rest");
@@ -188,12 +193,12 @@ namespace Rodnarok
                 }
                 SelfTestHold.Holding = false;
                 var splashes = Thrash.SplashesForTest - splashesBefore;
-                if (struggleTime > 0.5f && restTime > 0.5f)
+                if (struggleTime > 0.5f)
                 {
                     var high = struggleDepth / struggleTime;
-                    var low = restDepth / restTime;
-                    check.That(high < low - 0.3f, "a struggling fish thrashes nearer the surface than a resting one, " + high.ToString("0.00", CultureInfo.InvariantCulture) + " m under against " + low.ToString("0.00", CultureInfo.InvariantCulture) + " m");
+                    check.That(Mathf.Abs(high) < 0.3f, "a struggling fish thrashes at the surface, " + high.ToString("0.00", CultureInfo.InvariantCulture) + " m under it on average");
                 }
+                if (restTime > 0.5f) check.That(restSplashes == 0, "a resting fish splashes no more than the game has it, " + restSplashes.ToString(CultureInfo.InvariantCulture) + " extra splashes at rest");
                 if (struggleTime > 0.5f)
                     check.That(splashes / struggleTime >= 2f, "a struggling fish splashes at least twice a second, " + (splashes / struggleTime).ToString("0.0", CultureInfo.InvariantCulture) + " a second");
                 check.That(ringWrong <= 2, ringWrong.ToString(CultureInfo.InvariantCulture) + " frames of the fight showed the ring wrong: a struggle draws it wide and red, a rest small and yellow");
