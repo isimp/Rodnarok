@@ -24,6 +24,7 @@ namespace Rodnarok
 
         private static readonly AccessTools.FieldRef<Fish, float> WaterLevel = AccessTools.FieldRefAccess<Fish, float>("m_inWater");
         private static readonly AccessTools.FieldRef<Fish, Rigidbody> Body = AccessTools.FieldRefAccess<Fish, Rigidbody>("m_body");
+        private static readonly AccessTools.FieldRef<Fish, Vector3> Waypoint = AccessTools.FieldRefAccess<Fish, Vector3>("m_waypoint");
         private static readonly AccessTools.FieldRef<Fish, ZNetView> View = AccessTools.FieldRefAccess<Fish, ZNetView>("m_nview");
 
         private static readonly Dictionary<Fish, float> NextSplash = new Dictionary<Fish, float>();
@@ -56,7 +57,11 @@ namespace Rodnarok
             }
 
             if (!view.IsOwner()) return;
+            // The game steers the fish toward a place to swim at its own depth each step; while it
+            // struggles that place is lifted to the surface, and it is pushed up on top.
             var target = WaterLevel(fish) - UnderSurface;
+            var waypoint = Waypoint(fish);
+            if (waypoint.y < target) Waypoint(fish) = new Vector3(waypoint.x, target, waypoint.z);
             if (fish.transform.position.y < target) Body(fish).AddForce(Vector3.up * PushUp, ForceMode.Acceleration);
         }
 

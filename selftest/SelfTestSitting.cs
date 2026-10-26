@@ -51,24 +51,30 @@ namespace Rodnarok
                 if (gear.Rod == null) yield break;
                 for (var waited = 0f; waited < 1f; waited += Time.deltaTime) yield return null;
 
-                // On a chair on dry land, sat on as a player sits on one.
+                // On a chair on dry land, sat on as a player sits on one: walked up to, then used.
                 chair = Object.Instantiate(chairPrefab, dry.Value, facing);
                 yield return null;
                 var seat = chair.GetComponentInChildren<Chair>();
-                seat.Interact(player, false, false);
+                MoveTo(player, dry.Value + facing * Vector3.back * 0.6f);
+                yield return null;
+                var used = seat.Interact(player, false, false);
                 for (var waited = 0f; waited < 1.5f; waited += Time.deltaTime) yield return null;
-                check.That(player.IsAttached() && player.IsSitting(), "the character sits on the chair in the sitting pose");
+                check.That(player.IsAttached() && player.IsSitting(), "the character sits on the chair in the sitting pose; used: " + used + ", attached: " + player.IsAttached() + ", sitting pose: " + player.IsSitting());
                 if (player.IsAttached())
                 {
                     foreach (var step in CastAndReel(check, player, water.Value, "chair", () => player.IsAttached())) yield return step;
                 }
                 player.AttachStop();
+                ZNetScene.instance.Destroy(chair);
+                chair = null;
                 for (var waited = 0f; waited < 1f; waited += Time.deltaTime) yield return null;
 
-                // On the ground, with the sit emote.
-                player.StartEmote("sit", oneshot: false);
+                // On dry ground where the chair stood, with the sit emote.
+                MoveTo(player, dry.Value);
+                yield return null;
+                var sat = player.StartEmote("sit", oneshot: false);
                 for (var waited = 0f; waited < 1.5f; waited += Time.deltaTime) yield return null;
-                check.That(SeatedFishing.SitsOnTheGround(player) && player.IsSitting(), "the character sits on the ground in the sitting pose");
+                check.That(SeatedFishing.SitsOnTheGround(player) && player.IsSitting(), "the character sits on the ground in the sitting pose; emote started: " + sat + ", in the sit emote: " + SeatedFishing.SitsOnTheGround(player) + ", sitting pose: " + player.IsSitting());
                 if (SeatedFishing.SitsOnTheGround(player))
                 {
                     foreach (var step in CastAndReel(check, player, water.Value, "ground", () => SeatedFishing.SitsOnTheGround(player))) yield return step;
@@ -86,13 +92,7 @@ namespace Rodnarok
             }
 
             // Back where it stood.
-            player.transform.position = stoodAt;
-            var body = player.GetComponent<Rigidbody>();
-            if (body != null)
-            {
-                body.position = stoodAt;
-                body.linearVelocity = Vector3.zero;
-            }
+            MoveTo(player, stoodAt);
             for (var waited = 0f; waited < 1f; waited += Time.deltaTime) yield return null;
             check.That(!player.IsAttached() && !player.InEmote(), "the character stands again after the run");
             check.That(gear.AsBefore(), "the character's gear and what it knows are as before the run: " + gear.Difference());
@@ -151,6 +151,16 @@ namespace Rodnarok
             check.That(stayed, "the character stayed seated on the " + seat + " while reeling");
             if (cast != null) ZNetScene.instance.Destroy(cast.gameObject);
             yield return null;
+        }
+
+        /// <summary>Stands the character at a place, as if it had walked there.</summary>
+        private static void MoveTo(Player player, Vector3 place)
+        {
+            player.transform.position = place;
+            var body = player.GetComponent<Rigidbody>();
+            if (body == null) return;
+            body.position = place;
+            body.linearVelocity = Vector3.zero;
         }
 
         private static List<FishingFloat> OwnFloats() =>

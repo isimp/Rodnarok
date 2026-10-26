@@ -322,8 +322,7 @@ namespace Rodnarok
         {
             var view = fish.GetComponent<ZNetView>();
             if (view == null || !view.IsValid() || !view.IsOwner()) return;
-            var away = Flat(fish.transform.position - from);
-            var place = fish.transform.position + away * GoTo;
+            var place = OpenWaterAway(fish, Flat(fish.transform.position - from));
             SpawnPoint(fish) = place;
             view.GetZDO().Set(ZDOVars.s_spawnPoint, place);
             fish.m_swimRange = CircleRange * 2f;
@@ -336,6 +335,31 @@ namespace Rodnarok
         }
 
         private static readonly HashSet<Fish> Fled = new HashSet<Fish>();
+
+        /// <summary>
+        /// A place out in open water for a fleeing fish: of the directions around it, the one most
+        /// away from what it flees whose water is deep enough for it there and halfway, so it never
+        /// swims for the shore; straight away when no direction has such water.
+        /// </summary>
+        private static Vector3 OpenWaterAway(Fish fish, Vector3 away)
+        {
+            var from = fish.transform.position;
+            var surface = ZoneSystem.instance.m_waterLevel;
+            var best = from + away * GoTo;
+            var bestDot = float.MinValue;
+            for (var step = 0; step < 16; step++)
+            {
+                var angle = step * Mathf.PI / 8f;
+                var dir = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle));
+                var p = from + dir * GoTo;
+                if (!DeepEnough(p, surface, fish.m_minDepth) || !DeepEnough(from + dir * (GoTo / 2f), surface, fish.m_minDepth)) continue;
+                var dot = Vector3.Dot(dir, away);
+                if (dot <= bestDot) continue;
+                bestDot = dot;
+                best = p;
+            }
+            return best;
+        }
 
         /// <summary>Finds marked fish this game owns that it does not steer yet, such as those of a float cast before a restart, and lets those whose float is gone leave.</summary>
         private static void Sweep()
