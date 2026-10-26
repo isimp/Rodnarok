@@ -24,6 +24,7 @@ namespace Rodnarok
             foreach (var scenario in SelfTestArrival.All()) yield return scenario;
             foreach (var scenario in SelfTestBite.All()) yield return scenario;
             foreach (var scenario in SelfTestCalm.All()) yield return scenario;
+            foreach (var scenario in SelfTestSitting.All()) yield return scenario;
         }
 
         /// <summary>Every fish prefab takes some bait, the bait table built from them reaches every one, and each bait is ammunition the fishing rod casts.</summary>

@@ -26,6 +26,10 @@ The calm-water piece is the serpent post (`SerpentPost`): the game's darkwood po
 
 The post lowers the waves through the corner values the game keeps for each 64 m water tile. The game shapes the waves of what floats and draws the water from the same four values, so both stay calm together, and a corner is lowered by where it is alone, so two tiles meeting at it always agree and no seam shows (`CalmWater`). The calmed area follows the tiles' corners and fades across a tile.
 
+## Fishing while sitting
+
+The game stands a seated player up on any attack or block press (`Player.SetControls`), cancels a drawn cast while the player sits on a seat (`Player.UpdateAttackBowDraw`), and lets nobody start an attack in the sitting pose (`Character.CanMove`). A player holding a rod (anything casting fishing bait) who sits on a chair, a bench or a boat's bench, or on the ground with the sit emote, and holds still, is seen as not seated by those three for the moment they ask (`SeatedFishing`), so the rod casts and reels and the player stays seated. Moving, jumping or crouching stands the player up as in the game. A ship's controls are not a seat for this.
+
 ## How the arrival works
 
 When a float the player's own game cast lies in the water, the wait is rolled (`Schools`). When it is over, the school appears up to 14 m out, where the water is deep enough for the fish there, halfway and at the float, and the float is made its home: each fish circles it within 4 m, picking a new place to swim every 1.5 to 3 seconds, near the top of the depth it swims at. Its stars and size come from the game's own level-up roll for that fish beside the float. Each fish is placed only where the water is deep enough for it. A fish of a quality the game lets leap (`m_jumpMaxLevel`) leaps a few times on its way in, and only where the water stays deep for 10 m ahead.
