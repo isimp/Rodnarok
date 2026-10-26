@@ -60,7 +60,19 @@ namespace Rodnarok
         private static readonly HashSet<Fish> Ours = new HashSet<Fish>();
         private static readonly Dictionary<Fish, float> NextLeap = new Dictionary<Fish, float>();
         private static readonly Dictionary<Fish, float> GoneSince = new Dictionary<Fish, float>();
+        private static readonly HashSet<Fish> WetOnce = new HashSet<Fish>();
+        private static readonly Dictionary<Fish, float> MadeAt = new Dictionary<Fish, float>();
         private static float _nextSweep;
+
+        /// <summary>How far ahead the water must stay deep for a fish to leap, in metres.</summary>
+        private const float LeapReach = 10f;
+
+        /// <summary>Seconds a new fish may take to first touch the water before it counts as stuck on land.</summary>
+        private const float FirstWetGrace = 3f;
+
+        /// <summary>How many of the schools' fish were found on land and taken away, for the self-test.</summary>
+        [ForTest]
+        public static int LandedForTest { get; private set; }
 
         /// <summary>Rules the self-test sets for its run in place of the settings.</summary>
         [ForTest]
@@ -109,6 +121,7 @@ namespace Rodnarok
             }
             WatchFloats();
             foreach (var cast in Casts.Values.ToList()) Advance(cast);
+            KeepOffLand();
             if (Time.time >= _nextSweep)
             {
                 _nextSweep = Time.time + 2f;
@@ -190,15 +203,20 @@ namespace Rodnarok
             var facing = Quaternion.LookRotation(Flat(home - start.Value));
             for (var i = 0; i < size; i++)
             {
+                // Each fish where the water is deep enough for it, or else at the school's centre, which is.
                 var offset = Random.insideUnitCircle * 2f;
                 var place = new Vector3(start.Value.x + offset.x, surface - depth, start.Value.z + offset.y);
+                if (!DeepEnough(place, surface, template.m_minDepth)) place = new Vector3(start.Value.x, surface - depth, start.Value.z);
                 var go = UnityEngine.Object.Instantiate(prefab, place, facing);
+                // The rod's catch hands the fish over by itself; lying anywhere else it is never picked up in passing.
+                var item = go.GetComponent<ItemDrop>();
+                if (item != null) item.m_autoPickup = false;
                 var zdo = go.GetComponent<ZNetView>().GetZDO();
                 zdo.Set(FloatKey, cast.Id);
                 // Fish.Start takes its home from here, so the school's home is the float.
                 zdo.Set(ZDOVars.s_spawnPoint, home);
                 var quality = book.RollQuality(kind, place);
-                if (quality > 1) go.GetComponent<ItemDrop>()?.SetQuality(quality);
+                if (quality > 1) item?.SetQuality(quality);
 
                 var fish = go.GetComponent<Fish>();
                 fish.m_swimRange = CircleRange;
@@ -208,7 +226,36 @@ namespace Rodnarok
                 cast.Fish.Add(fish);
                 CastOf[fish] = cast;
                 Ours.Add(fish);
+                MadeAt[fish] = Time.time;
                 NextLeap[fish] = Time.time + Random.Range(0.5f, 3f);
+            }
+        }
+
+        /// <summary>
+        /// Takes away at once any of the schools' fish this game owns that lies on land: out of the
+        /// water, not in the air of a leap and not on a line, or never in the water at all a while
+        /// after it was made. The game lets a fish out of the water be picked up, and the schools'
+        /// fish are drawn by the bait, not won from the water.
+        /// </summary>
+        private static void KeepOffLand()
+        {
+            if (Ours.Count == 0) return;
+            foreach (var fish in Ours.ToList())
+            {
+                if (fish == null) continue;
+                if (!fish.IsOutOfWater())
+                {
+                    WetOnce.Add(fish);
+                    continue;
+                }
+                if (fish.IsHooked() || Jumping(fish)) continue;
+                if (!WetOnce.Contains(fish) && MadeAt.TryGetValue(fish, out var made) && Time.time - made < FirstWetGrace) continue;
+                var view = fish.GetComponent<ZNetView>();
+                if (view == null || !view.IsValid() || !view.IsOwner()) continue;
+                LandedForTest++;
+                Log.Warning("A " + Utils.GetPrefabName(fish.gameObject) + " of a school lay on land and was taken away.");
+                ZNetScene.instance.Destroy(fish.gameObject);
+                Drop(fish);
             }
         }
 
@@ -249,7 +296,19 @@ namespace Rodnarok
             var item = fish.GetComponent<ItemDrop>();
             if (view == null || !view.IsOwner() || fish.IsOutOfWater() || Jumping(fish)) return;
             if (item != null && item.m_itemData.m_quality > fish.m_jumpMaxLevel) return;
+            if (!DeepAhead(fish, home.y)) return;
             Jump(fish);
+        }
+
+        /// <summary>Whether the water stays deep enough for the fish all the way a leap could carry it.</summary>
+        private static bool DeepAhead(Fish fish, float surface)
+        {
+            var ahead = Flat(fish.transform.forward);
+            for (var distance = 2f; distance <= LeapReach; distance += 2f)
+            {
+                if (!DeepEnough(fish.transform.position + ahead * distance, surface, fish.m_minDepth)) return false;
+            }
+            return true;
         }
 
         /// <summary>A fish whose float is gone swims off, and is taken away once it has been gone a while.</summary>
@@ -293,6 +352,8 @@ namespace Rodnarok
                 var view = fish.GetComponent<ZNetView>();
                 if (view == null || !view.IsValid() || !view.IsOwner()) continue;
                 Ours.Add(fish);
+                var item = fish.GetComponent<ItemDrop>();
+                if (item != null) item.m_autoPickup = false;
                 var ff = ZNetScene.instance.FindInstance(id);
                 if (ff == null || ff.GetComponent<FishingFloat>() == null) Leave(fish, fish.transform.position - fish.transform.forward);
             }
@@ -325,6 +386,8 @@ namespace Rodnarok
             CastOf.Remove(fish);
             NextLeap.Remove(fish);
             Fled.Remove(fish);
+            WetOnce.Remove(fish);
+            MadeAt.Remove(fish);
         }
 
         /// <summary>Lets go of everything on leaving a world; the marks in the save stay, for the sweep of whoever comes next.</summary>
@@ -337,6 +400,8 @@ namespace Rodnarok
             NextLeap.Clear();
             GoneSince.Clear();
             Fled.Clear();
+            WetOnce.Clear();
+            MadeAt.Clear();
         }
 
         private static Vector3 Flat(Vector3 v)

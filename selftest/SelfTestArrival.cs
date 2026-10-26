@@ -89,6 +89,7 @@ namespace Rodnarok
             if (floatPrefab == null || baitPrefab == null) yield break;
 
             // The game's float stays only while its caster holds a rod, so one is put in hand and everything put back after.
+            var landedBefore = Schools.LandedForTest;
             var gear = SelfTestGear.RodInHand(player);
             FishingFloat ff = null;
             try
@@ -169,6 +170,24 @@ namespace Rodnarok
                 }
                 biter.OnHooked(null);
 
+                // Coming, circling, biting and scattering, no fish of the school ever reached land.
+                check.That(Schools.LandedForTest == landedBefore, (Schools.LandedForTest - landedBefore).ToString(CultureInfo.InvariantCulture) + " fish of the school reached land on their own");
+
+                // One put on land beside the character is taken away before anyone can pick it up.
+                var stray = others.FirstOrDefault(f => f != null);
+                if (stray != null)
+                {
+                    var name = stray.GetComponent<ItemDrop>().m_itemData.m_shared.m_name;
+                    var carried = Carried(player, name);
+                    var shore = player.transform.position + Flat(player.transform.forward) * 1.2f + Vector3.up * 0.3f;
+                    stray.transform.position = shore;
+                    var body = stray.GetComponent<Rigidbody>();
+                    if (body != null) body.position = shore;
+                    for (var waited = 0f; waited < 2f && stray != null; waited += Time.deltaTime) yield return null;
+                    check.That(stray == null, "a school fish on land beside the character was taken away within 2 s");
+                    check.That(Carried(player, name) == carried, "the fish on land was not picked up, " + carried.ToString(CultureInfo.InvariantCulture) + " carried before and " + Carried(player, name).ToString(CultureInfo.InvariantCulture) + " after");
+                }
+
                 // The float gone, the school leaves and is taken away.
                 ZNetScene.instance.Destroy(ff.gameObject);
                 ff = null;
@@ -181,6 +200,10 @@ namespace Rodnarok
                 check.That(gone, "the school was taken away within 10 s of the float going, leave time 2 s");
                 var lost = wildBefore.Where(id => ZDOMan.instance.GetZDO(id) == null).ToList();
                 check.That(lost.Count == 0, lost.Count.ToString(CultureInfo.InvariantCulture) + " fish of the world's own were taken away");
+
+                // The character is as it was: its hands, its inventory and what it knows.
+                gear.PutBack();
+                check.That(gear.AsBefore(), "the character's gear and what it knows are as before the run: " + gear.Difference());
             }
             finally
             {
@@ -188,6 +211,15 @@ namespace Rodnarok
                 if (ff != null) ZNetScene.instance.Destroy(ff.gameObject);
                 gear.PutBack();
             }
+        }
+
+        private static int Carried(Player player, string sharedName) =>
+            player.GetInventory().GetAllItems().Where(i => i.m_shared.m_name == sharedName).Sum(i => i.m_stack);
+
+        private static Vector3 Flat(Vector3 v)
+        {
+            v.y = 0f;
+            return v.sqrMagnitude < 0.0001f ? Vector3.forward : v.normalized;
         }
 
         /// <summary>The fish marked as drawn to this float, in the loaded world.</summary>
