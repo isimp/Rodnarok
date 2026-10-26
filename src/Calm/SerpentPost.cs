@@ -74,12 +74,41 @@ namespace Rodnarok
                 top.name = "SerpentHead";
                 foreach (var collider in top.GetComponentsInChildren<Collider>(true)) Object.DestroyImmediate(collider);
                 foreach (var body in top.GetComponentsInChildren<Rigidbody>(true)) Object.DestroyImmediate(body);
-                top.transform.localPosition = new Vector3(0f, TopOf(post, top.transform), 0f);
                 top.transform.localRotation = Quaternion.identity;
+                top.transform.localPosition = Vector3.zero;
+                top.transform.localScale = Vector3.one;
+                var (low, high) = Extent(top.transform);
+                var scale = HeadSize / Mathf.Max(0.01f, Mathf.Max(high.x - low.x, Mathf.Max(high.y - low.y, high.z - low.z)));
+                top.transform.localScale = Vector3.one * scale;
+                // The head's lowest point rests on the pole's top.
+                top.transform.localPosition = new Vector3(0f, TopOf(post, top.transform) - low.y * scale, 0f);
             }
 
             post.AddComponent<CalmPost>();
             return post;
+        }
+
+        /// <summary>How large the head is drawn on the post, its largest side in metres.</summary>
+        private const float HeadSize = 0.7f;
+
+        /// <summary>The lowest and highest corner of what a part draws, in its own space.</summary>
+        private static (Vector3 Low, Vector3 High) Extent(Transform part)
+        {
+            var low = Vector3.positiveInfinity;
+            var high = Vector3.negativeInfinity;
+            foreach (var filter in part.GetComponentsInChildren<MeshFilter>(true))
+            {
+                if (filter.sharedMesh == null) continue;
+                var b = filter.sharedMesh.bounds;
+                for (var i = 0; i < 8; i++)
+                {
+                    var corner = new Vector3((i & 1) == 0 ? b.min.x : b.max.x, (i & 2) == 0 ? b.min.y : b.max.y, (i & 4) == 0 ? b.min.z : b.max.z);
+                    var p = part.InverseTransformPoint(filter.transform.TransformPoint(corner));
+                    low = Vector3.Min(low, p);
+                    high = Vector3.Max(high, p);
+                }
+            }
+            return float.IsInfinity(low.x) ? (Vector3.zero, Vector3.zero) : (low, high);
         }
 
         /// <summary>The trophy's look: the model the game hangs on an item stand, else the first one drawn.</summary>

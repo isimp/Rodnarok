@@ -37,7 +37,10 @@ namespace Rodnarok
             if (chairPrefab == null) yield break;
 
             var stoodAt = player.transform.position;
-            var toWater = water.Value - stoodAt;
+            var dry = SelfTestPlaces.DryLandBeside(stoodAt);
+            check.That(dry.HasValue, "dry, level land within 1.5 to 4 m of the character for a chair");
+            if (!dry.HasValue) yield break;
+            var toWater = water.Value - dry.Value;
             toWater.y = 0f;
             var facing = Quaternion.LookRotation(toWater.sqrMagnitude < 0.01f ? player.transform.forward : toWater.normalized);
             var gear = SelfTestGear.RodInHand(player);
@@ -48,13 +51,13 @@ namespace Rodnarok
                 if (gear.Rod == null) yield break;
                 for (var waited = 0f; waited < 1f; waited += Time.deltaTime) yield return null;
 
-                // On a chair.
-                chair = Object.Instantiate(chairPrefab, stoodAt + facing * Vector3.forward * 0.6f, facing);
+                // On a chair on dry land, sat on as a player sits on one.
+                chair = Object.Instantiate(chairPrefab, dry.Value, facing);
                 yield return null;
                 var seat = chair.GetComponentInChildren<Chair>();
                 seat.Interact(player, false, false);
-                for (var waited = 0f; waited < 1f; waited += Time.deltaTime) yield return null;
-                check.That(player.IsAttached(), "the character sits on the chair");
+                for (var waited = 0f; waited < 1.5f; waited += Time.deltaTime) yield return null;
+                check.That(player.IsAttached() && player.IsSitting(), "the character sits on the chair in the sitting pose");
                 if (player.IsAttached())
                 {
                     foreach (var step in CastAndReel(check, player, water.Value, "chair", () => player.IsAttached())) yield return step;
@@ -65,7 +68,7 @@ namespace Rodnarok
                 // On the ground, with the sit emote.
                 player.StartEmote("sit", oneshot: false);
                 for (var waited = 0f; waited < 1.5f; waited += Time.deltaTime) yield return null;
-                check.That(SeatedFishing.SitsOnTheGround(player), "the character sits on the ground");
+                check.That(SeatedFishing.SitsOnTheGround(player) && player.IsSitting(), "the character sits on the ground in the sitting pose");
                 if (SeatedFishing.SitsOnTheGround(player))
                 {
                     foreach (var step in CastAndReel(check, player, water.Value, "ground", () => SeatedFishing.SitsOnTheGround(player))) yield return step;
@@ -82,6 +85,14 @@ namespace Rodnarok
                 gear.PutBack();
             }
 
+            // Back where it stood.
+            player.transform.position = stoodAt;
+            var body = player.GetComponent<Rigidbody>();
+            if (body != null)
+            {
+                body.position = stoodAt;
+                body.linearVelocity = Vector3.zero;
+            }
             for (var waited = 0f; waited < 1f; waited += Time.deltaTime) yield return null;
             check.That(!player.IsAttached() && !player.InEmote(), "the character stands again after the run");
             check.That(gear.AsBefore(), "the character's gear and what it knows are as before the run: " + gear.Difference());
@@ -120,7 +131,8 @@ namespace Rodnarok
             }
             check.That(cast != null, "sitting on the " + seat + ", the rod casts");
             check.That(seated(), "the character is still seated on the " + seat + " after the cast");
-            for (var waited = 0f; waited < 1f; waited += Time.deltaTime) yield return null;
+            for (var waited = 0f; waited < 1.5f; waited += Time.deltaTime) yield return null;
+            check.That(player.IsSitting(), "a moment after the cast the character is back in the sitting pose on the " + seat);
             Picture(check, "sitting-" + seat + "-cast");
             yield return null;
             if (cast == null) yield break;

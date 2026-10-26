@@ -56,7 +56,8 @@ namespace Rodnarok
             GameObject placed = null;
             try
             {
-                var at = player.transform.position + FlatForward(player) * 1.5f;
+                // On dry land beside the character, where a player would build it, out of the camera's way.
+                var at = SelfTestPlaces.DryLandBeside(player.transform.position) ?? player.transform.position + FlatForward(player) * 3f;
                 placed = Object.Instantiate(post, at, Quaternion.identity);
                 for (var waited = 0f; waited < 2f; waited += Time.deltaTime) yield return null;
 

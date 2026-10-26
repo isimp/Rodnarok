@@ -234,11 +234,11 @@ namespace Rodnarok
 
         private static float Across(Vector3 a, Vector3 b) => Vector2.Distance(new Vector2(a.x, a.z), new Vector2(b.x, b.z));
 
-        /// <summary>A place on the water 6 to 20 m from the character where the water is at least this deep.</summary>
+        /// <summary>A place on the water 6 to 20 m from the character where the water is at least this deep, as far out as found, as a cast throws it.</summary>
         internal static Vector3? DeepWaterBeside(Vector3 from, float depth)
         {
             var water = ZoneSystem.instance.m_waterLevel;
-            for (var distance = 6f; distance <= 20f; distance += 2f)
+            for (var distance = 20f; distance >= 6f; distance -= 2f)
             {
                 for (var step = 0; step < 16; step++)
                 {

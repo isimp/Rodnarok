@@ -21,6 +21,11 @@ namespace Rodnarok
         private static readonly AccessTools.FieldRef<FishingFloat, float> NibbleTime = AccessTools.FieldRefAccess<FishingFloat, float>("m_nibbleTime");
         private static readonly AccessTools.FieldRef<FishingFloat, Fish> Nibbler = AccessTools.FieldRefAccess<FishingFloat, Fish>("m_nibbler");
         private static readonly AccessTools.FieldRef<FishingFloat, float> LineLength = AccessTools.FieldRefAccess<FishingFloat, float>("m_lineLength");
+        private static readonly AccessTools.FieldRef<Fish, float> WaterLevel = AccessTools.FieldRefAccess<Fish, float>("m_inWater");
+
+        /// <summary>The line left when the scenario lets the fish go: well out in the water, never at the bank.</summary>
+        private const float LetGoAt = 8f;
+
         private static readonly System.Reflection.MethodInfo TryToHook = AccessTools.Method(typeof(FishingFloat), "TryToHook");
         private static readonly System.Reflection.MethodInfo SetCatch = AccessTools.Method(typeof(FishingFloat), "SetCatch");
 
@@ -156,13 +161,13 @@ namespace Rodnarok
                 SelfTestHold.Holding = true;
                 for (var waited = 0f; waited < 15f; waited += Time.deltaTime)
                 {
-                    if (ff == null || ff.GetCatch() != fish || LineLength(ff) < 3f || player.GetStamina() < 15f) break;
+                    if (ff == null || ff.GetCatch() != fish || LineLength(ff) < LetGoAt || player.GetStamina() < 15f) break;
                     var struggled = fish.IsEscaping();
                     var line = LineLength(ff);
                     var stamina = player.GetStamina();
                     yield return null;
                     if (ff == null || ff.GetCatch() != fish) break;
-                    var depth = ff.transform.position.y - fish.transform.position.y;
+                    var depth = WaterLevel(fish) - fish.transform.position.y;
                     if (struggled && fish.IsEscaping())
                     {
                         struggleDepth += depth * Time.deltaTime;
