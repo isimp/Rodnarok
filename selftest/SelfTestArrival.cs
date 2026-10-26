@@ -23,7 +23,7 @@ namespace Rodnarok
         private static readonly AccessTools.FieldRef<FishingFloat, float> NibbleTime = AccessTools.FieldRefAccess<FishingFloat, float>("m_nibbleTime");
         private static readonly AccessTools.FieldRef<FishingFloat, Fish> Nibbler = AccessTools.FieldRefAccess<FishingFloat, Fish>("m_nibbler");
 
-        /// <summary>The fish's and the float's methods whose working the arrival relies on.</summary>
+        /// <summary>The fish's and the float's methods whose working the arrival relies on. A school is made by Rodnarök itself, not through the world's spawns, so the many mods that change those spawns are no matter here.</summary>
         private static readonly (Type Type, string Method)[] FishingMethods =
         {
             (typeof(Fish), "FindFloat"),
@@ -34,7 +34,6 @@ namespace Rodnarok
             (typeof(FishingFloat), "RPC_Nibble"),
             (typeof(FishingFloat), "TryToHook"),
             (typeof(FishingFloat), "FixedUpdate"),
-            (typeof(SpawnSystem), "Spawn"),
         };
 
         public static IEnumerable<Scenario> All()
@@ -79,7 +78,7 @@ namespace Rodnarok
         {
             var player = Player.m_localPlayer;
             var rod = player.GetCurrentWeapon();
-            check.That(rod?.m_dropPrefab != null && rod.m_dropPrefab.name == "FishingRod", "the character holds a fishing rod (equip one, then run again)");
+            check.That(rod?.m_dropPrefab != null && rod.m_dropPrefab.name == "FishingRod", "the character holds a fishing rod (equip one, then run again); in hand: " + (rod?.m_dropPrefab != null ? rod.m_dropPrefab.name : rod?.m_shared.m_name ?? "nothing"));
             if (rod?.m_dropPrefab == null || rod.m_dropPrefab.name != "FishingRod") yield break;
             var spot = DeepWaterBeside(player.transform.position, 3.5f);
             check.That(spot.HasValue, "water at least 3.5 m deep within 6 to 14 m of the character (stand at a deep shore or on a dock)");
