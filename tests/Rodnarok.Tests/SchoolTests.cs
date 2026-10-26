@@ -68,27 +68,54 @@ namespace Rodnarok.Tests
             Assert.Empty(School.Scatter(1, hooked: 0));
         }
 
+        private static readonly FishingRules Rules = FishingRules.Default;
+
         [Fact]
-        public void RodnaroksFishLeaveOnceTheFloatHasBeenGoneAWhile()
+        public void WhileItsFloatIsOutNoFishOfTheSchoolIsTakenAway()
         {
-            Assert.False(School.Remove(ours: true, floatAlive: true, sinceFloatGone: 100f, leaveSeconds: 10f));
-            Assert.False(School.Remove(ours: true, floatAlive: false, sinceFloatGone: 9.9f, leaveSeconds: 10f));
-            Assert.True(School.Remove(ours: true, floatAlive: false, sinceFloatGone: 10f, leaveSeconds: 10f));
+            Assert.False(School.Remove(ours: true, floatAlive: true, sinceFloatGone: 1000f, nearestPlayer: 500f, underSurface: 20f, Rules));
+        }
+
+        [Fact]
+        public void ALeavingFishNearAPlayerAndNearTheSurfaceIsNeverTakenAwayInSight()
+        {
+            Assert.False(School.Remove(ours: true, floatAlive: false, sinceFloatGone: 60f, nearestPlayer: 15f, underSurface: 1.5f, Rules));
+            Assert.False(School.Remove(ours: true, floatAlive: false, sinceFloatGone: 60f, nearestPlayer: 39.9f, underSurface: 3.9f, Rules));
+        }
+
+        [Fact]
+        public void ALeavingFishIsTakenAwayOnceFortyMetresFromEveryPlayer()
+        {
+            Assert.True(School.Remove(ours: true, floatAlive: false, sinceFloatGone: 5f, nearestPlayer: 40f, underSurface: 0.5f, Rules));
+        }
+
+        [Fact]
+        public void ALeavingFishIsTakenAwayOnceFourMetresDeep()
+        {
+            Assert.True(School.Remove(ours: true, floatAlive: false, sinceFloatGone: 5f, nearestPlayer: 10f, underSurface: 4f, Rules));
+        }
+
+        [Fact]
+        public void AFishStuckNearbyIsTakenAwayAfterThreeMinutes()
+        {
+            Assert.False(School.Remove(ours: true, floatAlive: false, sinceFloatGone: 179f, nearestPlayer: 5f, underSurface: 1f, Rules));
+            Assert.True(School.Remove(ours: true, floatAlive: false, sinceFloatGone: 180f, nearestPlayer: 5f, underSurface: 1f, Rules));
         }
 
         [Fact]
         public void AFishOfTheWorldsOwnIsNeverTakenAway()
         {
-            Assert.False(School.Remove(ours: false, floatAlive: false, sinceFloatGone: 1000f, leaveSeconds: 10f));
+            Assert.False(School.Remove(ours: false, floatAlive: false, sinceFloatGone: 1000f, nearestPlayer: 500f, underSurface: 20f, Rules));
         }
 
         [Fact]
-        public void SchoolsAreOnBumpsOffAndFishLeaveTenSecondsAfterTheFloatByDefault()
+        public void SchoolsAreOnBumpsOffAndLeavingFishVanishOutOfSightByDefault()
         {
-            var rules = FishingRules.Default;
-            Assert.True(rules.Schools);
-            Assert.False(rules.Bumps);
-            Assert.Equal(10f, rules.LeaveSeconds);
+            Assert.True(Rules.Schools);
+            Assert.False(Rules.Bumps);
+            Assert.Equal(40f, Rules.OutOfSight);
+            Assert.Equal(4f, Rules.DiveDepth);
+            Assert.Equal(180f, Rules.LeaveBackstop);
         }
     }
 }

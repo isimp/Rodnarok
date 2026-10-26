@@ -105,7 +105,7 @@ namespace Rodnarok
                 check.That(tipShown, "the rod in hand shows its tip within 3 s");
                 if (!tipShown) yield break;
 
-                PlayRules.ForTest = Settings.Rules.With(waitMin: 1f, waitMax: 1f, schools: true, leaveSeconds: 2f);
+                PlayRules.ForTest = Settings.Rules.With(waitMin: 1f, waitMax: 1f, schools: true);
                 var bait = baitPrefab.GetComponent<ItemDrop>().m_itemData.Clone();
                 bait.m_dropPrefab = baitPrefab;
                 var go = UnityEngine.Object.Instantiate(floatPrefab, spot.Value, Quaternion.identity);
@@ -179,7 +179,10 @@ namespace Rodnarok
                 {
                     var name = stray.GetComponent<ItemDrop>().m_itemData.m_shared.m_name;
                     var carried = Carried(player, name);
-                    var shore = player.transform.position + Flat(player.transform.forward) * 1.2f + Vector3.up * 0.3f;
+                    // Dry land beside the character, where a fish could only have flopped ashore.
+                    var dry = SelfTestPlaces.DryLandBeside(player.transform.position);
+                    check.That(dry.HasValue, "dry land beside the character to put a fish on");
+                    var shore = (dry ?? player.transform.position) + Vector3.up * 0.3f;
                     stray.transform.position = shore;
                     var body = stray.GetComponent<Rigidbody>();
                     if (body != null) body.position = shore;
@@ -188,16 +191,39 @@ namespace Rodnarok
                     check.That(Carried(player, name) == carried, "the fish on land was not picked up, " + carried.ToString(CultureInfo.InvariantCulture) + " carried before and " + Carried(player, name).ToString(CultureInfo.InvariantCulture) + " after");
                 }
 
-                // The float gone, the school leaves and is taken away.
+                // The float gone, the school leaves, and each fish is taken away only out of sight:
+                // far from the character or deep under the surface, never where it was plainly seen.
+                var rules = PlayRules.Now;
+                var leaving = SchoolOf(floatId);
+                var last = leaving.ToDictionary(f => f, f => (Distance: 0f, Under: 0f));
+                var away = leaving.Count > 0 ? leaving.Average(f => Vector3.Distance(f.transform.position, player.transform.position)) : 0f;
                 ZNetScene.instance.Destroy(ff.gameObject);
                 ff = null;
-                var gone = false;
-                for (var waited = 0f; waited < 10f && !gone; waited += Time.deltaTime)
+                var inSight = new List<string>();
+                var since = 0f;
+                for (; since < 90f && last.Count > 0; since += Time.deltaTime)
                 {
-                    gone = SchoolOf(floatId).Count == 0;
+                    foreach (var fish in last.Keys.ToList())
+                    {
+                        if (fish == null)
+                        {
+                            var seen = last[fish];
+                            if (seen.Distance < rules.OutOfSight && seen.Under < rules.DiveDepth && since < rules.LeaveBackstop)
+                                inSight.Add(seen.Distance.ToString("0", CultureInfo.InvariantCulture) + " m off, " + seen.Under.ToString("0.0", CultureInfo.InvariantCulture) + " m under");
+                            last.Remove(fish);
+                            continue;
+                        }
+                        last[fish] = (Vector3.Distance(fish.transform.position, player.transform.position), ZoneSystem.instance.m_waterLevel - fish.transform.position.y);
+                    }
                     yield return null;
                 }
-                check.That(gone, "the school was taken away within 10 s of the float going, leave time 2 s");
+                check.That(inSight.Count == 0, inSight.Count.ToString(CultureInfo.InvariantCulture) + " leaving fish vanished in plain sight: " + string.Join("; ", inSight));
+                var stillHere = last.Keys.Where(f => f != null).ToList();
+                if (stillHere.Count > 0)
+                {
+                    var now = stillHere.Average(f => Vector3.Distance(f.transform.position, player.transform.position));
+                    check.That(now > away + 10f, stillHere.Count.ToString(CultureInfo.InvariantCulture) + " fish still about after 90 s are swimming off, from " + away.ToString("0", CultureInfo.InvariantCulture) + " m to " + now.ToString("0", CultureInfo.InvariantCulture) + " m away; the rest go out of sight later");
+                }
                 var lost = wildBefore.Where(id => ZDOMan.instance.GetZDO(id) == null).ToList();
                 check.That(lost.Count == 0, lost.Count.ToString(CultureInfo.InvariantCulture) + " fish of the world's own were taken away");
 

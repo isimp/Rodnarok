@@ -17,6 +17,10 @@ namespace Rodnarok
         private static readonly AccessTools.FieldRef<FishingFloat, Fish> Nibbler = AccessTools.FieldRefAccess<FishingFloat, Fish>("m_nibbler");
 
         private static Image _ring;
+        private static Outline _thickness;
+
+        /// <summary>How far the outline reaches around the arc's line, in the hud's units.</summary>
+        private const float Thickness = 1.5f;
 
         /// <summary>The ring as drawn, for the self-test; null before the first draw.</summary>
         [ForTest]
@@ -37,6 +41,7 @@ namespace Rodnarok
             ring.transform.localScale = new Vector3(draw.Scale, draw.Scale, draw.Scale);
             ring.fillAmount = draw.Fill;
             ring.color = new Color(draw.R, draw.G, draw.B, draw.A);
+            if (_thickness != null) _thickness.effectColor = ring.color;
         }
 
         /// <summary>The ring of this hud, made once from the game's bow ring: its picture, drawn as an arc filled clockwise from the top.</summary>
@@ -53,6 +58,11 @@ namespace Rodnarok
             _ring.fillOrigin = (int)Image.Origin360.Top;
             _ring.fillClockwise = true;
             _ring.fillAmount = 1f;
+            // The bow ring's line, drawn at the ring's smaller size, is thin; an outline of its own
+            // colour around the arc gives it body.
+            _thickness = go.AddComponent<Outline>();
+            _thickness.effectDistance = new Vector2(Thickness, Thickness);
+            _thickness.useGraphicAlpha = true;
             return _ring;
         }
 

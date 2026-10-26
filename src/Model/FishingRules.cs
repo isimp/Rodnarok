@@ -42,8 +42,14 @@ namespace Rodnarok
         /// <summary>Whether the fish that takes the bait bumps the float lightly before it bites.</summary>
         public bool Bumps { get; private set; }
 
-        /// <summary>Seconds after the float is gone before Rodnarök's fish that are left are taken away.</summary>
-        public float LeaveSeconds { get; private set; } = 10f;
+        /// <summary>How far, in metres, a leaving fish must be from every player to be taken away out of sight.</summary>
+        public float OutOfSight { get; private set; } = 40f;
+
+        /// <summary>How deep under the surface, in metres, a leaving fish dives to be taken away out of sight.</summary>
+        public float DiveDepth { get; private set; } = 4f;
+
+        /// <summary>Seconds after its float is gone that a leaving fish still in sight is taken away anyway, as one stuck.</summary>
+        public float LeaveBackstop { get; private set; } = 180f;
 
         /// <summary>These rules with the values given changed.</summary>
         public FishingRules With(
@@ -55,10 +61,10 @@ namespace Rodnarok
             float? calmKeep = null,
             bool? schools = null,
             bool? bumps = null,
-            float? leaveSeconds = null)
+            float? leaveBackstop = null)
         {
             var copy = (FishingRules)MemberwiseClone();
-            copy.LeaveSeconds = leaveSeconds ?? LeaveSeconds;
+            copy.LeaveBackstop = leaveBackstop ?? LeaveBackstop;
             copy.Schools = schools ?? Schools;
             copy.Bumps = bumps ?? Bumps;
             copy.HookWindow = hookWindow ?? HookWindow;

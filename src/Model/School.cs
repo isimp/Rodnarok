@@ -49,9 +49,13 @@ namespace Rodnarok
         /// <summary>The fish of a school that scatter when one is hooked: all the others.</summary>
         public static IReadOnlyList<int> Scatter(int size, int hooked) => Enumerable.Range(0, Math.Max(0, size)).Where(i => i != hooked).ToList();
 
-        /// <summary>Whether a fish is taken away: only Rodnarök's own, once its float has been gone this long.</summary>
-        public static bool Remove(bool ours, bool floatAlive, float sinceFloatGone, float leaveSeconds) =>
-            ours && !floatAlive && sinceFloatGone >= leaveSeconds;
+        /// <summary>
+        /// Whether a fish is taken away: only Rodnarök's own, once its float is gone, and only out of
+        /// sight: far from every player or deep under the surface. One stuck in sight is taken away
+        /// after the backstop.
+        /// </summary>
+        public static bool Remove(bool ours, bool floatAlive, float sinceFloatGone, float nearestPlayer, float underSurface, FishingRules rules) =>
+            ours && !floatAlive && (nearestPlayer >= rules.OutOfSight || underSurface >= rules.DiveDepth || sinceFloatGone >= rules.LeaveBackstop);
 
         /// <summary>One of <paramref name="count"/> choices, each taking an equal share of the rolls.</summary>
         private static int Pick(int count, double roll)

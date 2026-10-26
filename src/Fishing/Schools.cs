@@ -326,16 +326,28 @@ namespace Rodnarok
             if (fish == null) return;
             CastOf.Remove(fish);
             NextLeap.Remove(fish);
-            Flee(fish, from);
+            Flee(fish, from, Rules.DiveDepth);
             if (!GoneSince.ContainsKey(fish)) GoneSince[fish] = Time.time;
         }
 
-        /// <summary>The fish makes a place well away from <paramref name="from"/> its home and swims there at the speed the game gives a fleeing fish.</summary>
-        private static void Flee(Fish fish, Vector3 from)
+        /// <summary>
+        /// The fish makes a place well away from <paramref name="from"/> its home and swims there at
+        /// the speed the game gives a fleeing fish. Given a depth to dive to, it heads for water that
+        /// deep where there is some, and swims no shallower there, out of sight under the surface.
+        /// </summary>
+        private static void Flee(Fish fish, Vector3 from, float dive = 0f)
         {
             var view = fish.GetComponent<ZNetView>();
             if (view == null || !view.IsValid() || !view.IsOwner()) return;
-            var place = OpenWaterAway(fish, Flat(fish.transform.position - from));
+            var away = Flat(fish.transform.position - from);
+            var deep = Vector3.zero;
+            var diving = dive > 0f && OpenWaterAway(fish, away, dive + 0.5f, out deep);
+            var place = diving ? deep : OpenWaterAway(fish, away);
+            if (diving)
+            {
+                fish.m_minDepth = Mathf.Max(fish.m_minDepth, dive);
+                fish.m_maxDepth = Mathf.Max(fish.m_maxDepth, dive + 20f);
+            }
             SpawnPoint(fish) = place;
             view.GetZDO().Set(ZDOVars.s_spawnPoint, place);
             fish.m_swimRange = CircleRange * 2f;
@@ -354,24 +366,28 @@ namespace Rodnarok
         /// away from what it flees whose water is deep enough for it there and halfway, so it never
         /// swims for the shore; straight away when no direction has such water.
         /// </summary>
-        private static Vector3 OpenWaterAway(Fish fish, Vector3 away)
+        private static Vector3 OpenWaterAway(Fish fish, Vector3 away) =>
+            OpenWaterAway(fish, away, fish.m_minDepth, out var place) ? place : fish.transform.position + away * GoTo;
+
+        /// <summary>The place most away from what the fish flees whose water is at least this deep there and halfway; false where no direction has such water.</summary>
+        private static bool OpenWaterAway(Fish fish, Vector3 away, float depth, out Vector3 place)
         {
             var from = fish.transform.position;
             var surface = ZoneSystem.instance.m_waterLevel;
-            var best = from + away * GoTo;
+            place = default;
             var bestDot = float.MinValue;
             for (var step = 0; step < 16; step++)
             {
                 var angle = step * Mathf.PI / 8f;
                 var dir = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle));
                 var p = from + dir * GoTo;
-                if (!DeepEnough(p, surface, fish.m_minDepth) || !DeepEnough(from + dir * (GoTo / 2f), surface, fish.m_minDepth)) continue;
+                if (!DeepEnough(p, surface, depth) || !DeepEnough(from + dir * (GoTo / 2f), surface, depth)) continue;
                 var dot = Vector3.Dot(dir, away);
                 if (dot <= bestDot) continue;
                 bestDot = dot;
-                best = p;
+                place = p;
             }
-            return best;
+            return bestDot > float.MinValue;
         }
 
         /// <summary>Finds marked fish this game owns that it does not steer yet, such as those of a float cast before a restart, and lets those whose float is gone leave.</summary>
@@ -392,11 +408,11 @@ namespace Rodnarok
             }
         }
 
-        /// <summary>Takes away the fish that have been gone long enough, where this game owns them.</summary>
+        /// <summary>Takes away the leaving fish this game owns once they are out of sight: far from every player or deep under the surface.</summary>
         private static void TakeAwayTheLeft()
         {
             if (GoneSince.Count == 0) return;
-            var leave = Rules.LeaveSeconds;
+            var rules = Rules;
             foreach (var pair in GoneSince.ToList())
             {
                 var fish = pair.Key;
@@ -405,11 +421,24 @@ namespace Rodnarok
                     Drop(fish);
                     continue;
                 }
-                if (!School.Remove(ours: true, floatAlive: false, Time.time - pair.Value, leave)) continue;
+                var p = fish.transform.position;
+                var under = ZoneSystem.instance.m_waterLevel - p.y;
+                if (!School.Remove(ours: true, floatAlive: false, Time.time - pair.Value, NearestPlayer(p), under, rules)) continue;
                 var view = fish.GetComponent<ZNetView>();
                 if (view != null && view.IsValid() && view.IsOwner()) ZNetScene.instance.Destroy(fish.gameObject);
                 Drop(fish);
             }
+        }
+
+        /// <summary>How far the nearest player in the loaded world stands from a place.</summary>
+        private static float NearestPlayer(Vector3 place)
+        {
+            var nearest = float.MaxValue;
+            foreach (var player in Player.GetAllPlayers())
+            {
+                if (player != null) nearest = Mathf.Min(nearest, Vector3.Distance(player.transform.position, place));
+            }
+            return nearest;
         }
 
         private static void Drop(Fish fish)
