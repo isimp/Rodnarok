@@ -53,8 +53,8 @@ namespace Rodnarok
         private static IEnumerable BiteAndFight(ScenarioCheck check)
         {
             var player = Player.m_localPlayer;
-            var spot = SelfTestArrival.DeepWaterBeside(player.transform.position, 3.5f);
-            check.That(spot.HasValue, "water at least 3.5 m deep within 6 to 14 m of the character (stand at a deep shore or on a dock)");
+            var spot = SelfTestArrival.DeepWaterBeside(player.transform.position, 3f);
+            check.That(spot.HasValue, "water at least 3 m deep within 6 to 20 m of the character (stand facing open water)");
             if (!spot.HasValue) yield break;
             var floatPrefab = ZNetScene.instance.GetPrefab("FishingRodFloat");
             var baitPrefab = ObjectDB.instance.GetItemPrefab(Bait);

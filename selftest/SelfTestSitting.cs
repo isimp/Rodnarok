@@ -30,7 +30,7 @@ namespace Rodnarok
         {
             var player = Player.m_localPlayer;
             var water = SelfTestArrival.DeepWaterBeside(player.transform.position, 1f);
-            check.That(water.HasValue, "water within 6 to 14 m of the character");
+            check.That(water.HasValue, "water within 6 to 20 m of the character");
             if (!water.HasValue) yield break;
             var chairPrefab = ZNetScene.instance.GetPrefab(ChairPrefab);
             check.That(chairPrefab != null && chairPrefab.GetComponentInChildren<Chair>() != null, "the game's wooden chair is there to sit on");

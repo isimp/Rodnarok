@@ -37,7 +37,7 @@ namespace Rodnarok
             foreach (var r in pole) check.That(cost.TryGetValue(r.m_resItem.name, out var n) && n == r.m_amount, "it costs the darkwood pole's " + r.m_amount.ToString(CultureInfo.InvariantCulture) + " " + r.m_resItem.name);
 
             var water = SelfTestArrival.DeepWaterBeside(player.transform.position, 1.5f);
-            check.That(water.HasValue, "water within 6 to 14 m of the character");
+            check.That(water.HasValue, "water within 6 to 20 m of the character");
             if (!water.HasValue) yield break;
 
             var rules = PlayRules.Now;

@@ -13,7 +13,7 @@ namespace Rodnarok
     /// character, and the school the bait draws must come, match the bait and the world's group
     /// size, wear its stars as the game sizes them, have one of it take the bait, scatter when
     /// that one is hooked, and leave once the float is gone, while no fish of the world's own is
-    /// taken away. Needs a character beside water at least 3.5 m deep. A fishing rod is put in
+    /// taken away. Needs a character beside water at least 3 m deep. A fishing rod is put in
     /// its hands for the run (<see cref="SelfTestGear"/>) and its gear put back after; the float,
     /// the hook and everything the school was are taken away again.
     /// </summary>
@@ -78,8 +78,8 @@ namespace Rodnarok
         private static IEnumerable SchoolComesAndGoes(ScenarioCheck check)
         {
             var player = Player.m_localPlayer;
-            var spot = DeepWaterBeside(player.transform.position, 3.5f);
-            check.That(spot.HasValue, "water at least 3.5 m deep within 6 to 14 m of the character (stand at a deep shore or on a dock)");
+            var spot = DeepWaterBeside(player.transform.position, 3f);
+            check.That(spot.HasValue, "water at least 3 m deep within 6 to 20 m of the character (stand facing open water)");
             if (!spot.HasValue) yield break;
 
             var wildBefore = WildFish().ToList();
@@ -234,11 +234,11 @@ namespace Rodnarok
 
         private static float Across(Vector3 a, Vector3 b) => Vector2.Distance(new Vector2(a.x, a.z), new Vector2(b.x, b.z));
 
-        /// <summary>A place on the water 6 to 14 m from the character where the water is at least this deep.</summary>
+        /// <summary>A place on the water 6 to 20 m from the character where the water is at least this deep.</summary>
         internal static Vector3? DeepWaterBeside(Vector3 from, float depth)
         {
             var water = ZoneSystem.instance.m_waterLevel;
-            for (var distance = 6f; distance <= 14f; distance += 2f)
+            for (var distance = 6f; distance <= 20f; distance += 2f)
             {
                 for (var step = 0; step < 16; step++)
                 {
