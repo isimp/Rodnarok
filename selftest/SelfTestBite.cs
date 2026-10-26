@@ -24,6 +24,27 @@ namespace Rodnarok
         private static readonly System.Reflection.MethodInfo TryToHook = AccessTools.Method(typeof(FishingFloat), "TryToHook");
         private static readonly System.Reflection.MethodInfo SetCatch = AccessTools.Method(typeof(FishingFloat), "SetCatch");
 
+        private static bool RingShown() => Hud.instance != null && Hud.instance.m_crosshairBow.gameObject.activeSelf;
+
+        /// <summary>Whether the ring shows a struggle (wide and red) or a rest (small and yellow).</summary>
+        private static bool RingIs(bool red)
+        {
+            if (!RingShown()) return false;
+            var ring = Hud.instance.m_crosshairBow;
+            var scale = ring.transform.localScale.x;
+            return red
+                ? ring.color.r > 0.8f && ring.color.g < 0.4f && scale > 0.6f
+                : ring.color.r > 0.9f && ring.color.g > 0.8f && ring.color.b < 0.1f && scale < 0.4f;
+        }
+
+        /// <summary>Takes a picture of the screen for looking at; notes why when none can be taken.</summary>
+        private static bool Picture(ScenarioCheck check, string what)
+        {
+            var trouble = SelfTestPictures.Take(what);
+            check.That(trouble == null, "a picture of " + what + " is taken: " + trouble);
+            return true;
+        }
+
         public static IEnumerable<Scenario> All()
         {
             yield return new Scenario("ABiteComesAtTheHookPullsTheFloatUnderAndAFightStallsWhileItStruggles", BiteAndFight);
@@ -77,17 +98,38 @@ namespace Rodnarok
                     "the fish bit with its mouth within " + Bites.Reach.ToString("0.0", CultureInfo.InvariantCulture) + " m of the hook, at " + Bites.LastBiteDistanceForTest.ToString("0.00", CultureInfo.InvariantCulture) + " m");
 
                 // The float goes under, and stays under for about a second.
+                // Meanwhile the crosshair ring opens wide and white and closes toward yellow as the window runs out.
                 var deepest = 0f;
                 var late = 0f;
+                Color? ringEarly = null;
+                var scaleEarly = 0f;
+                var pictured = false;
                 for (var waited = 0f; waited < 1f; waited += Time.deltaTime)
                 {
                     var under = resting - ff.transform.position.y;
                     deepest = Mathf.Max(deepest, under);
                     if (waited >= 0.8f && late == 0f) late = under;
+                    if (waited >= 0.1f && ringEarly == null && RingShown())
+                    {
+                        ringEarly = Hud.instance.m_crosshairBow.color;
+                        scaleEarly = Hud.instance.m_crosshairBow.transform.localScale.x;
+                    }
+                    if (waited >= 0.3f && !pictured)
+                    {
+                        pictured = true;
+                        Picture(check, "ring-bite");
+                    }
                     yield return null;
                 }
                 check.That(deepest >= 0.3f, "the float went under by at least 0.3 m, by " + deepest.ToString("0.00", CultureInfo.InvariantCulture) + " m");
                 check.That(late >= 0.15f, "the float was still under 0.8 s after the bite, by " + late.ToString("0.00", CultureInfo.InvariantCulture) + " m");
+                check.That(ringEarly != null, "the crosshair ring showed right after the bite");
+                if (ringEarly != null)
+                {
+                    var now = Hud.instance.m_crosshairBow;
+                    check.That(ringEarly.Value.b > 0.6f && scaleEarly > 0.75f, "right after the bite the ring is wide and white, scale " + scaleEarly.ToString("0.00", CultureInfo.InvariantCulture) + ", blue " + ringEarly.Value.b.ToString("0.00", CultureInfo.InvariantCulture));
+                    check.That(RingShown() && now.transform.localScale.x < scaleEarly - 0.2f && now.color.b < ringEarly.Value.b - 0.2f, "a second after the bite the ring is smaller and yellower, scale " + now.transform.localScale.x.ToString("0.00", CultureInfo.InvariantCulture) + ", blue " + now.color.b.ToString("0.00", CultureInfo.InvariantCulture));
+                }
 
                 // Reeling after the hook window hooks nothing; within it, past the game's half second, it hooks.
                 Nibbler(ff) = biter;
@@ -106,6 +148,9 @@ namespace Rodnarok
                 var skill = player.GetSkillFactor(Skills.SkillType.Fishing);
                 var expected = rules.StallStaminaPerSecond * Mathf.Lerp(1f, rules.SkillCostShare, skill) + Mathf.Lerp(ff.m_hookedStaminaPerSec, ff.m_hookedStaminaPerSecMaxSkill, skill);
                 float struggleTime = 0f, struggleStamina = 0f, struggleLine = 0f, restTime = 0f, restLine = 0f;
+                var ringWrong = 0;
+                var picturedStruggle = false;
+                var picturedRest = false;
                 SelfTestHold.Holding = true;
                 for (var waited = 0f; waited < 15f; waited += Time.deltaTime)
                 {
@@ -120,14 +165,19 @@ namespace Rodnarok
                         struggleTime += Time.deltaTime;
                         struggleStamina += stamina - player.GetStamina();
                         struggleLine += line - LineLength(ff);
+                        if (!RingIs(red: true)) ringWrong++;
+                        if (!picturedStruggle && struggleTime > 0.3f) picturedStruggle = Picture(check, "ring-struggle");
                     }
                     else if (!struggled && !fish.IsEscaping())
                     {
                         restTime += Time.deltaTime;
                         restLine += line - LineLength(ff);
+                        if (!RingIs(red: false)) ringWrong++;
+                        if (!picturedRest && restTime > 0.3f) picturedRest = Picture(check, "ring-rest");
                     }
                 }
                 SelfTestHold.Holding = false;
+                check.That(ringWrong <= 2, ringWrong.ToString(CultureInfo.InvariantCulture) + " frames of the fight showed the ring wrong: a struggle draws it wide and red, a rest small and yellow");
                 check.That(struggleTime >= 0.5f, "the fish struggled at least half a second while the line was held, " + struggleTime.ToString("0.0", CultureInfo.InvariantCulture) + " s");
                 if (struggleTime > 0f)
                 {
