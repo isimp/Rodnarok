@@ -1,0 +1,179 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Reflection;
+using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
+
+namespace Rodnarok.Tests
+{
+    /// <summary>
+    /// Rodnarok's source compiled as the build compiles it: every file under src/ as Rodnarok, and every
+    /// file under selftest/ as the self-test beside it, against the reference copies in lib/ and
+    /// the .NET Framework 4.7.2 reference assemblies. The standards tests read both with the
+    /// compiler's own types, so a rule about numbers or strings sees an implicit conversion as
+    /// surely as a written one. blaxxun's ServerSync under src/ServerSync/ is compiled in as a
+    /// library of its own beside them, so Rodnarok's source sees its types as the build does, but no
+    /// standard reads it: it is not ours to restyle. Compiled once per test run.
+    /// </summary>
+    internal static class RodnarokSource
+    {
+        private static readonly Lazy<CSharpCompilation> Built = new Lazy<CSharpCompilation>(Build);
+        private static readonly Lazy<CSharpCompilation> BuiltSelfTest = new Lazy<CSharpCompilation>(BuildSelfTest);
+
+        /// <summary>Rodnarok itself, src/.</summary>
+        public static CSharpCompilation Compilation => Built.Value;
+
+        /// <summary>The self-test plugin, selftest/, which reaches Rodnarok's insides as its project grants it.</summary>
+        public static CSharpCompilation SelfTest => BuiltSelfTest.Value;
+
+        /// <summary>Both, Rodnarok first.</summary>
+        public static IEnumerable<CSharpCompilation> Compilations
+        {
+            get
+            {
+                yield return Compilation;
+                yield return SelfTest;
+            }
+        }
+
+        /// <summary>The repository's root, the folder holding Rodnarok.csproj.</summary>
+        public static string Root()
+        {
+            for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir != null; dir = dir.Parent)
+            {
+                if (File.Exists(Path.Combine(dir.FullName, "Rodnarok.csproj"))) return dir.FullName;
+            }
+            throw new InvalidOperationException("Rodnarok.csproj not found above the test run.");
+        }
+
+        /// <summary>Rodnarok's source and the self-test's as compiled, and the tests' own, read as written: every file whose comments a standard reads.</summary>
+        public static IEnumerable<SyntaxTree> WrittenTrees()
+        {
+            foreach (var compilation in Compilations)
+            {
+                foreach (var tree in compilation.SyntaxTrees)
+                {
+                    if (!string.IsNullOrEmpty(tree.FilePath)) yield return tree;
+                }
+            }
+            var tests = Path.Combine(Root(), "tests");
+            var separator = Path.DirectorySeparatorChar;
+            foreach (var file in Directory.EnumerateFiles(tests, "*.cs", SearchOption.AllDirectories))
+            {
+                if (file.Contains(separator + "bin" + separator) || file.Contains(separator + "obj" + separator)) continue;
+                yield return CSharpSyntaxTree.ParseText(File.ReadAllText(file), path: file);
+            }
+        }
+
+        /// <summary>A file's path from the repository's root, with forward slashes: "src/Model/Bite.cs".</summary>
+        public static string Relative(SyntaxTree tree) => Path.GetRelativePath(Root(), tree.FilePath).Replace('\\', '/');
+
+        /// <summary>Where a node is, as "src/Model/Bite.cs:12", for a failure to name.</summary>
+        public static string Where(SyntaxNode node) => $"{Relative(node.SyntaxTree)}:{node.GetLocation().GetLineSpan().StartLinePosition.Line + 1}";
+
+        /// <summary>Every node of a kind in Rodnarok's source and the self-test's, with the semantic model of its file.</summary>
+        public static IEnumerable<(T Node, SemanticModel Model)> All<T>() where T : SyntaxNode
+        {
+            foreach (var compilation in Compilations)
+            {
+                foreach (var tree in compilation.SyntaxTrees)
+                {
+                    if (string.IsNullOrEmpty(tree.FilePath)) continue;
+                    var model = compilation.GetSemanticModel(tree);
+                    foreach (var node in tree.GetRoot().DescendantNodes().OfType<T>()) yield return (node, model);
+                }
+            }
+        }
+
+        /// <summary>The type a node stands in: its outermost type declaration's name ("Bite" for a member of a nested type of it).</summary>
+        public static string TopType(SyntaxNode node) =>
+            node.AncestorsAndSelf().OfType<BaseTypeDeclarationSyntax>().LastOrDefault()?.Identifier.Text;
+
+        /// <summary>The method, property or other member a node stands in, by name.</summary>
+        public static string Member(SyntaxNode node)
+        {
+            foreach (var up in node.AncestorsAndSelf())
+            {
+                switch (up)
+                {
+                    case MethodDeclarationSyntax m: return m.Identifier.Text;
+                    case PropertyDeclarationSyntax p: return p.Identifier.Text;
+                    case ConstructorDeclarationSyntax c: return c.Identifier.Text;
+                    case LocalFunctionStatementSyntax l: continue;
+                    case FieldDeclarationSyntax f: return f.Declaration.Variables.First().Identifier.Text;
+                    case IndexerDeclarationSyntax _: return "this[]";
+                    case OperatorDeclarationSyntax o: return "operator " + o.OperatorToken.Text;
+                }
+            }
+            return null;
+        }
+
+        private static readonly CSharpParseOptions Parse = new CSharpParseOptions(LanguageVersion.Latest);
+
+        private static List<SyntaxTree> Trees(string folder) =>
+            Directory.GetFiles(Path.Combine(Root(), folder), "*.cs", SearchOption.AllDirectories)
+                .Where(path => !path.Contains(Path.DirectorySeparatorChar + "obj" + Path.DirectorySeparatorChar) && !path.Contains(Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar))
+                .OrderBy(path => path, StringComparer.Ordinal)
+                .Select(path => CSharpSyntaxTree.ParseText(File.ReadAllText(path), Parse, path))
+                .ToList();
+
+        /// <summary>The folder of the source compiled in unchanged, which no standard reads.</summary>
+        private static readonly string Vendored = Path.DirectorySeparatorChar + "src" + Path.DirectorySeparatorChar + "ServerSync" + Path.DirectorySeparatorChar;
+
+        private static CSharpCompilation Build()
+        {
+            var all = Trees("src");
+            var trees = all.Where(t => !t.FilePath.Contains(Vendored)).ToList();
+            // What Rodnarok.csproj grants the self-test, which the build writes as an attribute of its own.
+            trees.Add(CSharpSyntaxTree.ParseText("[assembly: System.Runtime.CompilerServices.InternalsVisibleTo(\"Rodnarok.SelfTest\")]", Parse));
+            var references = References().ToList();
+            var vendored = all.Where(t => t.FilePath.Contains(Vendored)).ToList();
+            if (vendored.Count > 0) references.Add(Library("Rodnarok.ServerSync", vendored, references));
+            return CSharpCompilation.Create("Rodnarok", trees, references, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+        }
+
+        /// <summary>Source compiled in unchanged, built as a library of its own for Rodnarok's source to reference; its nullable annotations read as the build reads them.</summary>
+        private static MetadataReference Library(string name, IEnumerable<SyntaxTree> trees, IEnumerable<MetadataReference> references)
+        {
+            var library = CSharpCompilation.Create(name, trees, references,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Annotations));
+            using (var image = new MemoryStream())
+            {
+                var emitted = library.Emit(image);
+                if (!emitted.Success)
+                    throw new InvalidOperationException(name + " does not compile: " + string.Join("; ", emitted.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Take(5)));
+                return MetadataReference.CreateFromImage(image.ToArray());
+            }
+        }
+
+        private static CSharpCompilation BuildSelfTest() =>
+            CSharpCompilation.Create("Rodnarok.SelfTest", Trees("selftest"), References().Append(Compilation.ToMetadataReference()),
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+        private static IEnumerable<MetadataReference> References()
+        {
+            var root = Root();
+            var framework = typeof(RodnarokSource).Assembly.GetCustomAttributes<AssemblyMetadataAttribute>()
+                .First(a => a.Key == "Net472References").Value;
+            var references = Directory.GetFiles(Path.Combine(root, "lib"), "*.dll")
+                .Concat(Directory.GetFiles(framework, "*.dll"))
+                .Concat(Directory.GetFiles(Path.Combine(framework, "Facades"), "*.dll"))
+                .Where(Managed)
+                .Select(path => (MetadataReference)MetadataReference.CreateFromFile(path));
+            return references.ToList();
+        }
+
+        /// <summary>Whether a library is a .NET assembly; the framework folder holds two that are not, which the build never references.</summary>
+        private static bool Managed(string path)
+        {
+            using (var stream = File.OpenRead(path))
+            using (var pe = new System.Reflection.PortableExecutable.PEReader(stream))
+            {
+                return pe.HasMetadata && System.Reflection.Metadata.PEReaderExtensions.GetMetadataReader(pe).IsAssembly;
+            }
+        }
+    }
+}

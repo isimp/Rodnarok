@@ -1,0 +1,37 @@
+name: Build
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      # lib/ holds metadata-only copies of everything the project references, so a build server
+      # needs no Valheim install and no download step. See tools/strip-references.ps1.
+      - name: Build
+        run: dotnet build -c Release -p:LibsDir=lib --nologo
+
+      # The in-game self-test is a plugin of its own, never packaged; built here so it keeps up with Rodnarok.
+      - name: Build the self-test
+        run: dotnet build selftest -c Release -p:LibsDir=lib --nologo
+
+      # The tests cover the part of Rodnarok that needs no game; the in-game self-test covers the rest.
+      - name: Test
+        run: dotnet test tests/Rodnarok.Tests --nologo
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Rodnarok
+          path: bin/Release/Rodnarok.dll
+          if-no-files-found: error

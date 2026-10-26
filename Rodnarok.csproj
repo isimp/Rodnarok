@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <AssemblyName>Rodnarok</AssemblyName>
+    <RootNamespace>Rodnarok</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <Version>0.1.0</Version>
+    <Authors>isimp</Authors>
+    <Product>Rodnarok</Product>
+    <Description>Fishing where the bait decides the fish, in any water: bites and fights you can read, a fight that stalls instead of breaking you, fishing from a seat, and a piece that calms the waves around it.</Description>
+    <Copyright>Copyright (c) 2026 isimp</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <DebugType>portable</DebugType>
+    <NoWarn>$(NoWarn);CS0649</NoWarn>
+    <!-- annotations, not enable: the vendored ServerSync source is written against nullable
+         annotations, which parse without turning null-state warnings on for the rest of Rodnarok. -->
+    <Nullable>annotations</Nullable>
+  </PropertyGroup>
+
+  <Import Project="BuildChecks.props" />
+  <Import Project="GameReferences.props" />
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!-- The tests build the model on their own, and the self-test is a plugin of its own. -->
+  <ItemGroup>
+    <Compile Remove="tests/**" />
+    <Compile Remove="tools/**" />
+    <Compile Remove="selftest/**" />
+    <InternalsVisibleTo Include="Rodnarok.SelfTest" />
+  </ItemGroup>
+
+  <Target Name="DeployToProfile" AfterTargets="Build"
+          Condition="'$(LibsDir)' == '' And Exists('$(BepInExDir)\plugins')">
+    <MakeDir Directories="$(DeployDir)" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(DeployDir)" ContinueOnError="true" />
+    <Message Importance="high" Text="Rodnarok -> $(DeployDir)" />
+  </Target>
+
+</Project>
