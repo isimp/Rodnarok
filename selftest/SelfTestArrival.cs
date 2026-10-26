@@ -23,10 +23,40 @@ namespace Rodnarok
         private static readonly AccessTools.FieldRef<FishingFloat, float> NibbleTime = AccessTools.FieldRefAccess<FishingFloat, float>("m_nibbleTime");
         private static readonly AccessTools.FieldRef<FishingFloat, Fish> Nibbler = AccessTools.FieldRefAccess<FishingFloat, Fish>("m_nibbler");
 
+        /// <summary>The fish's and the float's methods whose working the arrival relies on.</summary>
+        private static readonly (Type Type, string Method)[] FishingMethods =
+        {
+            (typeof(Fish), "FindFloat"),
+            (typeof(Fish), "TestBate"),
+            (typeof(Fish), "RandomizeWaypoint"),
+            (typeof(Fish), nameof(Fish.CustomFixedUpdate)),
+            (typeof(Fish), nameof(Fish.OnHooked)),
+            (typeof(FishingFloat), "RPC_Nibble"),
+            (typeof(FishingFloat), "TryToHook"),
+            (typeof(FishingFloat), "FixedUpdate"),
+            (typeof(SpawnSystem), "Spawn"),
+        };
+
         public static IEnumerable<Scenario> All()
         {
+            yield return new Scenario("NoOtherModChangesHowFishBite", NoOtherFishingPatches);
             yield return new Scenario("SchoolSizesComeFromTheWorldsSpawns", GroupsFromTheWorld);
             yield return new Scenario("ABaitDrawsASchoolThatTakesItScattersAndLeaves", SchoolComesAndGoes);
+        }
+
+        /// <summary>No other mod patches the methods the arrival relies on; one that does is named with them, since a result taken with it says little about Rodnarök.</summary>
+        private static IEnumerable NoOtherFishingPatches(ScenarioCheck check)
+        {
+            foreach (var (type, name) in FishingMethods)
+            {
+                var method = AccessTools.Method(type, name);
+                check.That(method != null, type.Name + "." + name + " is there");
+                if (method == null) continue;
+                var info = Harmony.GetPatchInfo(method);
+                var others = info?.Owners.Where(o => o != About.Guid).ToList() ?? new List<string>();
+                check.That(others.Count == 0, type.Name + "." + name + " is also patched by " + string.Join(", ", others));
+            }
+            yield return null;
         }
 
         /// <summary>Every fish the world spawns has its group size read from its spawn entry, and the cave fish, which the world never spawns in groups, has none.</summary>
