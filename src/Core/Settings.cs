@@ -19,6 +19,8 @@ namespace Rodnarok
         private static ConfigEntry<float> _stallStamina;
         private static ConfigEntry<float> _calmReach;
         private static ConfigEntry<float> _calmKeep;
+        private static ConfigEntry<bool> _schools;
+        private static ConfigEntry<bool> _bumps;
 
         /// <summary>The rules as the settings stand now; the defaults before they are bound.</summary>
         public static FishingRules Rules =>
@@ -30,7 +32,9 @@ namespace Rodnarok
                     waitMax: _waitMax.Value,
                     stallStaminaPerSecond: _stallStamina.Value,
                     calmReach: _calmReach.Value,
-                    calmKeep: _calmKeep.Value);
+                    calmKeep: _calmKeep.Value,
+                    schools: _schools.Value,
+                    bumps: _bumps.Value);
 
         public static void Bind(ConfigFile config)
         {
@@ -48,6 +52,10 @@ namespace Rodnarok
                 new ConfigDescription("How far the calm-water piece reaches, in metres. Waves are calmed by the corners of the game's 64 m water tiles, so the calm water fades out over a tile.", new AcceptableValueRange<float>(0f, 128f))));
             _calmKeep = Sync(config.Bind(Section, "CalmKeep", rules.CalmKeep,
                 new ConfigDescription("The share of the waves left where the calm-water piece reaches: 0 is flat water, 1 leaves the waves as they are.", new AcceptableValueRange<float>(0f, 1f))));
+            _schools = Sync(config.Bind(Section, "Schools", rules.Schools,
+                "Whether the bait draws a school of its fish, as many as the world spawns together, of which one takes the bait. Off, a single fish comes."));
+            _bumps = Sync(config.Bind(Section, "Bumps", rules.Bumps,
+                "Whether the fish that takes the bait first bumps the float lightly once or twice. A bump can never be hooked; the real bite pulls the float under."));
         }
 
         private static ConfigEntry<T> Sync<T>(ConfigEntry<T> entry)

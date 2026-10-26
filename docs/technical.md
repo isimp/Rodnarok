@@ -14,6 +14,10 @@ Every fish takes exactly one bait. Fish spawn only in their own biome, never ins
 
 The bait table is built at runtime from the baits the game's own fish take (`BaitTable`), so a fish another mod adds with a bait of its own comes too. A bait two fish take brings each in equal share.
 
+A while after the float lands, the bait draws a school of its fish (`School`): as many as the world spawns of that fish together (a Perch comes in twos to sixes, a Northern Salmon in threes to tens), each size as likely, and two to four of a fish the world never spawns in groups, such as the cave fish. Each fish rolls its stars as the world's spawns do, and the game draws a fish 40% larger for each star. They leap on their way in, circle the float near the top of the depth they swim at, and one of them, each as likely, takes the bait, so the catch keeps the game's odds of stars. When it is hooked the others scatter. With `Schools` off a single fish comes; with `Bumps` on the fish that takes the bait bumps the float lightly first, which can never be hooked.
+
+Fish never leave the world by themselves in the game: each is kept in the world's save until caught. Rodnarök marks its own fish, takes them away 10 seconds after their float is gone, and any player's game takes away a marked fish it finds with no float, so none gather in the save. A fish of the world's own is never taken away. Rodnarök's fish pay no attention to a player's noise; the world's own fish still flee from it.
+
 A bite needs the fish within reach of the hook through all three axes (`Bite`). The hook window is a setting, 1.5 s by default. The crosshair ring (`Ring`) closes over the window and shows a struggle apart from a rest in the fight.
 
 Holding the line while the fish rests reels it in at the game's speed and cost. While it struggles the line stalls: no line is gained, and it costs the `StallStamina` setting a second, the same for every fish, lowered by Fishing skill as reeling is (`Fight`).

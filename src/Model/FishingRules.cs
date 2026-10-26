@@ -36,6 +36,15 @@ namespace Rodnarok
         /// <summary>The share of the waves a calmed corner keeps.</summary>
         public float CalmKeep { get; private set; } = 0.1f;
 
+        /// <summary>Whether the bait draws a school; without, one fish comes.</summary>
+        public bool Schools { get; private set; } = true;
+
+        /// <summary>Whether the fish that takes the bait bumps the float lightly before it bites.</summary>
+        public bool Bumps { get; private set; }
+
+        /// <summary>Seconds after the float is gone before Rodnarök's fish that are left are taken away.</summary>
+        public float LeaveSeconds { get; private set; } = 10f;
+
         /// <summary>These rules with the values given changed.</summary>
         public FishingRules With(
             float? hookWindow = null,
@@ -43,9 +52,13 @@ namespace Rodnarok
             float? waitMax = null,
             float? stallStaminaPerSecond = null,
             float? calmReach = null,
-            float? calmKeep = null)
+            float? calmKeep = null,
+            bool? schools = null,
+            bool? bumps = null)
         {
             var copy = (FishingRules)MemberwiseClone();
+            copy.Schools = schools ?? Schools;
+            copy.Bumps = bumps ?? Bumps;
             copy.HookWindow = hookWindow ?? HookWindow;
             copy.WaitMin = waitMin ?? WaitMin;
             copy.WaitMax = waitMax ?? WaitMax;
