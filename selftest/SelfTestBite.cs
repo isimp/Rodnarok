@@ -149,6 +149,8 @@ namespace Rodnarok
                 var expected = rules.StallStaminaPerSecond * Mathf.Lerp(1f, rules.SkillCostShare, skill) + Mathf.Lerp(ff.m_hookedStaminaPerSec, ff.m_hookedStaminaPerSecMaxSkill, skill);
                 float struggleTime = 0f, struggleStamina = 0f, struggleLine = 0f, restTime = 0f, restLine = 0f;
                 var ringWrong = 0;
+                float struggleDepth = 0f, restDepth = 0f;
+                var splashesBefore = Thrash.SplashesForTest;
                 var picturedStruggle = false;
                 var picturedRest = false;
                 SelfTestHold.Holding = true;
@@ -160,8 +162,10 @@ namespace Rodnarok
                     var stamina = player.GetStamina();
                     yield return null;
                     if (ff == null || ff.GetCatch() != fish) break;
+                    var depth = ff.transform.position.y - fish.transform.position.y;
                     if (struggled && fish.IsEscaping())
                     {
+                        struggleDepth += depth * Time.deltaTime;
                         struggleTime += Time.deltaTime;
                         struggleStamina += stamina - player.GetStamina();
                         struggleLine += line - LineLength(ff);
@@ -170,6 +174,7 @@ namespace Rodnarok
                     }
                     else if (!struggled && !fish.IsEscaping())
                     {
+                        restDepth += depth * Time.deltaTime;
                         restTime += Time.deltaTime;
                         restLine += line - LineLength(ff);
                         if (!RingIs(red: false)) ringWrong++;
@@ -177,6 +182,15 @@ namespace Rodnarok
                     }
                 }
                 SelfTestHold.Holding = false;
+                var splashes = Thrash.SplashesForTest - splashesBefore;
+                if (struggleTime > 0.5f && restTime > 0.5f)
+                {
+                    var high = struggleDepth / struggleTime;
+                    var low = restDepth / restTime;
+                    check.That(high < low - 0.3f, "a struggling fish thrashes nearer the surface than a resting one, " + high.ToString("0.00", CultureInfo.InvariantCulture) + " m under against " + low.ToString("0.00", CultureInfo.InvariantCulture) + " m");
+                }
+                if (struggleTime > 0.5f)
+                    check.That(splashes / struggleTime >= 2f, "a struggling fish splashes at least twice a second, " + (splashes / struggleTime).ToString("0.0", CultureInfo.InvariantCulture) + " a second");
                 check.That(ringWrong <= 2, ringWrong.ToString(CultureInfo.InvariantCulture) + " frames of the fight showed the ring wrong: a struggle draws it wide and red, a rest small and yellow");
                 check.That(struggleTime >= 0.5f, "the fish struggled at least half a second while the line was held, " + struggleTime.ToString("0.0", CultureInfo.InvariantCulture) + " s");
                 if (struggleTime > 0f)

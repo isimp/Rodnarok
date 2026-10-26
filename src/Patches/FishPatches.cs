@@ -47,6 +47,20 @@ namespace Rodnarok
         }
     }
 
+    /// <summary>A hooked fish shows its struggle at the surface.</summary>
+    [HarmonyPatch(typeof(Fish), nameof(Fish.CustomFixedUpdate))]
+    internal static class StruggleShows
+    {
+        private static void Postfix(Fish __instance) => Thrash.Step(__instance);
+    }
+
+    /// <summary>A fish leaving the world is let go of by the thrashing.</summary>
+    [HarmonyPatch(typeof(Fish), "OnDisable")]
+    internal static class StruggleForgets
+    {
+        private static void Postfix(Fish __instance) => Thrash.Forget(__instance);
+    }
+
     /// <summary>When a school's fish is hooked, the rest of it scatters.</summary>
     [HarmonyPatch(typeof(Fish), nameof(Fish.OnHooked))]
     internal static class SchoolScattersOnHook
