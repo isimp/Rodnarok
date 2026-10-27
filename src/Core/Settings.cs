@@ -51,9 +51,9 @@ namespace Rodnarok
             var rules = FishingRules.Default;
             _sync = new ServerSync.ConfigSync(About.Guid) { DisplayName = About.Name, CurrentVersion = About.Version, ModRequired = true, IsLocked = true };
             _waitMin = Sync(config.Bind(Section, "WaitMin", rules.WaitMin,
-                new ConfigDescription("Shortest wait, in seconds, from the float landing until a fish of the bait's kind comes to it.", new AcceptableValueRange<float>(0f, 300f))));
+                new ConfigDescription("Shortest time, in seconds, a school takes to swim in from out of sight after the float lands. A long way in takes as long as its fish need to stay together.", new AcceptableValueRange<float>(0f, 300f))));
             _waitMax = Sync(config.Bind(Section, "WaitMax", rules.WaitMax,
-                new ConfigDescription("Longest wait, in seconds, from the float landing until a fish of the bait's kind comes to it.", new AcceptableValueRange<float>(0f, 300f))));
+                new ConfigDescription("Longest time, in seconds, a school takes to swim in from out of sight after the float lands, unless a long way in needs longer.", new AcceptableValueRange<float>(0f, 300f))));
             _hookWindow = Sync(config.Bind(Section, "HookWindow", rules.HookWindow,
                 new ConfigDescription("Seconds after a bite during which holding the line hooks the fish. The game gives half a second.", new AcceptableValueRange<float>(0.5f, 5f))));
             _stallStamina = Sync(config.Bind(Section, "StallStamina", rules.StallStaminaPerSecond,

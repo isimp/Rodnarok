@@ -46,16 +46,16 @@ namespace Rodnarok
         /// <summary>Which fish of a school this big takes the bait, counted from 0, for a roll from 0 to 1.</summary>
         public static int Biter(int size, double roll) => Pick(Math.Max(1, size), roll);
 
-        /// <summary>How long after it came a school gets a bite even with most of its fish still off.</summary>
-        private const float BiteBackstop = 20f;
+        /// <summary>How long after its swim in a school gets a bite even with most of its fish still off.</summary>
+        private const float BiteBackstop = 8f;
 
         /// <summary>
-        /// Whether a fish of the school may now be let go for the bait: once the school has come in
-        /// and half of it is near the float, or a while after it came whatever its fish are doing;
+        /// Whether a fish of the school may now be let go for the bait: once the school's swim in is
+        /// over and half of it is near the float, or a while after that whatever its fish are doing;
         /// never once something spooked it.
         /// </summary>
-        public static bool ReadyToBite(float sinceCame, int near, int size, bool spooked = false) =>
-            !spooked && (sinceCame >= BiteBackstop || (sinceCame >= Drift.Seconds && near * 2 >= size));
+        public static bool ReadyToBite(float sinceCame, float swimSeconds, int near, int size, bool spooked = false) =>
+            !spooked && (sinceCame >= swimSeconds + BiteBackstop || (sinceCame >= swimSeconds && near * 2 >= size));
 
         /// <summary>
         /// Whether a fish can be caught this way: a fish a bait drew only with the rod, so a bait

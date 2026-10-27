@@ -116,7 +116,7 @@ namespace Rodnarok
                 ff.Setup(player, Vector3.zero, 0f, null, null, bait);
                 var floatId = go.GetComponent<ZNetView>().GetZDO().m_uid;
 
-                // The school comes once the float lies in the water and the wait is over.
+                // The school appears the moment the float lies in the water, out of sight of the character.
                 List<Fish> school = null;
                 for (var waited = 0f; waited < 15f; waited += Time.deltaTime)
                 {
@@ -126,6 +126,14 @@ namespace Rodnarok
                 }
                 check.That(school != null && school.Count > 0, "a school came within 15 s of the float landing");
                 if (school == null || school.Count == 0) yield break;
+                var nowRules = PlayRules.Now;
+                var appearedInSight = school.Where(f => f != null
+                    && !Arrival.StartOutOfSight(Vector3.Distance(f.transform.position, player.transform.position) + 0.5f, FishWater(f) - f.transform.position.y + 0.3f, nowRules)).ToList();
+                check.That(appearedInSight.Count == 0, "every fish of the school appeared out of sight, 40 m from the character or 4 m under the surface; "
+                    + string.Join(", ", appearedInSight.Select(f => Vector3.Distance(f.transform.position, player.transform.position).ToString("0", CultureInfo.InvariantCulture) + " m off, "
+                        + (FishWater(f) - f.transform.position.y).ToString("0.0", CultureInfo.InvariantCulture) + " m under")));
+                var swim = Schools.SwimSecondsForTest(ff);
+                check.That(swim >= nowRules.WaitMin, "the school swims in over at least the shortest wait, " + swim.ToString("0.0", CultureInfo.InvariantCulture) + " s");
                 yield return null;
                 school = SchoolOf(floatId);
 
@@ -148,22 +156,22 @@ namespace Rodnarok
                 var halfNearAfter = -1f;
                 var nibbledEarly = false;
                 var pictured = false;
-                for (var waited = 0f; waited < Drift.Seconds + 30f && halfNearAfter < 0f; waited += Time.deltaTime)
+                for (var waited = 0f; waited < swim + 30f && halfNearAfter < 0f; waited += Time.deltaTime)
                 {
                     var here = school.Where(f => f != null).ToList();
                     var sinceCame = Time.time - cameAt;
-                    if (here.Count > 1 && sinceCame < Drift.Seconds * 0.75f) spreads.Add(Spread(here));
+                    if (here.Count > 1 && sinceCame < swim * 0.75f) spreads.Add(Spread(here));
                     if (here.Count(f => Across(f.transform.position, ff.transform.position) < 6f) * 2 >= here.Count) halfNearAfter = sinceCame;
-                    if (sinceCame < Drift.Seconds && NibbleTime(ff) > 0f && school.Contains(Nibbler(ff))) nibbledEarly = true;
-                    if (!pictured && sinceCame >= Drift.Seconds * 0.4f)
+                    if (sinceCame < swim && NibbleTime(ff) > 0f && school.Contains(Nibbler(ff))) nibbledEarly = true;
+                    if (!pictured && sinceCame >= swim * 0.4f)
                     {
                         pictured = true;
                         SelfTestPictures.Take("arrival-drifting");
                     }
                     yield return null;
                 }
-                check.That(halfNearAfter >= 0f, "half the school reached the float within " + (Drift.Seconds + 30f).ToString("0", CultureInfo.InvariantCulture) + " s");
-                check.That(halfNearAfter < 0f || halfNearAfter >= Drift.Seconds * 0.6f, "the school drifts in rather than rushing, half of it at the float after " + halfNearAfter.ToString("0.0", CultureInfo.InvariantCulture) + " s");
+                check.That(halfNearAfter >= 0f, "half the school reached the float within " + (swim + 30f).ToString("0", CultureInfo.InvariantCulture) + " s");
+                check.That(halfNearAfter < 0f || halfNearAfter >= swim * 0.6f, "the school swims in rather than rushing, half of it at the float after " + halfNearAfter.ToString("0.0", CultureInfo.InvariantCulture) + " s of a " + swim.ToString("0", CultureInfo.InvariantCulture) + " s swim"); 
                 check.That(school.Count < 2 || spreads.Count > 0 && spreads.Average() >= 2f, "the school is loose on its way in, its fish on average " + (spreads.Count > 0 ? spreads.Average() : 0f).ToString("0.0", CultureInfo.InvariantCulture) + " m from its middle");
                 check.That(!nibbledEarly, "no fish of the school took the bait before the school was in");
                 SelfTestPictures.Take("arrival-in");
@@ -274,6 +282,9 @@ namespace Rodnarok
         {
             for (var waited = 0f; waited < 40f && Schools.LeavingForTest > 0; waited += Time.deltaTime) yield return null;
         }
+
+        /// <summary>The water level at a fish, as the game keeps it.</summary>
+        private static readonly AccessTools.FieldRef<Fish, float> FishWater = AccessTools.FieldRefAccess<Fish, float>("m_inWater");
 
         internal static List<Fish> SchoolOf(ZDOID floatId) =>
             Fish.Instances.OfType<Fish>().Where(f => f != null && Schools.FloatOf(f) == floatId).ToList();

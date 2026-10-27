@@ -12,10 +12,10 @@ namespace Rodnarok
         /// <summary>Seconds after a bite that reeling still hooks the fish; the game gives half a second.</summary>
         public float HookWindow { get; private set; } = 1.5f;
 
-        /// <summary>Shortest wait, in seconds, before a fish comes to the float.</summary>
+        /// <summary>Shortest time, in seconds, a school swims in after the float lands; a long way in takes as long as its fish need.</summary>
         public float WaitMin { get; private set; } = 10f;
 
-        /// <summary>Longest wait, in seconds, before a fish comes to the float.</summary>
+        /// <summary>Longest time, in seconds, a school swims in after the float lands, unless a long way in needs longer.</summary>
         public float WaitMax { get; private set; } = 30f;
 
         /// <summary>Stamina a second for holding the line while the fish struggles, before skill lowers it.</summary>

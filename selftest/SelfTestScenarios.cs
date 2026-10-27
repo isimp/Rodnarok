@@ -29,7 +29,10 @@ namespace Rodnarok
             foreach (var scenario in SelfTestSitting.All()) yield return scenario;
         }
 
-        /// <summary>Every fish prefab takes some bait, the bait table built from them reaches every one, swims no slower than a school cruises in, and each bait is ammunition the fishing rod casts.</summary>
+        /// <summary>How far out a school starting far away may lie, as a fish's swim in is checked.</summary>
+        private const float FarStart = 44f;
+
+        /// <summary>Every fish prefab takes some bait, the bait table built from them reaches every one, swims in from a far start within a minute, and each bait is ammunition the fishing rod casts.</summary>
         private static IEnumerable EveryFishComesToABait(ScenarioCheck check)
         {
             var fish = ZNetScene.instance.m_prefabs.Where(p => p != null && p.GetComponent<Fish>() != null).ToList();
@@ -42,7 +45,8 @@ namespace Rodnarok
             foreach (var p in fish)
             {
                 var speed = p.GetComponent<Fish>().m_speed;
-                check.That(speed >= Drift.Cruise, p.name + " swims at least as fast as a school cruises in, " + speed.ToString("0.0", CultureInfo.InvariantCulture) + " m/s");
+                var swim = Drift.Swim(FarStart, 0f, speed);
+                check.That(speed > 0f && swim <= 60f, p.name + " swims, and a school of it gets in from " + FarStart.ToString("0", CultureInfo.InvariantCulture) + " m within a minute, " + swim.ToString("0", CultureInfo.InvariantCulture) + " s at " + speed.ToString("0.0", CultureInfo.InvariantCulture) + " m/s");
             }
 
             var rod = ZNetScene.instance.GetPrefab("FishingRod")?.GetComponent<ItemDrop>();

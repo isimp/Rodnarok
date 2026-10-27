@@ -11,10 +11,11 @@ namespace Rodnarok
     /// The schools baits draw. When a float this game cast lies in the water, the wait is rolled;
     /// when it is over, a fish of the world's own that takes the bait and can swim to the float is
     /// called to it from where it swims, and nothing is spawned. Without one, a school of the
-    /// bait's fish appears out in the water, where the water gives it a place to come from and a
-    /// way out again, and once the caster's last school is gone; where it does not, that is said
-    /// once. The school makes the float its home, circling it near the top of the depth it swims
-    /// at, the small ones leaping on the way in as the game lets them. Once most of it is near, one
+    /// bait's fish appears out of sight beyond the float the moment it lands, 40 m from every
+    /// player or 4 m under the surface, where the water gives it a way out again, and once the
+    /// caster's last school is gone; where it does not, that is said once. The wait is its swim in:
+    /// it makes the float its home, a deep one rising as it comes, circling it near the top of the
+    /// depth it swims at, the small ones leaping on the way in as the game lets them. Once most of it is near, one
     /// fish of it may go for the bait, and the game's own bite follows. When that one is hooked the
     /// rest scatter, and once the float is gone the school swims off and is taken away.
     ///
@@ -54,6 +55,10 @@ namespace Rodnarok
             public Vector3 Start;
             public float OwnSpeed;
             public bool In;
+            public float Wait;
+            public float SwimSeconds;
+            public float StartUnder;
+            public float SwimUnder;
             public readonly List<Fish> Fish = new List<Fish>();
             public int Biter = -1;
             public float BiterFreeAt = float.MaxValue;
@@ -86,6 +91,16 @@ namespace Rodnarok
         /// <summary>How many fish this game steers away as leaving, for the self-test.</summary>
         [ForTest]
         public static int LeavingForTest => GoneSince.Count;
+
+        /// <summary>How long the school of a float this game cast takes to swim in, for the self-test; below zero for none.</summary>
+        [ForTest]
+        public static float SwimSecondsForTest(FishingFloat ff) => ff != null && Casts.TryGetValue(ff, out var cast) && cast.Fish.Count > 0 ? cast.SwimSeconds : -1f;
+
+        /// <summary>How long after the float lands what comes to it is decided, in seconds: the float settles on the water first.</summary>
+        private const float Settle = 0.5f;
+
+        /// <summary>The farthest out beyond the float a school may start, in metres.</summary>
+        private const float FarthestStart = 60f;
 
         /// <summary>The fish of the world's own called to a float this game cast, for the self-test; null for none.</summary>
         [ForTest]
@@ -201,7 +216,8 @@ namespace Rodnarok
                     Float = ff,
                     Id = view.GetZDO().m_uid,
                     LastPlace = ff.transform.position,
-                    DueAt = Time.time + Arrival.Seconds(rules.WaitMin, rules.WaitMax, Random.value),
+                    DueAt = Time.time + Settle,
+                    Wait = Arrival.Seconds(rules.WaitMin, rules.WaitMax, Random.value),
                 };
             }
 
@@ -240,10 +256,15 @@ namespace Rodnarok
 
             cast.Fish.RemoveAll(f => f == null);
             if (!cast.In) DriftIn(cast);
-            foreach (var fish in cast.Fish) MaybeLeap(fish, cast.Float.transform.position);
+            // A school rising from deep leaps only once it is near its own depth.
+            var rising = cast.StartUnder > cast.SwimUnder + 0.5f && Drift.Share(Time.time - cast.CameAt, cast.SwimSeconds) < 0.6f;
+            if (!rising)
+            {
+                foreach (var fish in cast.Fish) MaybeLeap(fish, cast.Float.transform.position);
+            }
             if (cast.Hooked || cast.Fish.Count == 0 || cast.BiterFreeAt < float.MaxValue) return;
             var near = cast.Fish.Count(f => Across(f.transform.position, cast.Float.transform.position) < Near);
-            if (School.ReadyToBite(Time.time - cast.CameAt, near, cast.Fish.Count, cast.Spooked))
+            if (School.ReadyToBite(Time.time - cast.CameAt, cast.SwimSeconds, near, cast.Fish.Count, cast.Spooked))
             {
                 cast.Biter = School.Biter(cast.Fish.Count, Random.value);
                 cast.BiterFreeAt = Time.time + Random.Range(2f, 4f);
@@ -251,15 +272,17 @@ namespace Rodnarok
         }
 
         /// <summary>
-        /// Moves the school's home from where it appeared toward the float, its fish wandering widely
-        /// around it at one slow pace, until it reaches the float and each fish swims at its own speed.
-        /// The game takes a new fish's home from its saved data once, on its first frame, so a fish
-        /// whose home jumped from the school's then picks a new place to swim at once.
+        /// Moves the school's home from where it appeared toward the float over its swim, its fish
+        /// wandering widely around it at one slow pace and a school that started deep rising to its
+        /// own depth, until it reaches the float and each fish swims at its own speed. The game takes
+        /// a new fish's home from its saved data once, on its first frame, so a fish whose home jumped
+        /// from the school's then picks a new place to swim at once.
         /// </summary>
         private static void DriftIn(Cast cast)
         {
-            var share = Drift.Share(Time.time - cast.CameAt);
+            var share = Drift.Share(Time.time - cast.CameAt, cast.SwimSeconds);
             var home = Vector3.Lerp(cast.Start, cast.Float.transform.position, share);
+            var under = Drift.Depth(share, cast.StartUnder, cast.SwimUnder);
             foreach (var fish in cast.Fish)
             {
                 if (Fled.Contains(fish)) continue;
@@ -267,6 +290,11 @@ namespace Rodnarok
                 SpawnPoint(fish) = home;
                 fish.m_swimRange = Drift.SwimRange(share, CircleRange);
                 fish.m_speed = Drift.Speed(cast.OwnSpeed, share);
+                if (cast.StartUnder > cast.SwimUnder)
+                {
+                    fish.m_minDepth = under;
+                    fish.m_maxDepth = under + 0.5f;
+                }
             }
             cast.In = share >= 1f;
         }
@@ -312,17 +340,21 @@ namespace Rodnarok
             cast.Came = true;
             cast.CameAt = Time.time;
 
-            cast.Start = start.Value;
+            var at = start.Value.At;
+            var depth = start.Value.Under;
+            cast.Start = at;
             cast.OwnSpeed = template.m_speed;
+            cast.StartUnder = depth;
+            cast.SwimUnder = template.m_minDepth;
+            cast.SwimSeconds = Drift.Swim(Across(at, home), cast.Wait, template.m_speed);
             var size = School.Size(book.Group(kind), Rules, Random.value);
-            var depth = template.m_minDepth + 0.25f;
             for (var i = 0; i < size; i++)
             {
                 // Each fish where the water is deep enough for it, or else at the school's centre, which is.
                 var offset = Random.insideUnitCircle * Drift.Spread;
                 var facing = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
-                var place = new Vector3(start.Value.x + offset.x, surface - depth, start.Value.z + offset.y);
-                if (!DeepEnough(place, surface, template.m_minDepth)) place = new Vector3(start.Value.x, surface - depth, start.Value.z);
+                var place = new Vector3(at.x + offset.x, surface - depth, at.z + offset.y);
+                if (!DeepEnough(place, surface, depth)) place = new Vector3(at.x, surface - depth, at.z);
                 var go = UnityEngine.Object.Instantiate(prefab, place, facing);
                 // The rod's catch hands the fish over by itself; lying anywhere else it is never picked up in passing.
                 var item = go.GetComponent<ItemDrop>();
@@ -335,12 +367,18 @@ namespace Rodnarok
                 if (quality > 1) item?.SetQuality(quality);
 
                 var fish = go.GetComponent<Fish>();
-                SpawnPoint(fish) = start.Value;
+                SpawnPoint(fish) = at;
                 fish.m_swimRange = Drift.SwimRange(0f, CircleRange);
                 fish.m_speed = Drift.Speed(cast.OwnSpeed, 0f);
                 fish.m_wpDurationMin = RepickMin;
                 fish.m_wpDurationMax = RepickMax;
                 fish.m_maxDepth = Mathf.Min(fish.m_maxDepth, fish.m_minDepth + 0.5f);
+                if (depth > fish.m_minDepth)
+                {
+                    // Started deep: it swims as deep as it started, and rises over the swim in.
+                    fish.m_minDepth = depth;
+                    fish.m_maxDepth = depth + 0.5f;
+                }
                 cast.Fish.Add(fish);
                 CastOf[fish] = cast;
                 Ours.Add(fish);
@@ -442,25 +480,51 @@ namespace Rodnarok
             return false;
         }
 
-        /// <summary>
-        /// A place out in the water for a school to come from: as far out as can be found, with the
-        /// water deep enough for the fish there, halfway and at the float, so it can swim in.
-        /// </summary>
-        private static Vector3? StartFor(Vector3 home, float surface, float minDepth)
+        /// <summary>Where a school appears, and how far under the surface.</summary>
+        private struct StartPlace
         {
-            if (!DeepEnough(home, surface, minDepth)) return null;
-            var turn = Random.Range(0f, 360f);
-            for (var distance = Drift.From; distance >= 6f; distance -= 4f)
+            public Vector3 At;
+            public float Under;
+        }
+
+        /// <summary>
+        /// A place out of sight for a school to come from, beyond the float as seen from the one
+        /// fishing, through water deep enough for its fish all the way in: the nearest place where
+        /// the whole school is 40 m from every player, at its own depth; else 6 to 14 m out where the
+        /// water lets it swim 4 m under the surface. None where neither is.
+        /// </summary>
+        private static StartPlace? StartFor(Vector3 home, float surface, float minDepth)
+        {
+            if (!DeepEnough(home, surface, minDepth) || Player.m_localPlayer == null) return null;
+            var rules = Rules;
+            var away = Flat(home - Player.m_localPlayer.transform.position);
+            var own = minDepth + 0.25f;
+            foreach (var turn in BeyondTurns)
             {
-                for (var step = 0; step < 12; step++)
+                var dir = Quaternion.Euler(0f, turn, 0f) * away;
+                for (var distance = 2f; distance <= FarthestStart; distance += 2f)
                 {
-                    var angle = (turn + step * 30f) * Mathf.Deg2Rad;
-                    var p = home + new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * distance;
-                    if (DeepEnough(p, surface, minDepth) && DeepEnough((p + home) / 2f, surface, minDepth)) return p;
+                    var p = home + dir * distance;
+                    if (!DeepEnough(p, surface, minDepth)) break;
+                    if (Arrival.StartOutOfSight(NearestPlayer(p) - Drift.Spread, own, rules)) return new StartPlace { At = p, Under = own };
+                }
+            }
+            var deep = rules.DiveDepth;
+            foreach (var turn in BeyondTurns)
+            {
+                var dir = Quaternion.Euler(0f, turn, 0f) * away;
+                for (var distance = 6f; distance <= 14f; distance += 2f)
+                {
+                    if (!DeepAlong(home, dir, distance, surface, minDepth)) break;
+                    var p = home + dir * distance;
+                    if (DeepEnough(p, surface, deep) && Arrival.StartOutOfSight(NearestPlayer(p), deep, rules)) return new StartPlace { At = p, Under = deep };
                 }
             }
             return null;
         }
+
+        /// <summary>The turns from straight beyond the float a start is looked for in, nearest first, in degrees.</summary>
+        private static readonly float[] BeyondTurns = { 0f, 20f, -20f, 40f, -40f, 60f, -60f };
 
         private static bool DeepEnough(Vector3 p, float surface, float minDepth) =>
             ZoneSystem.instance.GetSolidHeight(p, out var ground) && surface - ground >= minDepth + 0.5f;

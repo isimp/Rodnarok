@@ -125,8 +125,8 @@ namespace Rodnarok.Tests
         [Fact]
         public void ASpookedSchoolNeverTakesTheBait()
         {
-            Assert.False(School.ReadyToBite(Drift.Seconds + 1f, near: 6, size: 6, spooked: true));
-            Assert.False(School.ReadyToBite(100f, near: 0, size: 6, spooked: true));
+            Assert.False(School.ReadyToBite(sinceCame: 21f, swimSeconds: 20f, near: 6, size: 6, spooked: true));
+            Assert.False(School.ReadyToBite(sinceCame: 100f, swimSeconds: 20f, near: 0, size: 6, spooked: true));
         }
 
         [Fact]

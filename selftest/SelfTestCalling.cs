@@ -9,9 +9,9 @@ namespace Rodnarok
 {
     /// <summary>
     /// What comes to a float besides a school. A fish of the world's own that takes the bait near
-    /// the float is called to it and nothing is spawned: a Perch is put in the water a few metres
-    /// off, with no float's mark, and must be the one called, take the bait, and leave no school
-    /// behind. A second cast right after a school was left must wait for that school to be gone
+    /// the float is called to it and nothing is spawned: a Perch is put in the water out of sight,
+    /// beyond the float 40 m from the character or 4 m under the surface, with no float's mark, and
+    /// must be the one called, take the bait, and leave no school behind. A second cast right after a school was left must wait for that school to be gone
     /// before its own comes. Needs a character beside water at least 3 m deep; the rod, the floats,
     /// the Perch put there and the schools are taken away again.
     /// </summary>
@@ -39,8 +39,8 @@ namespace Rodnarok
             var fishPrefab = ZNetScene.instance.GetPrefab(WorldFishPrefab);
             check.That(floatPrefab != null && baitPrefab != null && fishPrefab != null, "the float, the bait and the Perch prefabs are there");
             if (floatPrefab == null || baitPrefab == null || fishPrefab == null) yield break;
-            var near = DeepNear(spot.Value, 3f);
-            check.That(near.HasValue, "water at least 3 m deep 5 to 9 m from the float, reached through deep water, for the Perch");
+            var near = OutOfSightBeyond(spot.Value, player.transform.position);
+            check.That(near.HasValue, "a place out of sight for the Perch beyond the float, 40 m from the character or 4 m deep, reached from the float through water 3 m deep");
             if (!near.HasValue) yield break;
 
             var gear = SelfTestGear.RodInHand(player);
@@ -53,7 +53,7 @@ namespace Rodnarok
                 for (var waited = 0f; waited < 3f && Utils.FindChild(player.transform, "_RodTop") == null; waited += Time.deltaTime) yield return null;
                 foreach (var frame in SelfTestArrival.UntilNoSchoolLeaves()) yield return frame;
 
-                // A Perch of the world's own in the water a few metres off: no float's mark on it.
+                // A Perch of the world's own in the water out of sight: no float's mark on it.
                 perch = Object.Instantiate(fishPrefab, near.Value, Quaternion.identity);
                 yield return null;
                 var put = perch.GetComponent<Fish>();
@@ -172,22 +172,44 @@ namespace Rodnarok
             return ff;
         }
 
-        /// <summary>A place 5 to 9 m from the float, at least this deep and as deep every metre of the way to the float, 2 m under the surface; none where there is none.</summary>
-        private static Vector3? DeepNear(Vector3 at, float depth)
+        /// <summary>How deep the way from the Perch to the float must be, and how deep under the surface a Perch put near is.</summary>
+        private const float WayDepth = 3f;
+        private const float DeepUnder = 4f;
+
+        /// <summary>
+        /// A place out of sight beyond the float as seen from the character, reached from the float
+        /// through water 3 m deep every metre: 40 m from the character within 30 m of the float, 2 m
+        /// under the surface; else 5 to 9 m out, 4 m under where the water is deep enough; none where
+        /// there is neither.
+        /// </summary>
+        private static Vector3? OutOfSightBeyond(Vector3 at, Vector3 character)
         {
             var water = ZoneSystem.instance.m_waterLevel;
-            for (var distance = 5f; distance <= 9f; distance += 2f)
+            var away = at - character;
+            away.y = 0f;
+            away = away.sqrMagnitude < 0.01f ? Vector3.forward : away.normalized;
+            foreach (var turn in new[] { 0f, 30f, -30f, 60f, -60f })
             {
-                for (var step = 0; step < 16; step++)
+                var dir = Quaternion.Euler(0f, turn, 0f) * away;
+                for (var d = 1f; d <= 30f; d += 1f)
                 {
-                    var dir = new Vector3(Mathf.Cos(step * Mathf.PI / 8f), 0f, Mathf.Sin(step * Mathf.PI / 8f));
-                    var clear = true;
-                    for (var d = 1f; d <= distance && clear; d += 1f)
-                        clear = ZoneSystem.instance.GetSolidHeight(at + dir * d, out var ground) && water - ground >= depth;
-                    if (clear) return new Vector3(at.x + dir.x * distance, water - 2f, at.z + dir.z * distance);
+                    if (!Depth(at + dir * d, water, WayDepth)) break;
+                    var p = at + dir * d;
+                    if (Vector3.Distance(new Vector3(p.x, character.y, p.z), character) >= 42f) return new Vector3(p.x, water - 2f, p.z);
+                }
+            }
+            foreach (var turn in new[] { 0f, 30f, -30f, 60f, -60f })
+            {
+                var dir = Quaternion.Euler(0f, turn, 0f) * away;
+                for (var d = 1f; d <= 9f; d += 1f)
+                {
+                    if (!Depth(at + dir * d, water, WayDepth)) break;
+                    if (d >= 5f && Depth(at + dir * d, water, DeepUnder + 0.5f)) return new Vector3(at.x + dir.x * d, water - DeepUnder, at.z + dir.z * d);
                 }
             }
             return null;
         }
+
+        private static bool Depth(Vector3 p, float water, float depth) => ZoneSystem.instance.GetSolidHeight(p, out var ground) && water - ground >= depth;
     }
 }

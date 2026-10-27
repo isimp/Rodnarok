@@ -21,8 +21,8 @@ namespace Rodnarok
     /// <summary>
     /// How long a fish takes to come to the float, a roll between the rules' shortest and longest
     /// wait, and what comes then: a fish of the world's own that takes the bait, called from where
-    /// it swims, before a school is spawned; a school only where the water gives it a place to come
-    /// from and a way out again, and only once the caster's last school is gone.
+    /// it swims, before a school is spawned; a school only where the water gives it a place out of
+    /// sight to come from and a way out again, and only once the caster's last school is gone.
     /// </summary>
     internal static class Arrival
     {
@@ -43,7 +43,14 @@ namespace Rodnarok
             return lastSchoolGone ? ArrivalChoice.School : ArrivalChoice.Wait;
         }
 
-        /// <summary>Whether the water allows a school: a place out in it to come from, and a way out again to dive or swim out of sight.</summary>
+        /// <summary>
+        /// Whether a school appearing here is out of sight, by the same measure a leaving fish is taken
+        /// away by: far from every player, or deep under the surface.
+        /// </summary>
+        public static bool StartOutOfSight(float nearestPlayer, float underSurface, FishingRules rules) =>
+            nearestPlayer >= rules.OutOfSight || underSurface >= rules.DiveDepth;
+
+        /// <summary>Whether the water allows a school: a place out of sight to come from, and a way out again to dive or swim out of sight.</summary>
         public static bool WaterAllowsSchool(bool placeToComeFrom, bool wayOut) => placeToComeFrom && wayOut;
     }
 }
