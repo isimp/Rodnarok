@@ -117,12 +117,14 @@ namespace Rodnarok
             for (var waited = 0f; waited < 0.3f; waited += Time.deltaTime) yield return null;
             SelfTestDraw.Drawing = true;
             var drew = false;
+            var windUpShown = false;
             var pictured = false;
             var stayed = true;
             var lowered = true;
             for (var waited = 0f; waited < 1.5f; waited += Time.deltaTime)
             {
                 drew |= player.IsDrawingBow();
+                windUpShown |= SeatedRodPose.ShowingForTest(player) == SeatedPose.Draw;
                 stayed &= seated();
                 if (waited >= 0.5f) lowered &= posed();
                 if (waited >= 1f && !pictured) pictured = Picture(check, "sitting-" + seat + "-drawing");
@@ -132,6 +134,7 @@ namespace Rodnarok
             check.That(drew, "sitting on the " + seat + ", the rod draws");
             check.That(stayed, "the character stayed seated on the " + seat + " while drawing");
             check.That(lowered, "drawing on the " + seat + ", the character's head stays lowered as seated; at the end " + heads());
+            if (Settings.SeatedMotions) check.That(windUpShown, "drawing on the " + seat + ", the arms show the throw's wind-up");
 
             // The float is watched for a while: when any float shows, whether this game owns it, and
             // what the character was doing should it go again, so a failed cast says what happened.
@@ -174,12 +177,17 @@ namespace Rodnarok
             stayed = true;
             // Held as the block key reaches the game, so the seated player's own way to reel is what is tried.
             SelfTestDraw.Reeling = true;
+            var pullShown = false;
+            var picturedReel = false;
             for (var waited = 0f; waited < 1.5f && cast != null; waited += Time.deltaTime)
             {
                 stayed &= seated();
+                pullShown |= SeatedRodPose.ShowingForTest(player) == SeatedPose.Reel;
+                if (!picturedReel && waited >= 0.8f) picturedReel = Picture(check, "sitting-" + seat + "-reeling");
                 yield return null;
             }
             SelfTestDraw.Reeling = false;
+            if (Settings.SeatedMotions) check.That(pullShown, "reeling on the " + seat + ", the arms show the pull");
             check.That(cast != null && LineLength(cast) < line - 0.5f, "sitting on the " + seat + ", the line reels in, from " + line.ToString("0.0", CultureInfo.InvariantCulture) + " m");
             check.That(stayed, "the character stayed seated on the " + seat + " while reeling");
             if (cast != null) ZNetScene.instance.Destroy(cast.gameObject);

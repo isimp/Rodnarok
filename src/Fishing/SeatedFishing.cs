@@ -13,7 +13,7 @@ namespace Rodnarok
     internal static class SeatedFishing
     {
         /// <summary>The ammunition a fishing rod casts; a rod of another mod casting bait counts too.</summary>
-        private const string Bait = "$item_fishingbait";
+        internal const string RodAmmo = "$item_fishingbait";
 
         private static readonly AccessTools.FieldRef<Player, string> EmoteState = AccessTools.FieldRefAccess<Player, string>("m_emoteState");
 
@@ -26,7 +26,7 @@ namespace Rodnarok
         /// <summary>Whether a player holding a rod sits: on a seat (not at a ship's controls), or on the ground.</summary>
         public static bool SeatedWithRod(Player player)
         {
-            if (player == null || player.GetCurrentWeapon()?.m_shared.m_ammoType != Bait) return false;
+            if (player == null || player.GetCurrentWeapon()?.m_shared.m_ammoType != RodAmmo) return false;
             return (player.IsAttached() && player.GetDoodadController() == null) || SitsOnTheGround(player);
         }
 

@@ -33,10 +33,12 @@ namespace Rodnarok
         {
             Schools.Tick();
             BaitWatch.Tick();
+            SeatedRodPose.Tick();
             if (ZNetScene.instance == null)
             {
                 CalmWaters.Forget();
                 Lines.Clear();
+                SeatedRodPose.Forget();
             }
             else
             {
