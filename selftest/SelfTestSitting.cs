@@ -68,7 +68,7 @@ namespace Rodnarok
                 MoveTo(player, dry.Value + facing * Vector3.back * 0.6f);
                 yield return null;
                 var used = seat.Interact(player, false, false);
-                for (var waited = 0f; waited < 1.5f; waited += Time.deltaTime) yield return null;
+                for (var waited = 0f; waited < SitDown; waited += Time.deltaTime) yield return null;
                 check.That(player.IsAttached() && Seated(player, standing), "the character sits on the chair, its head lowered as seated; used: " + used + ", attached: " + player.IsAttached() + ", head " + Heads(player, standing));
                 Picture(check, "sitting-chair-seated");
                 yield return null;
@@ -85,7 +85,7 @@ namespace Rodnarok
                 MoveTo(player, dry.Value);
                 yield return null;
                 var sat = player.StartEmote("sit", oneshot: false);
-                for (var waited = 0f; waited < 1.5f; waited += Time.deltaTime) yield return null;
+                for (var waited = 0f; waited < SitDown; waited += Time.deltaTime) yield return null;
                 check.That(SeatedFishing.SitsOnTheGround(player) && Seated(player, standing), "the character sits on the ground, its head lowered as seated; emote started: " + sat + ", in the sit emote: " + SeatedFishing.SitsOnTheGround(player) + ", head " + Heads(player, standing));
                 Picture(check, "sitting-ground-seated");
                 yield return null;
@@ -324,6 +324,9 @@ namespace Rodnarok
                 return t != null ? _player.transform.InverseTransformPoint(t.position) : (Vector3?)null;
             }
         }
+
+        /// <summary>How long the character is given to sit down before anything is measured, in seconds: the legs settle well within it.</summary>
+        private const float SitDown = 3f;
 
         /// <summary>How long a cast is watched for its float, in seconds.</summary>
         private const float CastWatch = 6f;

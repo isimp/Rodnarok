@@ -9,7 +9,9 @@ namespace Rodnarok
     /// Keeps every seated player's hips, spine and legs as the seat has them (<see cref="SeatedBody"/>).
     /// A player sits for every game alike: the game turns on an animator switch for the seat, one
     /// named <c>attach_…</c> for a chair, a bench or a boat's bench and <c>emote_sit</c> on the ground,
-    /// and hands the switch to every other game. While a switch is on, the bones are kept whenever
+    /// and hands the switch to every other game. A player whose emote is the sit, which every game
+    /// reads from the player's saved data, sits too, whatever the switch shows. While a player
+    /// sits, the bones are kept whenever
     /// the game's base layer shows a sitting pose plainly, and put back right after the game's
     /// animation whenever it shows anything else, its standing throw, its pull or its sitting
     /// down again. Every game does this for every player it sees, whatever the motions setting.
@@ -19,6 +21,7 @@ namespace Rodnarok
     internal static class SeatedBodies
     {
         private static readonly AccessTools.FieldRef<Character, Animator> AnimatorOf = AccessTools.FieldRefAccess<Character, Animator>("m_animator");
+        private static readonly AccessTools.FieldRef<Player, string> EmoteState = AccessTools.FieldRefAccess<Player, string>("m_emoteState");
 
         /// <summary>The game's sitting states on its base animation layer.</summary>
         private static readonly int[] SitStates = new[] { "SitChair", "Emote_sit", "SitShip", "SitThrone", "SitDivan" }.Select(Animator.StringToHash).ToArray();
@@ -37,14 +40,19 @@ namespace Rodnarok
             public Quaternion[] Turns;
             public Vector3 HipsAt;
             public bool Kept;
+            public bool SawSitting;
             public float SwitchOffSince = -1f;
         }
 
         private static readonly Dictionary<Player, Body> Bodies = new Dictionary<Player, Body>();
         private static readonly Dictionary<RuntimeAnimatorController, int[]> SeatSwitches = new Dictionary<RuntimeAnimatorController, int[]>();
 
-        /// <summary>Whether a player sits and the game has shown their sitting pose since they sat down.</summary>
-        public static bool Seated(Player player) => player != null && Bodies.TryGetValue(player, out var body) && body.Kept;
+        /// <summary>
+        /// Whether a player sits, as the seat's switch or the sit emote says, a moment's blink of the
+        /// switch kept over, and the game has shown a sitting state since: a ship's helm has a switch
+        /// of its own but no sitting state.
+        /// </summary>
+        public static bool Seated(Player player) => player != null && Bodies.TryGetValue(player, out var body) && body.SawSitting;
 
         /// <summary>Called right after the game's animation: keeps or puts back each seated player's sitting pose.</summary>
         public static void Hold()
@@ -60,7 +68,7 @@ namespace Rodnarok
                     continue;
                 }
                 Bodies.TryGetValue(player, out var body);
-                if (!SeatSwitchOn(animator))
+                if (!SeatSwitchOn(animator) && EmoteState(player) != "sit")
                 {
                     // A switch blinking off for a moment keeps the pose; off for longer, the player stood up.
                     if (body == null) continue;
@@ -78,6 +86,7 @@ namespace Rodnarok
                 var sittingPose = SitStates.Contains(state.shortNameHash);
                 var inPose = state.normalizedTime * state.length;
                 var crossing = animator.IsInTransition(0);
+                body.SawSitting |= sittingPose;
                 if (SeatedBody.Keeps(true, sittingPose, crossing, inPose)) Keep(body);
                 else if (SeatedBody.PutsBack(true, sittingPose, crossing, inPose, body.Kept)) PutBack(body);
             }

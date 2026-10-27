@@ -12,7 +12,7 @@ namespace Rodnarok
     internal static class SeatedBody
     {
         /// <summary>How long into a sitting state its pose counts as settled, past any sitting down, in seconds.</summary>
-        public const float SettleSeconds = 1.5f;
+        public const float SettleSeconds = 1f;
 
         /// <summary>How long the seat's switch may be off before the kept pose is let go, in seconds.</summary>
         public const float SwitchGrace = 0.5f;
