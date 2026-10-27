@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using HarmonyLib;
 using UnityEngine;
 
@@ -86,11 +87,49 @@ namespace Rodnarok
         private static void Snap(FishingFloat ff, Fish fish, ZNetView view)
         {
             SnappedForTest++;
+            Tell(ff, "held through a struggle until the strain snapped it");
             Forget(ff);
-            Message(ff, "$msg_fishing_linebroke", true);
+            _snapping = true;
+            try
+            {
+                Message(ff, "$msg_fishing_linebroke", true);
+            }
+            finally
+            {
+                _snapping = false;
+            }
             fish.OnHooked(null);
             ff.m_lineBreakEffect.Create(ff.transform.position, Quaternion.identity);
             view.Destroy();
+        }
+
+        private static bool _snapping;
+
+        /// <summary>A float of this game says its line broke: the game's own break is told, Rodnarök's own snap has told itself.</summary>
+        public static void BrokeMessage(FishingFloat ff, string msg)
+        {
+            if (_snapping || msg != "$msg_fishing_linebroke") return;
+            Tell(ff, "the game broke it: the float got more than " + ff.m_breakDistance.ToString("0", CultureInfo.InvariantCulture)
+                + " m farther from the rod tip than the line is long, or more than " + ff.m_maxDistance.ToString("0", CultureInfo.InvariantCulture) + " m away");
+        }
+
+        /// <summary>Writes to the log why and how a line broke, so a break nobody saw coming can be traced.</summary>
+        private static void Tell(FishingFloat ff, string why)
+        {
+            var owner = Owner(ff);
+            var fish = ff.GetCatch();
+            var tip = owner != null ? Utils.FindChild(owner.transform, "_RodTop") : null;
+            var player = owner as Player;
+            var seated = player != null && (player.IsAttached() || SeatedFishing.SitsOnTheGround(player));
+            var text = "The line broke, " + why + ": line " + LineLength(ff).ToString("0.0", CultureInfo.InvariantCulture) + " m"
+                + (tip != null ? ", float " + Vector3.Distance(tip.position, ff.transform.position).ToString("0.0", CultureInfo.InvariantCulture) + " m from the rod tip"
+                    + ", the tip " + (tip.position.y - ZoneSystem.instance.m_waterLevel).ToString("0.0", CultureInfo.InvariantCulture) + " m above the sea" : ", no rod tip found")
+                + (fish != null ? ", the fish " + Vector3.Distance(fish.transform.position, ff.transform.position).ToString("0.0", CultureInfo.InvariantCulture) + " m from the float"
+                    + (fish.IsEscaping() ? ", struggling" : ", resting") : ", nothing hooked")
+                + ", strain " + StrainOf(ff).ToString("0.00", CultureInfo.InvariantCulture)
+                + (owner != null ? ", holding " + owner.IsBlocking() : "") + (player != null ? ", stamina " + player.GetStamina().ToString("0", CultureInfo.InvariantCulture) : "")
+                + ", seated " + seated;
+            Log.Info(text);
         }
 
         /// <summary>Lets go of a float's line.</summary>

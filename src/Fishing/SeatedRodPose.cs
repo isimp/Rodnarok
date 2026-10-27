@@ -63,12 +63,16 @@ namespace Rodnarok
             public Track Throw;
             public Track Reel;
             public Track Hold;
+
+            /// <summary>Which bones are held as the clip has them toward the whole character rather than toward the bone they hang from.</summary>
+            public bool[] Anchored;
         }
 
         private sealed class Overlay
         {
             public Poses Poses;
             public Transform[] Bones;
+            public Transform Root;
             public SeatedBlend Blend = new SeatedBlend();
             public float ReelTime;
             public float HoldTime;
@@ -145,7 +149,9 @@ namespace Rodnarok
                     Mix(ref target, ref taken, o.Poses.Throw.At(b.ThrowShare * o.Poses.Throw.Length, i), b.Throw);
                     Mix(ref target, ref taken, o.Poses.Reel.At(o.ReelTime, i), b.Reel);
                     Mix(ref target, ref taken, o.Poses.Hold.At(o.HoldTime, i), b.Hold);
-                    if (taken > 0f) bone.localRotation = Quaternion.Slerp(bone.localRotation, target, weight);
+                    if (taken <= 0f) continue;
+                    if (o.Poses.Anchored[i]) bone.rotation = Quaternion.Slerp(bone.rotation, o.Root.rotation * target, weight);
+                    else bone.localRotation = Quaternion.Slerp(bone.localRotation, target, weight);
                 }
             }
         }
@@ -218,7 +224,7 @@ namespace Rodnarok
                 Unfit.Remove(avatar);
                 Read[avatar] = poses;
             }
-            return new Overlay { Poses = poses, Bones = poses.Bones.Select(animator.GetBoneTransform).ToArray() };
+            return new Overlay { Poses = poses, Bones = poses.Bones.Select(animator.GetBoneTransform).ToArray(), Root = animator.transform };
         }
 
         /// <summary>
@@ -259,6 +265,7 @@ namespace Rodnarok
                 holder.SetActive(true);
                 copyAnimator.Rebind();
                 var copyBones = bones.Select(copyAnimator.GetBoneTransform).ToArray();
+                var anchored = Anchors(bones);
 
                 graph = PlayableGraph.Create("Rodnarok seated rod poses");
                 graph.SetTimeUpdateMode(DirectorUpdateMode.Manual);
@@ -266,9 +273,10 @@ namespace Rodnarok
                 var poses = new Poses
                 {
                     Bones = bones,
-                    Throw = ReadTrack(graph, output, throwClip, false, copyBones),
-                    Reel = ReadTrack(graph, output, reelClip, true, copyBones),
-                    Hold = ReadTrack(graph, output, holdClip, true, copyBones),
+                    Anchored = anchored,
+                    Throw = ReadTrack(graph, output, throwClip, false, copyBones, anchored, copy.transform),
+                    Reel = ReadTrack(graph, output, reelClip, true, copyBones, anchored, copy.transform),
+                    Hold = ReadTrack(graph, output, holdClip, true, copyBones, anchored, copy.transform),
                 };
                 if (Same(poses.Throw.Frames[0], poses.Reel.Frames[0]) && Same(poses.Reel.Frames[0], poses.Hold.Frames[0]))
                 {
@@ -284,7 +292,7 @@ namespace Rodnarok
             }
         }
 
-        private static Track ReadTrack(PlayableGraph graph, AnimationPlayableOutput output, AnimationClip clip, bool loop, Transform[] bones)
+        private static Track ReadTrack(PlayableGraph graph, AnimationPlayableOutput output, AnimationClip clip, bool loop, Transform[] bones, bool[] anchored, Transform root)
         {
             var playable = AnimationClipPlayable.Create(graph, clip);
             playable.SetApplyFootIK(false);
@@ -295,10 +303,24 @@ namespace Rodnarok
             {
                 playable.SetTime(clip.length * f / (count - 1));
                 graph.Evaluate();
-                frames[f] = bones.Select(b => b.localRotation).ToArray();
+                frames[f] = bones.Select((b, i) => anchored[i] ? Quaternion.Inverse(root.rotation) * b.rotation : b.localRotation).ToArray();
             }
             playable.Destroy();
             return new Track { Length = clip.length, Loop = loop, Frames = frames };
+        }
+
+        /// <summary>
+        /// The bones held toward the whole character: each side's shoulder, or its upper arm where the
+        /// rig has no shoulder, and the head. The seated chest leans otherwise than the standing one
+        /// the clips were made on, so turned only toward it the arms would carry the rod low; held
+        /// toward the character, they carry it as standing, and the bones below follow the clip.
+        /// </summary>
+        private static bool[] Anchors(HumanBodyBones[] bones)
+        {
+            var anchors = new HashSet<HumanBodyBones> { HumanBodyBones.Head };
+            anchors.Add(bones.Contains(HumanBodyBones.LeftShoulder) ? HumanBodyBones.LeftShoulder : HumanBodyBones.LeftUpperArm);
+            anchors.Add(bones.Contains(HumanBodyBones.RightShoulder) ? HumanBodyBones.RightShoulder : HumanBodyBones.RightUpperArm);
+            return bones.Select(anchors.Contains).ToArray();
         }
 
         private static bool Same(Quaternion[] a, Quaternion[] b)

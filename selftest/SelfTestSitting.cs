@@ -39,8 +39,13 @@ namespace Rodnarok
 
             var stoodAt = player.transform.position;
             // A spot whose throw toward the water is clear: a cast that meets a branch at once ends there.
-            var dry = SelfTestPlaces.DryLandBeside(stoodAt, spot => SelfTestPlaces.ThrowBlockedBy(spot, water.Value) == null);
-            check.That(dry.HasValue, "dry, level land within 1.5 to 4 m of the character for a chair, with a clear throw toward the water");
+            // Where the character stands comes first, as a player fishes from where they stand, a dock
+            // among its posts as much as a shore.
+            var dry = SelfTestPlaces.ThrowBlockedBy(stoodAt, water.Value) == null
+                ? stoodAt
+                : SelfTestPlaces.DryLandBeside(stoodAt, spot => SelfTestPlaces.ThrowBlockedBy(spot, water.Value) == null);
+            check.That(dry.HasValue, "the character's own spot, or dry, level land within 1.5 to 4 m of it, for a chair, with a clear throw toward the water; from the own spot the throw meets "
+                + SelfTestPlaces.ThrowBlockedBy(stoodAt, water.Value));
             if (!dry.HasValue) yield break;
             var toWater = water.Value - dry.Value;
             toWater.y = 0f;

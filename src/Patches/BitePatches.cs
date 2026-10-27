@@ -41,6 +41,13 @@ namespace Rodnarok
         }
     }
 
+    /// <summary>A line the game breaks is told in the log with how it stood, as Rodnarök's own snaps are.</summary>
+    [HarmonyPatch(typeof(FishingFloat), "Message")]
+    internal static class BreaksAreTold
+    {
+        private static void Prefix(FishingFloat __instance, string msg) => Lines.BrokeMessage(__instance, msg);
+    }
+
     /// <summary>A float leaving the world takes its line's strain with it.</summary>
     [HarmonyPatch(typeof(FishingFloat), "OnDestroy")]
     internal static class LineForgets
