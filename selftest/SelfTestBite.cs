@@ -11,8 +11,11 @@ namespace Rodnarok
     /// beside the character and the school comes. The fish must bite only with its mouth at the
     /// hook, the float must go under for about a second, reeling must hook within the hook window
     /// and not after it, and holding the line through a struggle must gain no line for the stall
-    /// cost while holding it through a rest reels in. The fish is let go before it is landed, so
-    /// nothing reaches the inventory; the rod, the float and the school are taken away again.
+    /// cost and strain the line at the tension's pace, while easing off lets the strain go as the
+    /// fish takes line out and holding through a rest reels in. The ring's arc must follow the
+    /// strain, and held too long the line must snap. Tension is on for it, at the server's numbers.
+    /// The fish is let go or freed before it is landed, so nothing reaches the inventory; the rod,
+    /// the float and the school are taken away again.
     /// </summary>
     internal static class SelfTestBite
     {
@@ -33,16 +36,39 @@ namespace Rodnarok
 
         private static bool RingShown() => Ring != null && Ring.gameObject.activeSelf;
 
-        /// <summary>Whether the ring shows a struggle (whole and red) or a rest (whole and yellow), at its one size.</summary>
-        private static bool RingIs(bool red)
+        /// <summary>The strain at which the scenario eases off in a struggle, and at which it holds again.</summary>
+        private const float EaseAt = 0.3f;
+        private const float HoldAgainAt = 0.05f;
+
+        /// <summary>
+        /// Whether the ring shows a struggle (red) or a rest (yellow) at its one size, its arc the
+        /// line's strain over a faint track of the same colour.
+        /// </summary>
+        private static bool RingIs(bool red, float strain)
         {
             if (!RingShown()) return false;
             var ring = Ring;
-            var whole = ring.fillAmount > 0.99f && Mathf.Abs(ring.transform.localScale.x - RingSize) < 0.01f;
-            return whole && (red
+            var track = CrosshairRing.TrackForTest;
+            var sized = Mathf.Abs(ring.transform.localScale.x - RingSize) < 0.01f;
+            var arc = Mathf.Abs(ring.fillAmount - strain) < 0.06f;
+            var faint = track != null && track.gameObject.activeSelf && track.color.a > 0.1f && track.color.a < 0.5f
+                && Mathf.Abs(track.color.g - ring.color.g) < 0.01f && Mathf.Abs(track.transform.localScale.x - RingSize) < 0.01f;
+            return sized && arc && faint && (red
                 ? ring.color.r > 0.8f && ring.color.g < 0.4f
                 : ring.color.r > 0.9f && ring.color.g > 0.8f && ring.color.b < 0.1f);
         }
+
+        /// <summary>The ring as drawn, for a failure's message.</summary>
+        private static string RingSeen()
+        {
+            if (!RingShown()) return "hidden";
+            var track = CrosshairRing.TrackForTest;
+            return "arc " + Ring.fillAmount.ToString("0.00", CultureInfo.InvariantCulture) + ", colour " + Ring.color + ", size " + Ring.transform.localScale.x.ToString("0.00", CultureInfo.InvariantCulture)
+                + ", track " + (track != null && track.gameObject.activeSelf ? track.color.ToString() : "hidden");
+        }
+
+        /// <summary>Whether a rate measured over frames is within a third of the rule's.</summary>
+        private static bool Near(float measured, float rule) => rule > 0f && measured > rule * 0.67f && measured < rule * 1.33f;
 
         /// <summary>The ring's one size, as the ring is drawn the moment after a bite.</summary>
         private static float RingSize = -1f;
@@ -57,7 +83,7 @@ namespace Rodnarok
 
         public static IEnumerable<Scenario> All()
         {
-            yield return new Scenario("ABiteComesAtTheHookPullsTheFloatUnderAndAFightStallsWhileItStruggles", BiteAndFight);
+            yield return new Scenario("ABiteComesAtTheHookPullsTheFloatUnderAndAHeldStruggleStrainsTheLine", BiteAndFight);
         }
 
         private static IEnumerable BiteAndFight(ScenarioCheck check)
@@ -84,7 +110,7 @@ namespace Rodnarok
                 }
                 if (!tipShown) yield break;
 
-                PlayRules.ForTest = Settings.Rules.With(waitMin: 1f, waitMax: 1f, schools: true);
+                PlayRules.ForTest = Settings.Rules.With(waitMin: 1f, waitMax: 1f, schools: true, tension: true);
                 var rules = PlayRules.Now;
                 var bait = baitPrefab.GetComponent<ItemDrop>().m_itemData.Clone();
                 bait.m_dropPrefab = baitPrefab;
@@ -159,26 +185,36 @@ namespace Rodnarok
                 if (fish == null) yield break;
                 yield return null;
 
-                // Holding the line: a struggle stalls for the stall cost, a rest reels in.
+                // Holding the line in rhythm, as a player would: through a rest it reels in, through a
+                // struggle it stalls for the stall cost and strains the line, and eased off in time the
+                // strain goes while the fish takes line out. Near the bank the rests are left unreeled.
                 var skill = player.GetSkillFactor(Skills.SkillType.Fishing);
                 var expected = rules.StallStaminaPerSecond * Mathf.Lerp(1f, rules.SkillCostShare, skill) + Mathf.Lerp(ff.m_hookedStaminaPerSec, ff.m_hookedStaminaPerSecMaxSkill, skill);
-                float struggleTime = 0f, struggleStamina = 0f, struggleLine = 0f, restTime = 0f, restLine = 0f;
+                float struggleTime = 0f, heldTime = 0f, heldStamina = 0f, heldLine = 0f, strained = 0f;
+                float easedTime = 0f, easedLineOut = 0f, eased = 0f, restTime = 0f, restLine = 0f;
                 var ringWrong = 0;
+                var ringSeen = "";
                 float struggleDepth = 0f, restDepth = 0f;
                 var splashesThen = Thrash.SplashesForTest;
                 var splashesBefore = Thrash.SplashesForTest;
                 var restSplashes = 0;
                 var picturedStruggle = false;
                 var picturedRest = false;
-                SelfTestHold.Holding = true;
-                for (var waited = 0f; waited < 15f; waited += Time.deltaTime)
+                var holding = true;
+                for (var waited = 0f; waited < 30f; waited += Time.deltaTime)
                 {
-                    if (ff == null || ff.GetCatch() != fish || LineLength(ff) < LetGoAt || player.GetStamina() < 15f) break;
+                    if (ff == null || ff.GetCatch() != fish || player.GetStamina() < 15f) break;
+                    if (heldTime >= 0.5f && easedTime >= 0.5f && restTime >= 0.5f) break;
                     var struggled = fish.IsEscaping();
                     var line = LineLength(ff);
                     var stamina = player.GetStamina();
+                    var strain = Lines.StrainOf(ff);
+                    if (struggled) holding = strain >= EaseAt ? false : strain <= HoldAgainAt || holding;
+                    else holding = line > LetGoAt + 3f;
+                    SelfTestHold.Holding = holding;
                     yield return null;
                     if (ff == null || ff.GetCatch() != fish) break;
+                    var strainNow = Lines.StrainOf(ff);
                     var depth = WaterLevel(fish) - fish.transform.position.y;
                     var splashesAtStep = splashesThen;
                     splashesThen = Thrash.SplashesForTest;
@@ -186,18 +222,29 @@ namespace Rodnarok
                     {
                         struggleDepth += depth * Time.deltaTime;
                         struggleTime += Time.deltaTime;
-                        struggleStamina += stamina - player.GetStamina();
-                        struggleLine += line - LineLength(ff);
-                        if (!RingIs(red: true)) ringWrong++;
-                        if (!picturedStruggle && struggleTime > 0.3f) picturedStruggle = Picture(check, "ring-struggle");
+                        if (holding)
+                        {
+                            heldTime += Time.deltaTime;
+                            heldStamina += stamina - player.GetStamina();
+                            heldLine += line - LineLength(ff);
+                            strained += strainNow - strain;
+                        }
+                        else
+                        {
+                            easedTime += Time.deltaTime;
+                            easedLineOut += LineLength(ff) - line;
+                            eased += strain - strainNow;
+                        }
+                        if (!RingIs(red: true, strainNow)) { ringWrong++; ringSeen = RingSeen(); }
+                        if (!picturedStruggle && holding && strainNow > 0.25f) picturedStruggle = Picture(check, "ring-struggle");
                     }
                     else if (!struggled && !fish.IsEscaping())
                     {
                         restDepth += depth * Time.deltaTime;
                         restTime += Time.deltaTime;
                         restSplashes += Thrash.SplashesForTest - splashesAtStep;
-                        restLine += line - LineLength(ff);
-                        if (!RingIs(red: false)) ringWrong++;
+                        if (holding) restLine += line - LineLength(ff);
+                        if (!RingIs(red: false, strainNow)) { ringWrong++; ringSeen = RingSeen(); }
                         if (!picturedRest && restTime > 0.3f) picturedRest = Picture(check, "ring-rest");
                     }
                 }
@@ -207,24 +254,45 @@ namespace Rodnarok
                 {
                     var high = struggleDepth / struggleTime;
                     check.That(Mathf.Abs(high) < 0.3f, "a struggling fish thrashes at the surface, " + high.ToString("0.00", CultureInfo.InvariantCulture) + " m under it on average");
+                    check.That(splashes / struggleTime >= 2f, "a struggling fish splashes at least twice a second, " + (splashes / struggleTime).ToString("0.0", CultureInfo.InvariantCulture) + " a second");
                 }
                 if (restTime > 0.5f) check.That(restSplashes == 0, "a resting fish splashes no more than the game has it, " + restSplashes.ToString(CultureInfo.InvariantCulture) + " extra splashes at rest");
-                if (struggleTime > 0.5f)
-                    check.That(splashes / struggleTime >= 2f, "a struggling fish splashes at least twice a second, " + (splashes / struggleTime).ToString("0.0", CultureInfo.InvariantCulture) + " a second");
-                check.That(ringWrong <= 2, ringWrong.ToString(CultureInfo.InvariantCulture) + " frames of the fight showed the ring wrong: a struggle draws the whole ring red, a rest yellow, both at the bite's size");
-                check.That(struggleTime >= 0.5f, "the fish struggled at least half a second while the line was held, " + struggleTime.ToString("0.0", CultureInfo.InvariantCulture) + " s");
-                if (struggleTime > 0f)
+                check.That(ringWrong <= 3, ringWrong.ToString(CultureInfo.InvariantCulture) + " frames of the fight showed the ring wrong: red in a struggle, yellow at rest, its arc the line's strain over a faint track, at the bite's size; the last " + ringSeen);
+                check.That(heldTime >= 0.5f, "the line was held through a struggle at least half a second, " + heldTime.ToString("0.0", CultureInfo.InvariantCulture) + " s");
+                if (heldTime > 0.2f)
                 {
-                    check.That(Mathf.Abs(struggleLine) < 0.01f, "holding through a struggle gained no line, " + struggleLine.ToString("0.000", CultureInfo.InvariantCulture) + " m in " + struggleTime.ToString("0.0", CultureInfo.InvariantCulture) + " s");
-                    var rate = struggleStamina / struggleTime;
+                    check.That(Mathf.Abs(heldLine) < 0.01f, "holding through a struggle gained no line, " + heldLine.ToString("0.000", CultureInfo.InvariantCulture) + " m in " + heldTime.ToString("0.0", CultureInfo.InvariantCulture) + " s");
+                    var rate = heldStamina / heldTime;
                     check.That(rate > expected * 0.6f && rate < expected * 1.4f, "holding through a struggle cost " + rate.ToString("0.0", CultureInfo.InvariantCulture) + " stamina a second, the stall cost with the hooked drain is " + expected.ToString("0.0", CultureInfo.InvariantCulture));
+                    var strainRate = strained / heldTime;
+                    check.That(Near(strainRate, 1f / rules.SnapSeconds), "holding through a struggle strains the line to snapping in " + rules.SnapSeconds.ToString("0.0", CultureInfo.InvariantCulture) + " s, " + (strainRate * 100f).ToString("0", CultureInfo.InvariantCulture) + "% a second");
+                }
+                check.That(easedTime >= 0.5f, "the line was eased off in a struggle at least half a second, " + easedTime.ToString("0.0", CultureInfo.InvariantCulture) + " s");
+                if (easedTime > 0.2f)
+                {
+                    check.That(Near(eased / easedTime, 1f / rules.EaseSeconds), "easing off lets the strain go over " + rules.EaseSeconds.ToString("0.0", CultureInfo.InvariantCulture) + " s, " + (eased / easedTime * 100f).ToString("0", CultureInfo.InvariantCulture) + "% a second");
+                    check.That(Near(easedLineOut / easedTime, rules.RunSpeed), "eased off, the struggling fish takes line out at " + rules.RunSpeed.ToString("0.0", CultureInfo.InvariantCulture) + " m/s, " + (easedLineOut / easedTime).ToString("0.0", CultureInfo.InvariantCulture) + " m/s");
                 }
                 check.That(restTime >= 0.5f && restLine / Mathf.Max(restTime, 0.01f) > 0.5f * Mathf.Lerp(rules.ReelSpeed, rules.ReelSpeedMaxSkill, skill),
                     "holding while it rests reels it in, " + restLine.ToString("0.0", CultureInfo.InvariantCulture) + " m in " + restTime.ToString("0.0", CultureInfo.InvariantCulture) + " s");
 
+                // Held through a struggle too long, the line snaps as the game breaks one.
+                if (ff != null && ff.GetCatch() == fish)
+                {
+                    PlayRules.ForTest = rules.With(snapSeconds: 0.3f);
+                    var snappedBefore = Lines.SnappedForTest;
+                    SelfTestHold.Holding = true;
+                    for (var waited = 0f; waited < 20f && ff != null && ff.GetCatch() == fish && player.GetStamina() >= 15f; waited += Time.deltaTime) yield return null;
+                    SelfTestHold.Holding = false;
+                    check.That(Lines.SnappedForTest == snappedBefore + 1, "held through a struggle past the snap time, the line snapped");
+                    check.That(ff == null || ff.GetCatch() == null, "after the snap nothing is on the line");
+                    check.That(fish == null || !fish.IsHooked(), "after the snap the fish swims free");
+                    PlayRules.ForTest = rules;
+                }
+
                 // Let go before it is landed.
                 if (ff != null && ff.GetCatch() != null) SetCatch.Invoke(ff, new object[] { null });
-                fish.OnHooked(null);
+                if (fish != null) fish.OnHooked(null);
             }
             finally
             {

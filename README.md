@@ -8,7 +8,7 @@ Most of Rodnarök was written by Claude Code (Anthropic), which did the heavy li
 
 ## Using it
 
-A fish of the bait's kind shows up a short while after the float lands and swims to it where you can watch it come. It bites only when it is really at the float, the float is pulled under with a splash, and the crosshair ring closes over the time you have to hook it by holding the line. In the fight the fish thrashes at the surface while it struggles and calms when it rests, and the ring shows which. Holding the line through a struggle only stalls and costs a little stamina, so a fight never drains you empty.
+A fish of the bait's kind shows up a short while after the float lands and swims to it where you can watch it come. It bites only when it is really at the float, the float is pulled under with a splash, and the crosshair ring closes over the time you have to hook it by holding the line. In the fight the fish thrashes at the surface while it struggles and calms when it rests, and the ring turns red or yellow to show which. Hold the line while it rests to reel it in. Holding through a struggle gains nothing and strains the line, and the ring fills as it does: ease off before it closes or the line snaps, and the fish takes some line back while you do.
 
 You can cast and reel while sitting on a chair, a bench or a boat's bench. The *Serpent post*, built with the hammer, calms the waves around it.
 

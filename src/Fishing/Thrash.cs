@@ -10,13 +10,17 @@ namespace Rodnarok
     /// game that owns it pushes it up until its back breaks the surface, and every game draws its
     /// splash about three times a second; while it rests it splashes no more than the game has it.
     /// The struggle is read from the fish's saved state, as the game reads it, so every player
-    /// sees it.
+    /// sees it. A struggling fish whose line is eased off heads away from the one fishing as it
+    /// takes line out.
     /// </summary>
     internal static class Thrash
     {
         /// <summary>How far under the surface a struggling fish is held, its back just breaking the water, and how hard it is pushed up.</summary>
         private const float UnderSurface = 0.05f;
         private const float PushUp = 30f;
+
+        /// <summary>How far ahead, in metres, a fish taking line out heads.</summary>
+        private const float RunAhead = 4f;
 
         /// <summary>Seconds between a struggling fish's splashes, varied a little.</summary>
         private const float SplashEveryMin = 0.25f;
@@ -64,7 +68,15 @@ namespace Rodnarok
             // struggles that place is lifted to the surface, and it is pushed up on top.
             var target = WaterLevel(fish) - UnderSurface;
             var waypoint = Waypoint(fish);
-            if (waypoint.y < target) Waypoint(fish) = new Vector3(waypoint.x, target, waypoint.z);
+            if (Lines.IsRunning(fish) && Player.m_localPlayer != null)
+            {
+                // With the line eased off it takes line out: it heads away from the one fishing.
+                var away = fish.transform.position - Player.m_localPlayer.transform.position;
+                away.y = 0f;
+                if (away.sqrMagnitude > 0.01f) waypoint = fish.transform.position + away.normalized * RunAhead;
+            }
+            if (waypoint.y < target) waypoint.y = target;
+            Waypoint(fish) = waypoint;
             if (fish.transform.position.y < target) Body(fish).AddForce(Vector3.up * PushUp, ForceMode.Acceleration);
         }
 

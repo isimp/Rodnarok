@@ -65,5 +65,45 @@ namespace Rodnarok.Tests
             Assert.Equal(1f, draw.Fill, 3);
             Assert.True(draw.R > 0.95f && draw.G > 0.85f && draw.B < 0.05f, "yellow");
         }
+
+        [Fact]
+        public void WithTensionTheArcIsTheStrainBuildingOverAFaintFullTrack()
+        {
+            var draw = RingDraw.For(Ring.ForFight(struggling: true, strain: 0.5f));
+            Assert.Equal(0.5f, draw.Fill, 3);
+            Assert.True(draw.R > 0.8f && draw.G < 0.4f && draw.B < 0.4f, "red in a struggle");
+            Assert.InRange(draw.TrackA, 0.15f, 0.4f);
+        }
+
+        [Fact]
+        public void AnUnstrainedLineShowsOnlyTheTrack()
+        {
+            var draw = RingDraw.For(Ring.ForFight(struggling: true, strain: 0f));
+            Assert.True(draw.Shown);
+            Assert.Equal(0f, draw.Fill, 3);
+            Assert.True(draw.TrackA > 0f);
+        }
+
+        [Fact]
+        public void AtRestTheStrainStillShowsAsItEasesInYellow()
+        {
+            var draw = RingDraw.For(Ring.ForFight(struggling: false, strain: 0.3f));
+            Assert.Equal(0.3f, draw.Fill, 3);
+            Assert.True(draw.R > 0.95f && draw.G > 0.85f && draw.B < 0.05f, "yellow");
+            Assert.True(draw.TrackA > 0f);
+        }
+
+        [Fact]
+        public void TheStrainedRingKeepsTheBitesSize()
+        {
+            Assert.Equal(RingDraw.For(Ring.ForBite(0f, 1.5f)).Scale, RingDraw.For(Ring.ForFight(true, 0.7f)).Scale);
+        }
+
+        [Fact]
+        public void TheBiteAndAFightWithoutTensionHaveNoTrack()
+        {
+            Assert.Equal(0f, RingDraw.For(Ring.ForBite(0.3f, 1.5f)).TrackA);
+            Assert.Equal(0f, RingDraw.For(Ring.ForFight(struggling: true)).TrackA);
+        }
     }
 }

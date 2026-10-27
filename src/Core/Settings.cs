@@ -21,6 +21,10 @@ namespace Rodnarok
         private static ConfigEntry<float> _calmKeep;
         private static ConfigEntry<bool> _schools;
         private static ConfigEntry<bool> _bumps;
+        private static ConfigEntry<bool> _tension;
+        private static ConfigEntry<float> _snapSeconds;
+        private static ConfigEntry<float> _easeSeconds;
+        private static ConfigEntry<float> _runSpeed;
 
         /// <summary>The rules as the settings stand now; the defaults before they are bound.</summary>
         public static FishingRules Rules =>
@@ -34,7 +38,11 @@ namespace Rodnarok
                     calmReach: _calmReach.Value,
                     calmKeep: _calmKeep.Value,
                     schools: _schools.Value,
-                    bumps: _bumps.Value);
+                    bumps: _bumps.Value,
+                    tension: _tension.Value,
+                    snapSeconds: _snapSeconds.Value,
+                    easeSeconds: _easeSeconds.Value,
+                    runSpeed: _runSpeed.Value);
 
         public static void Bind(ConfigFile config)
         {
@@ -56,6 +64,14 @@ namespace Rodnarok
                 "Whether the bait draws a school of its fish, as many as the world spawns together, of which one takes the bait. Off, a single fish comes."));
             _bumps = Sync(config.Bind(Section, "Bumps", rules.Bumps,
                 "Whether the fish that takes the bait first bumps the float lightly once or twice. A bump can never be hooked; the real bite pulls the float under."));
+            _tension = Sync(config.Bind(Section, "Tension", rules.Tension,
+                "Whether holding the line through a struggle strains it until it snaps, shown by the crosshair ring filling. Easing off lets the strain go while the fish takes line out. Off, holding through a struggle only stalls."));
+            _snapSeconds = Sync(config.Bind(Section, "SnapSeconds", rules.SnapSeconds,
+                new ConfigDescription("Seconds of holding the line through a struggle until it snaps, with Tension on.", new AcceptableValueRange<float>(0.5f, 10f))));
+            _easeSeconds = Sync(config.Bind(Section, "EaseSeconds", rules.EaseSeconds,
+                new ConfigDescription("Seconds of easing off, or of the fish resting, until a line strained to snapping is unstrained, with Tension on.", new AcceptableValueRange<float>(0.1f, 10f))));
+            _runSpeed = Sync(config.Bind(Section, "RunSpeed", rules.RunSpeed,
+                new ConfigDescription("Metres of line a second a struggling fish takes out while the line is eased off, with Tension on. The line breaks past the game's 30 m as ever.", new AcceptableValueRange<float>(0f, 10f))));
         }
 
         private static ConfigEntry<T> Sync<T>(ConfigEntry<T> entry)

@@ -21,6 +21,18 @@ namespace Rodnarok
         /// <summary>Stamina a second for holding the line while the fish struggles, before skill lowers it.</summary>
         public float StallStaminaPerSecond { get; private set; } = 2f;
 
+        /// <summary>Whether holding through a struggle strains the line; without, holding only stalls.</summary>
+        public bool Tension { get; private set; } = true;
+
+        /// <summary>Seconds of holding through a struggle until the line snaps.</summary>
+        public float SnapSeconds { get; private set; } = 2f;
+
+        /// <summary>Seconds of easing off until a line strained to snapping is unstrained.</summary>
+        public float EaseSeconds { get; private set; } = 1f;
+
+        /// <summary>Metres of line a second a struggling fish takes out while the line is eased off.</summary>
+        public float RunSpeed { get; private set; } = 2f;
+
         /// <summary>Metres of line a second reeled in at Fishing 0.</summary>
         public float ReelSpeed { get; private set; } = 2f;
 
@@ -61,9 +73,17 @@ namespace Rodnarok
             float? calmKeep = null,
             bool? schools = null,
             bool? bumps = null,
-            float? leaveBackstop = null)
+            float? leaveBackstop = null,
+            bool? tension = null,
+            float? snapSeconds = null,
+            float? easeSeconds = null,
+            float? runSpeed = null)
         {
             var copy = (FishingRules)MemberwiseClone();
+            copy.Tension = tension ?? Tension;
+            copy.SnapSeconds = snapSeconds ?? SnapSeconds;
+            copy.EaseSeconds = easeSeconds ?? EaseSeconds;
+            copy.RunSpeed = runSpeed ?? RunSpeed;
             copy.LeaveBackstop = leaveBackstop ?? LeaveBackstop;
             copy.Schools = schools ?? Schools;
             copy.Bumps = bumps ?? Bumps;

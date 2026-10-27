@@ -32,8 +32,15 @@ namespace Rodnarok
         private void Update()
         {
             Schools.Tick();
-            if (ZNetScene.instance == null) CalmWaters.Forget();
-            else CalmWaters.Tick();
+            if (ZNetScene.instance == null)
+            {
+                CalmWaters.Forget();
+                Lines.Clear();
+            }
+            else
+            {
+                CalmWaters.Tick();
+            }
             SelfTestHost.Tick();
         }
 

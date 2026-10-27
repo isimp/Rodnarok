@@ -27,7 +27,7 @@ namespace Rodnarok
         private static void Prefix(FishingFloat __instance) => Bites.StretchWindow(__instance);
     }
 
-    /// <summary>Each step of the float: a bitten float is pulled under, and a struggle gives back the line reeled in.</summary>
+    /// <summary>Each step of the float: a bitten float is pulled under, a struggle gives back the line reeled in, and the line's strain follows the fight.</summary>
     [HarmonyPatch(typeof(FishingFloat), "FixedUpdate")]
     internal static class FloatStep
     {
@@ -36,8 +36,16 @@ namespace Rodnarok
         private static void Postfix(FishingFloat __instance, float __state)
         {
             Bites.StallLine(__instance, __state);
+            Lines.Step(__instance);
             Bites.Pull(__instance);
         }
+    }
+
+    /// <summary>A float leaving the world takes its line's strain with it.</summary>
+    [HarmonyPatch(typeof(FishingFloat), "OnDestroy")]
+    internal static class LineForgets
+    {
+        private static void Postfix(FishingFloat __instance) => Lines.Forget(__instance);
     }
 
     /// <summary>A struggling fish costs the stall cost to hold, the same for every fish.</summary>
