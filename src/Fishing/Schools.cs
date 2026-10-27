@@ -408,15 +408,17 @@ namespace Rodnarok
             var heard = HeardAt(at) ?? HeardAt(Centre(cast.Fish));
             var near = cast.Fish.Any(f => Across(f.transform.position, at) < Near);
             var fast = Wary.FloatStartles(cast.FloatSpeed, near);
-            if (!fast) cast.FastSince = -1f;
+            // Reeling on after the school flinched aside still drags the float through it.
+            var dragging = Wary.Dragging(cast.FloatSpeed, near, cast.Away);
+            if (!dragging) cast.FastSince = -1f;
             else if (cast.FastSince < 0f) cast.FastSince = now;
-            if (fast && Wary.Dragged(now - cast.FastSince))
+            if (dragging && Wary.Dragged(now - cast.FastSince))
             {
                 StartledForTest++;
                 DriveOff(cast, at);
                 return true;
             }
-            if (heard != null || fast)
+            if (heard != null || fast || dragging)
             {
                 cast.QuietSince = now;
                 // A flinching school heard to as well darts; a darting one is not made to flinch.
@@ -476,13 +478,24 @@ namespace Rodnarok
             cast.Fish.RemoveAll(f => f == null || !f.IsHooked());
         }
 
+        /// <summary>The turns from straight away, in degrees, a frightened fish tries in order where the water straight away is too shallow.</summary>
+        private static readonly float[] SidestepTurns = { 0f, 45f, -45f, 90f, -90f };
+
         /// <summary>A fish swims quickly a few metres away from what frightened it, where the water lets it, and waits there.</summary>
         private static void Sidestep(Cast cast, Fish fish, Vector3 from, float distance)
         {
             var view = fish.GetComponent<ZNetView>();
             if (view == null || !view.IsValid() || !view.IsOwner()) return;
-            var place = fish.transform.position + Flat(fish.transform.position - from) * distance;
-            if (!DeepEnough(place, ZoneSystem.instance.m_waterLevel, fish.m_minDepth)) place = fish.transform.position;
+            // Straight away where the water lets it, else turned aside, else it waits where it is.
+            var away = Flat(fish.transform.position - from);
+            var place = fish.transform.position;
+            foreach (var turn in SidestepTurns)
+            {
+                var candidate = fish.transform.position + Quaternion.Euler(0f, turn, 0f) * away * distance;
+                if (!DeepEnough(candidate, ZoneSystem.instance.m_waterLevel, fish.m_minDepth)) continue;
+                place = candidate;
+                break;
+            }
             SpawnPoint(fish) = place;
             view.GetZDO().Set(ZDOVars.s_spawnPoint, place);
             fish.m_swimRange = 1.5f;

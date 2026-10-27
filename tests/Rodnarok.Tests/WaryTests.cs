@@ -90,6 +90,15 @@ namespace Rodnarok.Tests
         }
 
         [Fact]
+        public void AFloatKeptReelingAfterTheSchoolFlinchedAsideStillDragsThroughIt()
+        {
+            Assert.True(Wary.Dragging(speed: 1f, schoolNear: false, schoolAway: true));
+            Assert.True(Wary.Dragging(speed: 1f, schoolNear: true, schoolAway: false));
+            Assert.False(Wary.Dragging(speed: 1f, schoolNear: false, schoolAway: false));
+            Assert.False(Wary.Dragging(speed: 0.3f, schoolNear: true, schoolAway: true));
+        }
+
+        [Fact]
         public void AFloatDraggedThroughTheSchoolAWhileDrivesItOff()
         {
             Assert.False(Wary.Dragged(fastFor: Wary.DraggedSeconds - 0.1f));

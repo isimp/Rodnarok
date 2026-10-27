@@ -67,6 +67,12 @@ namespace Rodnarok
         /// <summary>Whether a float moving this fast makes a school near it flinch.</summary>
         public static bool FloatStartles(float speed, bool schoolNear) => schoolNear && speed > FloatSpeed;
 
+        /// <summary>
+        /// Whether a float moving this fast is being dragged through the school: near it, or after
+        /// the school flinched or darted aside from it, as reeling in goes on.
+        /// </summary>
+        public static bool Dragging(float speed, bool schoolNear, bool schoolAway) => speed > FloatSpeed && (schoolNear || schoolAway);
+
         /// <summary>Whether a float kept moving fast this long drives the school off.</summary>
         public static bool Dragged(float fastFor) => fastFor >= DraggedSeconds;
 

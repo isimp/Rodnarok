@@ -41,6 +41,9 @@ namespace Rodnarok
 
         /// <summary>The strain at which the scenario eases off in a struggle, and at which it holds again.</summary>
         private const float EaseAt = 0.55f;
+
+        /// <summary>How long a struggling fish is given to rise to the surface before its depth counts, in seconds.</summary>
+        private const float RiseSeconds = 0.5f;
         private const float HoldAgainAt = 0.05f;
 
         private static readonly AccessTools.FieldRef<Character, Quaternion> LookYaw = AccessTools.FieldRefAccess<Character, Quaternion>("m_lookYaw");
@@ -247,6 +250,8 @@ namespace Rodnarok
                 var ringWrong = 0;
                 var ringSeen = "";
                 float struggleDepth = 0f, restDepth = 0f;
+                // A struggle's depth is measured once the fish has had time to rise to the surface.
+                float settledDepth = 0f, settledTime = 0f, struggleFrom = -1f;
                 var splashesThen = Thrash.SplashesForTest;
                 var splashesBefore = Thrash.SplashesForTest;
                 var restSplashes = 0;
@@ -276,6 +281,12 @@ namespace Rodnarok
                     {
                         struggleDepth += depth * Time.deltaTime;
                         struggleTime += Time.deltaTime;
+                        if (struggleFrom < 0f) struggleFrom = Time.time;
+                        if (Time.time - struggleFrom >= RiseSeconds)
+                        {
+                            settledDepth += depth * Time.deltaTime;
+                            settledTime += Time.deltaTime;
+                        }
                         if (holding)
                         {
                             heldTime += Time.deltaTime;
@@ -296,6 +307,7 @@ namespace Rodnarok
                     }
                     else if (!struggled && !fish.IsEscaping())
                     {
+                        struggleFrom = -1f;
                         restDepth += depth * Time.deltaTime;
                         restTime += Time.deltaTime;
                         restSplashes += Thrash.SplashesForTest - splashesAtStep;
@@ -313,8 +325,9 @@ namespace Rodnarok
                 var splashes = Thrash.SplashesForTest - splashesBefore;
                 if (struggleTime > 0.5f)
                 {
-                    var high = struggleDepth / struggleTime;
-                    check.That(Mathf.Abs(high) < 0.3f, "a struggling fish thrashes at the surface, " + high.ToString("0.00", CultureInfo.InvariantCulture) + " m under it on average");
+                    var high = settledTime > 0.2f ? settledDepth / settledTime : struggleDepth / struggleTime;
+                    check.That(Mathf.Abs(high) < 0.3f, "a struggling fish thrashes at the surface once risen, " + high.ToString("0.00", CultureInfo.InvariantCulture) + " m under it on average past the first "
+                        + RiseSeconds.ToString("0.0", CultureInfo.InvariantCulture) + " s of each struggle, " + (struggleDepth / struggleTime).ToString("0.00", CultureInfo.InvariantCulture) + " m over the whole");
                     check.That(splashes / struggleTime >= 2f, "a struggling fish splashes at least twice a second, " + (splashes / struggleTime).ToString("0.0", CultureInfo.InvariantCulture) + " a second");
                 }
                 if (restTime > 0.5f) check.That(restSplashes == 0, "a resting fish splashes no more than the game has it, " + restSplashes.ToString(CultureInfo.InvariantCulture) + " extra splashes at rest");

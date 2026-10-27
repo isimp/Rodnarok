@@ -65,6 +65,7 @@ namespace Rodnarok
                 var startledBefore = Schools.StartledForTest;
                 var leavingBefore = Schools.LeavingForTest;
                 var before = FromPlayer(school, player);
+                var startedAt = school.ToDictionary(f => f, f => f != null ? f.transform.position : Vector3.zero);
                 player.AddNoise(Vector3.Distance(player.transform.position, ff.transform.position) / Wary.Hearing + 10f);
                 var away = false;
                 for (var waited = 0f; waited < 1f && !away; waited += Time.deltaTime)
@@ -74,9 +75,12 @@ namespace Rodnarok
                 }
                 for (var waited = 0f; waited < 2f; waited += Time.deltaTime) yield return null;
                 var after = FromPlayer(school, player);
+                var moved = school.Where(f => f != null).Select(f => Across(f.transform.position, startedAt[f])).DefaultIfEmpty(0f).Average();
                 check.That(away && Schools.StartledForTest == startledBefore + 1, "noise reaching the school startles it; startled " + (Schools.StartledForTest - startledBefore).ToString(CultureInfo.InvariantCulture) + " times");
-                check.That(after > before + 2f && after < before + Wary.DartDistance + 6f, "startled, the school darts a few metres away from the noise, not away for good: from "
-                    + before.ToString("0.0", CultureInfo.InvariantCulture) + " m to " + after.ToString("0.0", CultureInfo.InvariantCulture) + " m from the character on average");
+                // Straight away from the noise where the water lets it, else turned aside, so it is measured by how far it moved.
+                check.That(moved > 2f && moved < Wary.DartDistance + 6f && after > before - 2f, "startled, the school darts a few metres off, not toward the noise nor away for good: moved "
+                    + moved.ToString("0.0", CultureInfo.InvariantCulture) + " m on average, from " + before.ToString("0.0", CultureInfo.InvariantCulture) + " m to "
+                    + after.ToString("0.0", CultureInfo.InvariantCulture) + " m from the character");
 
                 // All quiet again: it comes back, not before the quiet has lasted.
                 var quietFrom = Time.time;
