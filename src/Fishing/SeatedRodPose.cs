@@ -17,7 +17,7 @@ namespace Rodnarok
     /// bones are turned toward those frames: the wind-up played and held while drawing, the throw
     /// as the cast goes out, the pull while reeling and the stance while the float is out,
     /// crossing over from one to the next and fading in and out as a whole. Every game shows it
-    /// for every seated player it sees, read from their animator's sitting state, the rod in their
+    /// for every seated player it sees, read from the game's seat switch (<see cref="SeatedBodies"/>), the rod in their
     /// hand, their block and their float; the draw and the throw only the player's own game knows of.
     /// </summary>
     internal static class SeatedRodPose
@@ -25,9 +25,6 @@ namespace Rodnarok
         private static readonly AccessTools.FieldRef<Character, Animator> AnimatorOf = AccessTools.FieldRefAccess<Character, Animator>("m_animator");
         private static readonly AccessTools.FieldRef<VisEquipment, int> RightItem = AccessTools.FieldRefAccess<VisEquipment, int>("m_currentRightItemHash");
         private static readonly System.Func<FishingFloat, Character> FloatOwner = AccessTools.MethodDelegate<System.Func<FishingFloat, Character>>(AccessTools.Method(typeof(FishingFloat), "GetOwner"));
-
-        /// <summary>The game's sitting states on its base animation layer.</summary>
-        private static readonly int[] SitStates = new[] { "SitChair", "Emote_sit", "SitShip", "SitThrone", "SitDivan" }.Select(Animator.StringToHash).ToArray();
 
         /// <summary>The game's clips for each motion.</summary>
         private const string ThrowClip = "Throw";
@@ -110,7 +107,7 @@ namespace Rodnarok
                 var animator = AnimatorOf(player);
                 if (animator == null) continue;
                 var local = player == Player.m_localPlayer;
-                var seated = Seated(animator);
+                var seated = SeatedBodies.Seated(player);
                 var pose = SeatedPoses.For(
                     seated && HoldsRod(player, local),
                     local && player.IsDrawingBow(),
@@ -176,12 +173,6 @@ namespace Rodnarok
             if (share <= 0f) return;
             taken += share;
             mixed = taken <= share ? pose : Quaternion.Slerp(mixed, pose, share / taken);
-        }
-
-        private static bool Seated(Animator animator)
-        {
-            var state = animator.GetCurrentAnimatorStateInfo(0).shortNameHash;
-            return SitStates.Contains(state);
         }
 
         /// <summary>Whether the player holds a rod: from the hand for the player's own game, from what others see in it for the rest.</summary>

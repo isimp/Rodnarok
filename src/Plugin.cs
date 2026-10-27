@@ -28,8 +28,8 @@ namespace Rodnarok
             _harmony = new Harmony(About.Guid);
             _harmony.PatchAll(typeof(Plugin).Assembly);
             Commands.Register();
-            _afterAnimation = AfterAnimation.Hook(SeatedRodPose.Turn);
-            if (!_afterAnimation) Log.Warning("Unity's loop has no place after its animation; seated fishing motions are turned in the late scripts instead, and a line or cape may flicker.");
+            _afterAnimation = AfterAnimation.Hook(AfterTheGamesAnimation);
+            if (!_afterAnimation) Log.Warning("Unity's loop has no place after its animation; seated bodies and fishing motions are set in the late scripts instead, and a line or cape may flicker.");
         }
 
         private void Update()
@@ -43,6 +43,7 @@ namespace Rodnarok
                 CalmStands.Forget();
                 Lines.Clear();
                 SeatedRodPose.Forget();
+                SeatedBodies.Forget();
             }
             else
             {
@@ -54,7 +55,14 @@ namespace Rodnarok
 
         private void LateUpdate()
         {
-            if (!_afterAnimation) SeatedRodPose.Turn();
+            if (!_afterAnimation) AfterTheGamesAnimation();
+        }
+
+        /// <summary>Right after the game's animation: seated bodies keep their seat, then seated arms show the fishing motions.</summary>
+        private static void AfterTheGamesAnimation()
+        {
+            SeatedBodies.Hold();
+            SeatedRodPose.Turn();
         }
 
         private void OnDestroy()
