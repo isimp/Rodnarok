@@ -32,6 +32,7 @@ namespace Rodnarok
         private void Update()
         {
             Schools.Tick();
+            BaitWatch.Tick();
             if (ZNetScene.instance == null)
             {
                 CalmWaters.Forget();
