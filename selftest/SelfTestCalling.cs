@@ -128,6 +128,18 @@ namespace Rodnarok
                 }
                 check.That(first.Count > 0, "the first cast brought a school within 15 s");
                 if (first.Count == 0) yield break;
+
+                // It starts out of sight, so it is let swim in first: taken in before that, its fish would
+                // be out of sight already and go at once.
+                var swim = Schools.SwimSecondsForTest(ff);
+                var arrived = false;
+                for (var waited = 0f; waited < swim + 15f && !arrived; waited += Time.deltaTime)
+                {
+                    var here = first.Where(f => f != null).ToList();
+                    arrived = here.Count > 0 && here.Count(f => Vector3.Distance(f.transform.position, player.transform.position) < 30f) * 2 >= here.Count;
+                    yield return null;
+                }
+                check.That(arrived, "the first school swam in within reach of the character");
                 ZNetScene.instance.Destroy(ff.gameObject);
                 ff = null;
                 for (var waited = 0f; waited < 0.5f; waited += Time.deltaTime) yield return null;

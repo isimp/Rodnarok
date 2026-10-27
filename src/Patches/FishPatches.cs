@@ -70,22 +70,37 @@ namespace Rodnarok
     }
 
     /// <summary>
-    /// A place to swim the game turns down keeps no hold on a school's fish or a called one. The game
-    /// writes the new place before it finds the water there too shallow, and the fish swims for it
-    /// until a later choice holds; near a bank, and fleeing at speed, that can run it aground. For
-    /// these fish the place they swam for before stands instead.
+    /// A school's fish, or a called one, swims only for a place it reaches through deep water. The
+    /// game writes the new place before it finds the water there too shallow, and the fish swims for
+    /// it until a later choice holds; and a place it takes it checks only there and halfway, so the
+    /// way can cross a bank. Near a bank, and fleeing at speed, either can run the fish aground. For
+    /// these fish a place turned down, or one whose way is not deep enough every metre, leaves the
+    /// place they swam for before standing, or none where they had none. The float a fish goes for
+    /// is the game's choice and is left to it.
     /// </summary>
     [HarmonyPatch(typeof(Fish), "RandomizeWaypoint")]
     internal static class TurnedDownPlaceHoldsNoFish
     {
         private static readonly AccessTools.FieldRef<Fish, UnityEngine.Vector3> Waypoint = AccessTools.FieldRefAccess<Fish, UnityEngine.Vector3>("m_waypoint");
+        private static readonly AccessTools.FieldRef<Fish, bool> HaveWaypoint = AccessTools.FieldRefAccess<Fish, bool>("m_haveWaypoint");
+        private static readonly AccessTools.FieldRef<Fish, FishingFloat> WaypointFloat = AccessTools.FieldRefAccess<Fish, FishingFloat>("m_waypointFF");
 
-        private static void Prefix(Fish __instance, out UnityEngine.Vector3 __state) => __state = Waypoint(__instance);
-
-        private static void Postfix(Fish __instance, bool __result, UnityEngine.Vector3 __state)
+        internal struct Before
         {
-            if (__result || (!Schools.IsOurs(__instance) && !Schools.IsCalled(__instance))) return;
-            Waypoint(__instance) = __state;
+            public UnityEngine.Vector3 Place;
+            public bool Had;
+        }
+
+        private static void Prefix(Fish __instance, out Before __state) =>
+            __state = new Before { Place = Waypoint(__instance), Had = HaveWaypoint(__instance) };
+
+        private static void Postfix(Fish __instance, ref bool __result, Before __state)
+        {
+            if (!Schools.IsOurs(__instance) && !Schools.IsCalled(__instance)) return;
+            if (__result && (WaypointFloat(__instance) != null || Schools.DeepWayTo(__instance, Waypoint(__instance)))) return;
+            Waypoint(__instance) = __state.Place;
+            HaveWaypoint(__instance) = __state.Had;
+            __result = false;
         }
     }
 }

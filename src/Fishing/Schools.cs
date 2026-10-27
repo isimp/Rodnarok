@@ -41,6 +41,7 @@ namespace Rodnarok
 
         private static readonly AccessTools.FieldRef<Fish, Vector3> SpawnPoint = AccessTools.FieldRefAccess<Fish, Vector3>("m_spawnPoint");
         private static readonly AccessTools.FieldRef<Fish, float> SwimTimer = AccessTools.FieldRefAccess<Fish, float>("m_swimTimer");
+        private static readonly AccessTools.FieldRef<Fish, Vector3> FishWaypoint = AccessTools.FieldRefAccess<Fish, Vector3>("m_waypoint");
         private static readonly AccessTools.FieldRef<Fish, bool> Jumping = AccessTools.FieldRefAccess<Fish, bool>("m_isJumping");
         private static readonly Action<Fish> Jump = AccessTools.MethodDelegate<Action<Fish>>(AccessTools.Method(typeof(Fish), "Jump"));
 
@@ -639,6 +640,26 @@ namespace Rodnarok
         /// <summary>The shortest way a fleeing fish is sent, in metres.</summary>
         private const float GoShortest = 10f;
 
+        /// <summary>
+        /// Whether a fish reaches this place through water deep enough for it every metre of the way:
+        /// as deep as it swims at its float for a school's fish on its way in, which may still be rising
+        /// from deep, else as deep as it swims now.
+        /// </summary>
+        public static bool DeepWayTo(Fish fish, Vector3 place)
+        {
+            var from = fish.transform.position;
+            var across = Across(from, place);
+            if (across < 0.5f) return true;
+            var need = CastOf.TryGetValue(fish, out var cast) && !cast.In ? Mathf.Min(fish.m_minDepth, cast.SwimUnder) : fish.m_minDepth;
+            var dir = Flat(place - from);
+            var surface = ZoneSystem.instance.m_waterLevel;
+            for (var distance = 1f; distance < across; distance += 1f)
+            {
+                if (!DeepEnough(from + dir * distance, surface, need)) return false;
+            }
+            return DeepEnough(place, surface, need);
+        }
+
         /// <summary>Whether the water is deep enough every 2 m of the way, out to its end.</summary>
         private static bool DeepAlong(Vector3 from, Vector3 dir, float reach, float surface, float depth)
         {
@@ -732,6 +753,9 @@ namespace Rodnarok
                 parts.Add(Across(fish.transform.position, cast.Float.transform.position).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " m from its float");
             if (LeaptAt.TryGetValue(fish, out var leapt)) parts.Add("leapt " + (now - leapt).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " s before");
             if (MadeAt.TryGetValue(fish, out var made)) parts.Add("made " + (now - made).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " s before");
+            parts.Add("heading for a place " + Across(fish.transform.position, FishWaypoint(fish)).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " m off, its home "
+                + Across(fish.transform.position, SpawnPoint(fish)).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " m off, at "
+                + fish.m_speed.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " m/s");
             parts.Add(WetOnce.Contains(fish) ? "had been in the water" : "never in the water");
             return string.Join(", ", parts);
         }

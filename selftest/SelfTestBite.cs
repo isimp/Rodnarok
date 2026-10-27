@@ -346,10 +346,21 @@ namespace Rodnarok
                 {
                     PlayRules.ForTest = rules.With(snapSeconds: 0.3f);
                     var snappedBefore = Lines.SnappedForTest;
+                    // The fight so far may have spent the stamina a hold needs, and a hooked fish lets none
+                    // come back; the character is given it, as the stamina is the game's to refill anyway.
+                    var staminaBefore = player.GetStamina();
+                    player.AddStamina(player.GetMaxStamina());
+                    var struggledSince = false;
                     SelfTestHold.Holding = true;
-                    for (var waited = 0f; waited < 20f && ff != null && ff.GetCatch() == fish && player.GetStamina() >= 15f; waited += Time.deltaTime) yield return null;
+                    for (var waited = 0f; waited < 20f && ff != null && ff.GetCatch() == fish && player.GetStamina() >= 15f; waited += Time.deltaTime)
+                    {
+                        struggledSince |= fish.IsEscaping();
+                        yield return null;
+                    }
                     SelfTestHold.Holding = false;
-                    check.That(Lines.SnappedForTest == snappedBefore + 1, "held through a struggle past the snap time, the line snapped");
+                    check.That(Lines.SnappedForTest == snappedBefore + 1, "held through a struggle past the snap time, the line snapped; stamina "
+                        + staminaBefore.ToString("0", CultureInfo.InvariantCulture) + " before, given " + player.GetMaxStamina().ToString("0", CultureInfo.InvariantCulture)
+                        + ", " + player.GetStamina().ToString("0", CultureInfo.InvariantCulture) + " at the end, a struggle seen " + struggledSince);
                     check.That(ff == null || ff.GetCatch() == null, "after the snap nothing is on the line");
                     check.That(fish == null || !fish.IsHooked(), "after the snap the fish swims free");
                     PlayRules.ForTest = rules;
