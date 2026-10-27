@@ -51,10 +51,17 @@ namespace Rodnarok
 
         /// <summary>
         /// Whether a fish of the school may now be let go for the bait: once the school has come in
-        /// and half of it is near the float, or a while after it came whatever its fish are doing.
+        /// and half of it is near the float, or a while after it came whatever its fish are doing;
+        /// never once something spooked it.
         /// </summary>
-        public static bool ReadyToBite(float sinceCame, int near, int size) =>
-            sinceCame >= BiteBackstop || (sinceCame >= Drift.Seconds && near * 2 >= size);
+        public static bool ReadyToBite(float sinceCame, int near, int size, bool spooked = false) =>
+            !spooked && (sinceCame >= BiteBackstop || (sinceCame >= Drift.Seconds && near * 2 >= size));
+
+        /// <summary>
+        /// Whether a fish can be caught this way: a fish a bait drew only with the rod, so a bait
+        /// is never a way to summon fish for other means; a fish of the world's own any way at all.
+        /// </summary>
+        public static bool Catchable(bool drawnByBait, bool byRod) => !drawnByBait || byRod;
 
         /// <summary>The fish of a school that scatter when one is hooked: all the others.</summary>
         public static IReadOnlyList<int> Scatter(int size, int hooked) => Enumerable.Range(0, Math.Max(0, size)).Where(i => i != hooked).ToList();

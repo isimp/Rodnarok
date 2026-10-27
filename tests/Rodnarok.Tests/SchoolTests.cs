@@ -109,6 +109,27 @@ namespace Rodnarok.Tests
         }
 
         [Fact]
+        public void AFishABaitDrewIsCaughtOnlyWithTheRod()
+        {
+            Assert.True(School.Catchable(drawnByBait: true, byRod: true));
+            Assert.False(School.Catchable(drawnByBait: true, byRod: false));
+        }
+
+        [Fact]
+        public void AFishOfTheWorldsOwnIsLeftToEveryWayOfCatchingIt()
+        {
+            Assert.True(School.Catchable(drawnByBait: false, byRod: false));
+            Assert.True(School.Catchable(drawnByBait: false, byRod: true));
+        }
+
+        [Fact]
+        public void ASpookedSchoolNeverTakesTheBait()
+        {
+            Assert.False(School.ReadyToBite(Drift.Seconds + 1f, near: 6, size: 6, spooked: true));
+            Assert.False(School.ReadyToBite(100f, near: 0, size: 6, spooked: true));
+        }
+
+        [Fact]
         public void SchoolsAreOnBumpsOffAndLeavingFishVanishOutOfSightByDefault()
         {
             Assert.True(Rules.Schools);

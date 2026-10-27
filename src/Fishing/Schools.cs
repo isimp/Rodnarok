@@ -55,6 +55,7 @@ namespace Rodnarok
             public int Biter = -1;
             public float BiterFreeAt = float.MaxValue;
             public bool Hooked;
+            public bool Spooked;
         }
 
         private static readonly Dictionary<FishingFloat, Cast> Casts = new Dictionary<FishingFloat, Cast>();
@@ -98,7 +99,7 @@ namespace Rodnarok
         /// <summary>The float one of the schools' fish may go for now: its own, while it is the one let to and the float waits in the water; none otherwise.</summary>
         public static FishingFloat FloatFor(Fish fish)
         {
-            if (!CastOf.TryGetValue(fish, out var cast) || cast.Hooked || cast.Float == null) return null;
+            if (!CastOf.TryGetValue(fish, out var cast) || cast.Hooked || cast.Spooked || cast.Float == null) return null;
             if (cast.Biter < 0 || cast.Biter >= cast.Fish.Count || cast.Fish[cast.Biter] != fish || Time.time < cast.BiterFreeAt) return null;
             return cast.Float.IsInWater() && cast.Float.GetCatch() == null ? cast.Float : null;
         }
@@ -114,6 +115,26 @@ namespace Rodnarok
                 var other = cast.Fish[i];
                 if (other != null) Flee(other, ff.transform.position);
             }
+        }
+
+        /// <summary>How many schools this game spooked, for the self-test.</summary>
+        [ForTest]
+        public static int SpookedForTest { get; private set; }
+
+        /// <summary>
+        /// Something other than the rod hit a fish of a school this game steers: the school is
+        /// spooked, takes no bait, and every fish of it not on a line leaves, diving out of sight.
+        /// </summary>
+        public static void Spook(Fish hit, Vector3 from)
+        {
+            if (hit == null || !CastOf.TryGetValue(hit, out var cast) || cast.Spooked) return;
+            cast.Spooked = true;
+            SpookedForTest++;
+            foreach (var fish in cast.Fish.ToList())
+            {
+                if (fish != null && !fish.IsHooked()) Leave(fish, from);
+            }
+            cast.Fish.RemoveAll(f => f == null || !f.IsHooked());
         }
 
         /// <summary>Called every frame in a world.</summary>
@@ -178,7 +199,7 @@ namespace Rodnarok
             foreach (var fish in cast.Fish) MaybeLeap(fish, cast.Float.transform.position);
             if (cast.Hooked || cast.Fish.Count == 0 || cast.BiterFreeAt < float.MaxValue) return;
             var near = cast.Fish.Count(f => Across(f.transform.position, cast.Float.transform.position) < Near);
-            if (School.ReadyToBite(Time.time - cast.CameAt, near, cast.Fish.Count))
+            if (School.ReadyToBite(Time.time - cast.CameAt, near, cast.Fish.Count, cast.Spooked))
             {
                 cast.Biter = School.Biter(cast.Fish.Count, Random.value);
                 cast.BiterFreeAt = Time.time + Random.Range(2f, 4f);

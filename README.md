@@ -20,6 +20,10 @@ Install Rodnarök on every player and on a dedicated server. The server's settin
 
 All settings are in `BepInEx/config/isimp.Rodnarok.cfg`, and `/rodnarok` in the chat tells where.
 
+## Other mods
+
+The fish a bait brings can only be caught with the rod. This is a deliberate choice and changes how Spearfishing works with Rodnarök: a spear, harpoon, arrow or bolt that hits one of these fish catches nothing and scares the whole school away. Without it every cast would bring a free school of fish to shoot, for one bait you get back. Fish of the world's own are left to Spearfishing as before.
+
 ## Thanks
 
 Several ideas come from ChillFishing by Lenson: above all calming the water where you fish, and also fishing while seated and fish that come to you rather than you travelling to them.
