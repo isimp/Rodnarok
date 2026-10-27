@@ -63,10 +63,13 @@ namespace Rodnarok
             LookPitch(player) = -Mathf.Asin(Mathf.Clamp(dir.normalized.y, -1f, 1f)) * Mathf.Rad2Deg;
         }
 
+        /// <summary>Whether this run takes the fight picture: only in daylight in game, since the water and the float are unseen at night.</summary>
+        private static bool _wikiLight;
+
         /// <summary>Grabs a panel of the fight picture once, noting why when it cannot.</summary>
         private static void WikiPanel(ScenarioCheck check, string name, string caption)
         {
-            if (SelfTestPictures.Has(name)) return;
+            if (!_wikiLight || SelfTestPictures.Has(name)) return;
             var trouble = SelfTestPictures.Grab(name, caption);
             check.That(trouble == null, "the fight picture's panel " + name + " is grabbed: " + trouble);
         }
@@ -144,6 +147,7 @@ namespace Rodnarok
                 if (!tipShown) yield break;
 
                 SelfTestPictures.Forget();
+                _wikiLight = EnvMan.IsDaylight();
                 PlayRules.ForTest = Settings.Rules.With(waitMin: 1f, waitMax: 1f, schools: true, tension: true);
                 var rules = PlayRules.Now;
                 var bait = baitPrefab.GetComponent<ItemDrop>().m_itemData.Clone();
@@ -319,8 +323,15 @@ namespace Rodnarok
 
                 // The four moments together, as the picture for the mod's pages.
                 yield return null;
-                var sheet = SelfTestPictures.Compose(WikiPicture, WikiPanels);
-                check.That(sheet == null, "the fight picture for the mod's pages is put together from bite, struggle, ease and rest: " + sheet);
+                if (_wikiLight)
+                {
+                    var sheet = SelfTestPictures.Compose(WikiPicture, WikiPanels);
+                    check.That(sheet == null, "the fight picture for the mod's pages is put together from bite, struggle, ease and rest: " + sheet);
+                }
+                else
+                {
+                    check.Note("the picture for the mod's pages was left out: it is night in game, run again in daylight for it");
+                }
 
                 // Held through a struggle too long, the line snaps as the game breaks one.
                 if (ff != null && ff.GetCatch() == fish)

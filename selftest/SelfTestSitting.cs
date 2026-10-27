@@ -88,6 +88,7 @@ namespace Rodnarok
             finally
             {
                 SelfTestDraw.Drawing = false;
+                SelfTestDraw.Reeling = false;
                 SelfTestHold.Holding = false;
                 foreach (var ff in OwnFloats()) ZNetScene.instance.Destroy(ff.gameObject);
                 if (player.IsAttached()) player.AttachStop();
@@ -148,13 +149,14 @@ namespace Rodnarok
             // Reeling in.
             var line = LineLength(cast);
             stayed = true;
-            SelfTestHold.Holding = true;
+            // Held as the block key reaches the game, so the seated player's own way to reel is what is tried.
+            SelfTestDraw.Reeling = true;
             for (var waited = 0f; waited < 1.5f && cast != null; waited += Time.deltaTime)
             {
                 stayed &= seated();
                 yield return null;
             }
-            SelfTestHold.Holding = false;
+            SelfTestDraw.Reeling = false;
             check.That(cast != null && LineLength(cast) < line - 0.5f, "sitting on the " + seat + ", the line reels in, from " + line.ToString("0.0", CultureInfo.InvariantCulture) + " m");
             check.That(stayed, "the character stayed seated on the " + seat + " while reeling");
             if (cast != null) ZNetScene.instance.Destroy(cast.gameObject);

@@ -5,18 +5,23 @@ using System.Linq;
 
 namespace Rodnarok
 {
-    /// <summary>What a scenario checks, and what failed of it.</summary>
+    /// <summary>What a scenario checks, what failed of it, and what it notes beside its result.</summary>
     internal sealed class ScenarioCheck
     {
         private readonly List<string> _failures = new List<string>();
+        private readonly List<string> _notes = new List<string>();
 
         public IReadOnlyList<string> Failures => _failures;
+        public IReadOnlyList<string> Notes => _notes;
 
         /// <summary>Notes a failure, saying what was expected, unless it holds.</summary>
         public void That(bool holds, string what)
         {
             if (!holds) _failures.Add(what);
         }
+
+        /// <summary>Notes something told beside the result without failing it, such as a part left out and why.</summary>
+        public void Note(string what) => _notes.Add(what);
     }
 
     /// <summary>One part of the self-test: a name, and a body that yields once for each frame it waits.</summary>
@@ -105,15 +110,16 @@ namespace Rodnarok
         {
             var failures = _check.Failures.ToList();
             if (broke != null) failures.Add("broke: " + broke.GetType().Name + ": " + broke.Message);
+            var notes = _check.Notes.Count == 0 ? "" : " (note: " + string.Join("; ", _check.Notes) + ")";
             if (failures.Count == 0)
             {
                 Passed++;
-                _write("PASS " + _current.Name);
+                _write("PASS " + _current.Name + notes);
             }
             else
             {
                 Failed++;
-                _write("FAIL " + _current.Name + ": " + string.Join("; ", failures));
+                _write("FAIL " + _current.Name + ": " + string.Join("; ", failures) + notes);
             }
             Close();
             _current = null;

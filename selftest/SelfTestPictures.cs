@@ -64,9 +64,10 @@ namespace Rodnarok
             var message = MessageHud.instance != null ? MessageHud.instance.m_messageCenterText : null;
             if (message == null) return "the game's message text is not there";
             var label = CaptionAt(message, caption);
-            var messageAlpha = message.canvasRenderer.GetAlpha();
-            message.canvasRenderer.SetAlpha(0f);
-            SelfTestPlugin.Instance.StartCoroutine(GrabWhenDrawn(name, label, message, messageAlpha));
+            // The game fades its message by a tween that outlasts a set alpha, so the text is switched off for the frame.
+            var messageShown = message.enabled;
+            message.enabled = false;
+            SelfTestPlugin.Instance.StartCoroutine(GrabWhenDrawn(name, label, message, messageShown));
             return null;
         }
 
@@ -111,12 +112,12 @@ namespace Rodnarok
             Panels.Clear();
         }
 
-        private static IEnumerator GrabWhenDrawn(string name, TMP_Text label, TMP_Text message, float messageAlpha)
+        private static IEnumerator GrabWhenDrawn(string name, TMP_Text label, TMP_Text message, bool messageShown)
         {
             yield return new WaitForEndOfFrame();
             var screen = (Texture2D)CaptureTexture.Invoke(null, null);
             Object.Destroy(label.gameObject);
-            message.canvasRenderer.SetAlpha(messageAlpha);
+            if (message != null) message.enabled = messageShown;
             if (screen == null) yield break;
             var w = Mathf.RoundToInt(screen.width * PanelWidth);
             var h = Mathf.RoundToInt(screen.height * (PanelAbove + PanelBelow));

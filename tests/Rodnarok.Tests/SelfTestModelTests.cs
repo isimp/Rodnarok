@@ -50,6 +50,32 @@ namespace Rodnarok.Tests
         }
 
         [Fact]
+        public void ANoteIsToldWithItsScenarioWithoutFailingIt()
+        {
+            var log = new List<string>();
+            var runner = new ScenarioRunner(new[]
+            {
+                new Scenario("Noted", check => { check.Note("the picture waits for daylight"); return Frames(1, () => { }); }),
+            }, log.Add);
+            for (var i = 0; i < 5; i++) runner.Step();
+            Assert.Equal(1, runner.Passed);
+            Assert.Contains("PASS Noted (note: the picture waits for daylight)", log);
+        }
+
+        [Fact]
+        public void ANoteRidesAlongAFailureToo()
+        {
+            var log = new List<string>();
+            var runner = new ScenarioRunner(new[]
+            {
+                new Scenario("Both", check => { check.Note("skipped a part"); check.That(false, "it broke"); return Frames(1, () => { }); }),
+            }, log.Add);
+            for (var i = 0; i < 5; i++) runner.Step();
+            Assert.Equal(1, runner.Failed);
+            Assert.Contains("FAIL Both: it broke (note: skipped a part)", log);
+        }
+
+        [Fact]
         public void AScenarioThatBreaksFailsAndTheRunGoesOn()
         {
             var log = new List<string>();
