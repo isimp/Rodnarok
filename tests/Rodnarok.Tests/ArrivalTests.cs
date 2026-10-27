@@ -34,5 +34,54 @@ namespace Rodnarok.Tests
         {
             Assert.Equal(0f, Arrival.Seconds(-5f, -1f, 0.5));
         }
+
+        private static readonly FishingRules Rules = FishingRules.Default;
+
+        [Fact]
+        public void AWorldFishThatTakesTheBaitIsCalledInsteadOfASchool()
+        {
+            Assert.Equal(ArrivalChoice.Call, Arrival.Choose(worldFishToCall: true, waterAllowsSchool: true, lastSchoolGone: true, Rules));
+        }
+
+        [Fact]
+        public void AWorldFishIsCalledEvenWhereNoSchoolCouldComeOrTheLastOneStillLeaves()
+        {
+            Assert.Equal(ArrivalChoice.Call, Arrival.Choose(worldFishToCall: true, waterAllowsSchool: false, lastSchoolGone: false, Rules));
+        }
+
+        [Fact]
+        public void WithNoWorldFishToCallASchoolComesWhereTheWaterAllowsIt()
+        {
+            Assert.Equal(ArrivalChoice.School, Arrival.Choose(worldFishToCall: false, waterAllowsSchool: true, lastSchoolGone: true, Rules));
+        }
+
+        [Fact]
+        public void TooLittleWaterBringsNoSchoolAndIsSaid()
+        {
+            Assert.Equal(ArrivalChoice.TooLittleWater, Arrival.Choose(worldFishToCall: false, waterAllowsSchool: false, lastSchoolGone: true, Rules));
+            Assert.Equal(ArrivalChoice.TooLittleWater, Arrival.Choose(worldFishToCall: false, waterAllowsSchool: false, lastSchoolGone: false, Rules));
+        }
+
+        [Fact]
+        public void ANewSchoolWaitsUntilTheLastHasLeft()
+        {
+            Assert.Equal(ArrivalChoice.Wait, Arrival.Choose(worldFishToCall: false, waterAllowsSchool: true, lastSchoolGone: false, Rules));
+        }
+
+        [Fact]
+        public void WithCallingOffASchoolComesThoughAWorldFishIsNear()
+        {
+            var off = Rules.With(callWorldFish: false);
+            Assert.Equal(ArrivalChoice.School, Arrival.Choose(worldFishToCall: true, waterAllowsSchool: true, lastSchoolGone: true, off));
+            Assert.True(Rules.CallWorldFish);
+        }
+
+        [Fact]
+        public void TheWaterAllowsASchoolOnlyWithAPlaceToComeFromAndAWayOut()
+        {
+            Assert.True(Arrival.WaterAllowsSchool(placeToComeFrom: true, wayOut: true));
+            Assert.False(Arrival.WaterAllowsSchool(placeToComeFrom: true, wayOut: false));
+            Assert.False(Arrival.WaterAllowsSchool(placeToComeFrom: false, wayOut: true));
+        }
     }
 }

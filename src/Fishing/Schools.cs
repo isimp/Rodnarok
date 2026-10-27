@@ -9,11 +9,14 @@ namespace Rodnarok
 {
     /// <summary>
     /// The schools baits draw. When a float this game cast lies in the water, the wait is rolled;
-    /// when it is over a school of the bait's fish appears out in the water and makes the float
-    /// its home, circling it near the top of the depth it swims at, the small ones leaping on
-    /// the way in as the game lets them. Once most of it is near, one fish of it may go for the
-    /// bait, and the game's own bite follows. When that one is hooked the rest scatter, and once
-    /// the float is gone the school swims off and is taken away.
+    /// when it is over, a fish of the world's own that takes the bait and can swim to the float is
+    /// called to it from where it swims, and nothing is spawned. Without one, a school of the
+    /// bait's fish appears out in the water, where the water gives it a place to come from and a
+    /// way out again, and once the caster's last school is gone; where it does not, that is said
+    /// once. The school makes the float its home, circling it near the top of the depth it swims
+    /// at, the small ones leaping on the way in as the game lets them. Once most of it is near, one
+    /// fish of it may go for the bait, and the game's own bite follows. When that one is hooked the
+    /// rest scatter, and once the float is gone the school swims off and is taken away.
     ///
     /// Each of these fish carries the id of its float in its saved data. Any game that owns a
     /// marked fish whose float is gone takes it away a while later, so none gather in the world's
@@ -56,6 +59,7 @@ namespace Rodnarok
             public float BiterFreeAt = float.MaxValue;
             public bool Hooked;
             public bool Spooked;
+            public Fish Called;
         }
 
         private static readonly Dictionary<FishingFloat, Cast> Casts = new Dictionary<FishingFloat, Cast>();
@@ -65,7 +69,27 @@ namespace Rodnarok
         private static readonly Dictionary<Fish, float> GoneSince = new Dictionary<Fish, float>();
         private static readonly HashSet<Fish> WetOnce = new HashSet<Fish>();
         private static readonly Dictionary<Fish, float> MadeAt = new Dictionary<Fish, float>();
+        private static readonly Dictionary<Fish, Cast> CalledBy = new Dictionary<Fish, Cast>();
         private static float _nextSweep;
+
+        /// <summary>What a float with too little water for a school says, once.</summary>
+        private const string TooLittleWaterText = "Too little water here for a school. Fish of the world's own still bite.";
+
+        /// <summary>How many fish of the world's own were called to a float, for the self-test.</summary>
+        [ForTest]
+        public static int CalledForTest { get; private set; }
+
+        /// <summary>How many casts had too little water for a school, for the self-test.</summary>
+        [ForTest]
+        public static int TooLittleWaterForTest { get; private set; }
+
+        /// <summary>How many fish this game steers away as leaving, for the self-test.</summary>
+        [ForTest]
+        public static int LeavingForTest => GoneSince.Count;
+
+        /// <summary>The fish of the world's own called to a float this game cast, for the self-test; null for none.</summary>
+        [ForTest]
+        public static Fish CalledFishForTest(FishingFloat ff) => ff != null && Casts.TryGetValue(ff, out var cast) ? cast.Called : null;
 
         /// <summary>How far ahead the water must stay deep for a fish to leap, in metres.</summary>
         private const float LeapReach = 10f;
@@ -89,6 +113,9 @@ namespace Rodnarok
         /// <summary>Whether this game steers a fish as one of a school.</summary>
         public static bool IsOurs(Fish fish) => fish != null && Ours.Contains(fish);
 
+        /// <summary>Whether a fish of the world's own is called to a float this game cast.</summary>
+        public static bool IsCalled(Fish fish) => fish != null && CalledBy.ContainsKey(fish);
+
         /// <summary>The float a fish was drawn to, from its saved mark; none for a fish of the world's own.</summary>
         public static ZDOID FloatOf(Fish fish)
         {
@@ -99,6 +126,8 @@ namespace Rodnarok
         /// <summary>The float one of the schools' fish may go for now: its own, while it is the one let to and the float waits in the water; none otherwise.</summary>
         public static FishingFloat FloatFor(Fish fish)
         {
+            if (CalledBy.TryGetValue(fish, out var calling))
+                return calling.Float != null && calling.Float.IsInWater() && calling.Float.GetCatch() == null ? calling.Float : null;
             if (!CastOf.TryGetValue(fish, out var cast) || cast.Hooked || cast.Spooked || cast.Float == null) return null;
             if (cast.Biter < 0 || cast.Biter >= cast.Fish.Count || cast.Fish[cast.Biter] != fish || Time.time < cast.BiterFreeAt) return null;
             return cast.Float.IsInWater() && cast.Float.GetCatch() == null ? cast.Float : null;
@@ -107,6 +136,8 @@ namespace Rodnarok
         /// <summary>A fish was hooked or let go by a float; a school whose fish is hooked scatters.</summary>
         public static void Hooked(Fish fish, FishingFloat ff)
         {
+            // A called fish, once on the line or let go, is the game's again.
+            CalledBy.Remove(fish);
             if (ff == null || !CastOf.TryGetValue(fish, out var cast) || cast.Hooked) return;
             cast.Hooked = true;
             var hooked = cast.Fish.IndexOf(fish);
@@ -182,6 +213,7 @@ namespace Rodnarok
                     continue;
                 }
                 Casts.Remove(pair.Key);
+                if (pair.Value.Called is object) CalledBy.Remove(pair.Value.Called);
                 foreach (var fish in pair.Value.Fish) Leave(fish, pair.Value.LastPlace);
             }
         }
@@ -191,6 +223,18 @@ namespace Rodnarok
             if (!cast.Came)
             {
                 if (Time.time >= cast.DueAt) Come(cast);
+                return;
+            }
+            if (cast.Called is object)
+            {
+                // A called fish gone from the world before it bit: what comes is decided again.
+                if (cast.Called == null && !cast.Hooked)
+                {
+                    CalledBy.Remove(cast.Called);
+                    cast.Called = null;
+                    cast.Came = false;
+                    cast.DueAt = Time.time + 1f;
+                }
                 return;
             }
 
@@ -227,24 +271,46 @@ namespace Rodnarok
             cast.In = share >= 1f;
         }
 
-        /// <summary>The school appears loose out in the water, one kind of the bait's fish, as many as the world spawns together.</summary>
+        /// <summary>
+        /// What comes once the wait is over: a fish of the world's own called, a school appearing loose
+        /// out in the water, one kind of the bait's fish as many as the world spawns together, a wait
+        /// for the caster's last school to be gone, or word that the water is too little for a school.
+        /// </summary>
         private static void Come(Cast cast)
         {
-            cast.Came = true;
-            cast.CameAt = Time.time;
             var book = FishBook.Current;
-            var kind = book?.Baits.Choose(cast.Float.GetBait(), Random.value);
+            var bait = cast.Float.GetBait();
+            var kind = book?.Baits.Choose(bait, Random.value);
             var prefab = book?.Prefab(kind);
-            if (prefab == null) return;
+            if (prefab == null)
+            {
+                cast.Came = true;
+                return;
+            }
             var template = prefab.GetComponent<Fish>();
             var home = cast.Float.transform.position;
             var surface = home.y;
+            var worldFish = Callable(cast.Float, bait);
             var start = StartFor(home, surface, template.m_minDepth);
-            if (!start.HasValue)
+            var water = Arrival.WaterAllowsSchool(start.HasValue, start.HasValue && HasWayOut(home, surface, template.m_minDepth));
+            switch (Arrival.Choose(worldFish != null, water, GoneSince.Count == 0, Rules))
             {
-                Log.Info("No school for " + kind + ": the water by the float is shallower than it swims.");
-                return;
+                case ArrivalChoice.Call:
+                    Call(cast, worldFish);
+                    return;
+                case ArrivalChoice.Wait:
+                    cast.DueAt = Time.time + 1f;
+                    return;
+                case ArrivalChoice.TooLittleWater:
+                    cast.Came = true;
+                    TooLittleWaterForTest++;
+                    Log.Info("No school for " + kind + ": the water by the float gives it no place to come from or no way out.");
+                    if (Player.m_localPlayer != null) Player.m_localPlayer.Message(MessageHud.MessageType.Center, TooLittleWaterText);
+                    return;
             }
+
+            cast.Came = true;
+            cast.CameAt = Time.time;
 
             cast.Start = start.Value;
             cast.OwnSpeed = template.m_speed;
@@ -314,6 +380,66 @@ namespace Rodnarok
                 ZNetScene.instance.Destroy(fish.gameObject);
                 Drop(fish);
             }
+        }
+
+        /// <summary>A fish of the world's own is called to the float: it goes for it at its next choice, hearing nobody meanwhile.</summary>
+        private static void Call(Cast cast, Fish fish)
+        {
+            cast.Came = true;
+            cast.CameAt = Time.time;
+            cast.In = true;
+            cast.Called = fish;
+            CalledBy[fish] = cast;
+            SwimTimer(fish) = 0f;
+            CalledForTest++;
+        }
+
+        /// <summary>
+        /// The nearest fish of the world's own this game steers that takes this bait, within the
+        /// float's reach, and can swim to the float through water deep enough for it all the way;
+        /// null for none. A fish another game steers is left to it.
+        /// </summary>
+        private static Fish Callable(FishingFloat ff, string bait)
+        {
+            var at = ff.transform.position;
+            var surface = ZoneSystem.instance.m_waterLevel;
+            Fish best = null;
+            var bestDistance = float.MaxValue;
+            foreach (var fish in Fish.Instances.OfType<Fish>())
+            {
+                if (fish == null || IsOurs(fish) || IsCalled(fish) || !FloatOf(fish).IsNone() || fish.IsHooked() || fish.IsOutOfWater()) continue;
+                var view = fish.GetComponent<ZNetView>();
+                if (view == null || !view.IsValid() || !view.IsOwner()) continue;
+                if (!fish.m_baits.Any(b => b.m_bait != null && b.m_bait.name == bait)) continue;
+                var distance = Vector3.Distance(fish.transform.position, at);
+                if (distance > ff.m_range || distance >= bestDistance) continue;
+                var across = Across(fish.transform.position, at);
+                if (across > 0.5f && !DeepAlong(fish.transform.position, Flat(at - fish.transform.position), across, surface, fish.m_minDepth)) continue;
+                best = fish;
+                bestDistance = distance;
+            }
+            return best;
+        }
+
+        /// <summary>
+        /// Whether a school leaving this float has a way out of sight through water deep enough for
+        /// it: away as far as a leaving fish must be from every player, or to water deep enough to
+        /// dive under, the whole way.
+        /// </summary>
+        private static bool HasWayOut(Vector3 home, float surface, float minDepth)
+        {
+            var rules = Rules;
+            for (var step = 0; step < 16; step++)
+            {
+                var angle = step * Mathf.PI / 8f;
+                var dir = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle));
+                if (DeepAlong(home, dir, rules.OutOfSight, surface, minDepth)) return true;
+                for (var reach = GoTo; reach >= GoShortest; reach -= 10f)
+                {
+                    if (DeepAlong(home, dir, reach, surface, minDepth) && DeepEnough(home + dir * reach, surface, rules.DiveDepth + 0.5f)) return true;
+                }
+            }
+            return false;
         }
 
         /// <summary>
@@ -559,6 +685,7 @@ namespace Rodnarok
             WetOnce.Clear();
             MadeAt.Clear();
             LeaptAt.Clear();
+            CalledBy.Clear();
         }
 
         private static Vector3 Flat(Vector3 v)

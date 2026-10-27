@@ -106,7 +106,9 @@ namespace Rodnarok
                 check.That(tipShown, "the rod in hand shows its tip within 3 s");
                 if (!tipShown) yield break;
 
-                PlayRules.ForTest = Settings.Rules.With(waitMin: 1f, waitMax: 1f, schools: true);
+                // The school of a scenario before may still be leaving, and a new one waits for it.
+                foreach (var frame in SelfTestArrival.UntilNoSchoolLeaves()) yield return frame;
+                PlayRules.ForTest = Settings.Rules.With(waitMin: 1f, waitMax: 1f, schools: true, callWorldFish: false);
                 var bait = baitPrefab.GetComponent<ItemDrop>().m_itemData.Clone();
                 bait.m_dropPrefab = baitPrefab;
                 var go = UnityEngine.Object.Instantiate(floatPrefab, spot.Value, Quaternion.identity);
@@ -267,7 +269,13 @@ namespace Rodnarok
         }
 
         /// <summary>The fish marked as drawn to this float, in the loaded world.</summary>
-        private static List<Fish> SchoolOf(ZDOID floatId) =>
+        /// <summary>Waits, a frame at a time and at most 40 s, until no school of this game is leaving any more.</summary>
+        internal static IEnumerable UntilNoSchoolLeaves()
+        {
+            for (var waited = 0f; waited < 40f && Schools.LeavingForTest > 0; waited += Time.deltaTime) yield return null;
+        }
+
+        internal static List<Fish> SchoolOf(ZDOID floatId) =>
             Fish.Instances.OfType<Fish>().Where(f => f != null && Schools.FloatOf(f) == floatId).ToList();
 
         /// <summary>The fish of the world's own in the loaded world, by their ids.</summary>

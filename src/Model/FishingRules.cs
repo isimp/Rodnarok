@@ -51,6 +51,9 @@ namespace Rodnarok
         /// <summary>Whether the bait draws a school; without, one fish comes.</summary>
         public bool Schools { get; private set; } = true;
 
+        /// <summary>Whether a fish of the world's own that takes the bait within the float's reach is called to it instead of a school.</summary>
+        public bool CallWorldFish { get; private set; } = true;
+
         /// <summary>Whether the fish that takes the bait bumps the float lightly before it bites.</summary>
         public bool Bumps { get; private set; }
 
@@ -61,7 +64,7 @@ namespace Rodnarok
         public float DiveDepth { get; private set; } = 4f;
 
         /// <summary>Seconds after its float is gone that a leaving fish still in sight is taken away anyway, as one stuck.</summary>
-        public float LeaveBackstop { get; private set; } = 180f;
+        public float LeaveBackstop { get; private set; } = 30f;
 
         /// <summary>These rules with the values given changed.</summary>
         public FishingRules With(
@@ -77,9 +80,11 @@ namespace Rodnarok
             bool? tension = null,
             float? snapSeconds = null,
             float? easeSeconds = null,
-            float? runSpeed = null)
+            float? runSpeed = null,
+            bool? callWorldFish = null)
         {
             var copy = (FishingRules)MemberwiseClone();
+            copy.CallWorldFish = callWorldFish ?? CallWorldFish;
             copy.Tension = tension ?? Tension;
             copy.SnapSeconds = snapSeconds ?? SnapSeconds;
             copy.EaseSeconds = easeSeconds ?? EaseSeconds;

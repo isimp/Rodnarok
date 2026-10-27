@@ -77,10 +77,10 @@ namespace Rodnarok.Tests
         }
 
         [Fact]
-        public void ALeavingFishNearAPlayerAndNearTheSurfaceIsNeverTakenAwayInSight()
+        public void ALeavingFishNearAPlayerAndNearTheSurfaceIsNotTakenAwayInSightBeforeTheBackstop()
         {
-            Assert.False(School.Remove(ours: true, floatAlive: false, sinceFloatGone: 60f, nearestPlayer: 15f, underSurface: 1.5f, Rules));
-            Assert.False(School.Remove(ours: true, floatAlive: false, sinceFloatGone: 60f, nearestPlayer: 39.9f, underSurface: 3.9f, Rules));
+            Assert.False(School.Remove(ours: true, floatAlive: false, sinceFloatGone: 20f, nearestPlayer: 15f, underSurface: 1.5f, Rules));
+            Assert.False(School.Remove(ours: true, floatAlive: false, sinceFloatGone: 20f, nearestPlayer: 39.9f, underSurface: 3.9f, Rules));
         }
 
         [Fact]
@@ -96,10 +96,10 @@ namespace Rodnarok.Tests
         }
 
         [Fact]
-        public void AFishStuckNearbyIsTakenAwayAfterThreeMinutes()
+        public void AFishStuckNearbyIsTakenAwayAfterThirtySeconds()
         {
-            Assert.False(School.Remove(ours: true, floatAlive: false, sinceFloatGone: 179f, nearestPlayer: 5f, underSurface: 1f, Rules));
-            Assert.True(School.Remove(ours: true, floatAlive: false, sinceFloatGone: 180f, nearestPlayer: 5f, underSurface: 1f, Rules));
+            Assert.False(School.Remove(ours: true, floatAlive: false, sinceFloatGone: 29f, nearestPlayer: 5f, underSurface: 1f, Rules));
+            Assert.True(School.Remove(ours: true, floatAlive: false, sinceFloatGone: 30f, nearestPlayer: 5f, underSurface: 1f, Rules));
         }
 
         [Fact]
@@ -136,7 +136,7 @@ namespace Rodnarok.Tests
             Assert.False(Rules.Bumps);
             Assert.Equal(40f, Rules.OutOfSight);
             Assert.Equal(4f, Rules.DiveDepth);
-            Assert.Equal(180f, Rules.LeaveBackstop);
+            Assert.Equal(30f, Rules.LeaveBackstop);
         }
     }
 }

@@ -25,6 +25,7 @@ namespace Rodnarok
         private static ConfigEntry<float> _snapSeconds;
         private static ConfigEntry<float> _easeSeconds;
         private static ConfigEntry<float> _runSpeed;
+        private static ConfigEntry<bool> _callWorldFish;
 
         /// <summary>The rules as the settings stand now; the defaults before they are bound.</summary>
         public static FishingRules Rules =>
@@ -42,7 +43,8 @@ namespace Rodnarok
                     tension: _tension.Value,
                     snapSeconds: _snapSeconds.Value,
                     easeSeconds: _easeSeconds.Value,
-                    runSpeed: _runSpeed.Value);
+                    runSpeed: _runSpeed.Value,
+                    callWorldFish: _callWorldFish.Value);
 
         public static void Bind(ConfigFile config)
         {
@@ -72,6 +74,8 @@ namespace Rodnarok
                 new ConfigDescription("Seconds of easing off, or of the fish resting, until a line strained to snapping is unstrained, with Tension on.", new AcceptableValueRange<float>(0.1f, 10f))));
             _runSpeed = Sync(config.Bind(Section, "RunSpeed", rules.RunSpeed,
                 new ConfigDescription("Metres of line a second a struggling fish takes out while the line is eased off, with Tension on. The line breaks past the game's 30 m as ever.", new AcceptableValueRange<float>(0f, 10f))));
+            _callWorldFish = Sync(config.Bind(Section, "CallWorldFish", rules.CallWorldFish,
+                "Whether a fish of the world's own that takes the bait, within the float's reach and able to swim to it, is called to the float instead of a school. Off, a school comes wherever the water allows one."));
         }
 
         private static ConfigEntry<T> Sync<T>(ConfigEntry<T> entry)

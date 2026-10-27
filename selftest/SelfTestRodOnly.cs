@@ -50,7 +50,9 @@ namespace Rodnarok
                 if (gear.Rod == null) yield break;
                 for (var waited = 0f; waited < 3f && Utils.FindChild(player.transform, "_RodTop") == null; waited += Time.deltaTime) yield return null;
 
-                PlayRules.ForTest = Settings.Rules.With(waitMin: 1f, waitMax: 1f, schools: true);
+                // The school of a scenario before may still be leaving, and a new one waits for it.
+                foreach (var frame in SelfTestArrival.UntilNoSchoolLeaves()) yield return frame;
+                PlayRules.ForTest = Settings.Rules.With(waitMin: 1f, waitMax: 1f, schools: true, callWorldFish: false);
                 var bait = baitPrefab.GetComponent<ItemDrop>().m_itemData.Clone();
                 bait.m_dropPrefab = baitPrefab;
                 var go = Object.Instantiate(floatPrefab, spot.Value, Quaternion.identity);
