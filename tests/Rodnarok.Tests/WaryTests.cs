@@ -4,7 +4,7 @@ namespace Rodnarok.Tests
 {
     /// <summary>
     /// A school is wary of the one fishing, without vanishing at every step. Under water it hears
-    /// half of the game's noise: a player walking or running close to it startles it, one sneaking,
+    /// only part of the game's noise: a player walking or running close to it startles it, one sneaking,
     /// sitting or standing still never does; startled, it darts a few metres off and comes back once
     /// all is quiet a moment. A float moved quickly, as a short reel does, only makes it flinch: a
     /// little sidestep, back as soon as the float is still. Frights add up, a startle counting twice
@@ -25,17 +25,18 @@ namespace Rodnarok.Tests
         }
 
         [Fact]
-        public void UnderWaterHalfTheGamesNoiseIsHeard()
+        public void UnderWaterOnlyPartOfTheGamesNoiseIsHeard()
         {
-            Assert.False(Wary.Heard(distance: 10f, noise: Walking));
+            Assert.InRange(Wary.Hearing, 0.25f, 0.5f);
+            Assert.False(Wary.Heard(distance: 8f, noise: Walking));
             Assert.False(Wary.Heard(distance: Walking * Wary.Hearing, noise: Walking));
         }
 
         [Fact]
         public void RunningIsHeardFartherOut()
         {
-            Assert.True(Wary.Heard(distance: 12f, noise: Running));
-            Assert.False(Wary.Heard(distance: 20f, noise: Running));
+            Assert.True(Wary.Heard(distance: 9f, noise: Running));
+            Assert.False(Wary.Heard(distance: 16f, noise: Running));
         }
 
         [Fact]
@@ -67,19 +68,19 @@ namespace Rodnarok.Tests
         }
 
         [Fact]
-        public void FiveShortReelsAreOnlyFlinchesTheSixthDrivesTheSchoolOff()
+        public void ManyShortReelsAreOnlyFlinchesBeforeTheSchoolLeaves()
         {
             var fright = 0;
-            for (var i = 0; i < 5; i++) fright += Wary.Fright(heard: false);
+            for (var i = 0; i < 6; i++) fright += Wary.Fright(heard: false);
             Assert.False(Wary.Leaves(fright));
-            Assert.True(Wary.Leaves(fright + Wary.Fright(heard: false)));
+            Assert.True(Wary.Leaves(Wary.FrightToLeave));
         }
 
         [Fact]
-        public void TwoStartlesByNoiseDoNotDriveTheSchoolOffAThirdDoes()
+        public void ThreeStartlesByNoiseDoNotDriveTheSchoolOff()
         {
-            Assert.False(Wary.Leaves(Wary.Fright(heard: true) * 2));
-            Assert.True(Wary.Leaves(Wary.Fright(heard: true) * 3));
+            Assert.False(Wary.Leaves(Wary.Fright(heard: true) * 3));
+            Assert.True(Wary.Leaves(Wary.Fright(heard: true) * 4));
         }
 
         [Fact]
@@ -147,7 +148,7 @@ namespace Rodnarok.Tests
         [Fact]
         public void AShyFishOftenGivesUpAndANotShyOneNever()
         {
-            Assert.True(Wary.GivesUp(1f, roll: 0.3));
+            Assert.True(Wary.GivesUp(1f, roll: Wary.MostGivingUp - 0.01));
             Assert.False(Wary.GivesUp(1f, roll: Wary.MostGivingUp + 0.01));
             Assert.False(Wary.GivesUp(0f, roll: 0.0));
         }

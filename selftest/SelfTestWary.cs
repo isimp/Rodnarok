@@ -61,11 +61,11 @@ namespace Rodnarok
                 check.That(school != null && school.Count > 0 && Nearest(school, ff) < 14f, "a school swam to within 14 m of the float within 60 s");
                 if (school == null || school.Count == 0) yield break;
 
-                // Noise as the game makes it for a step or a run, loud enough that half of it reaches past the float.
+                // Noise as the game makes it for a step or a run, loud enough that what a fish hears of it reaches past the float.
                 var startledBefore = Schools.StartledForTest;
                 var leavingBefore = Schools.LeavingForTest;
-                var before = Average(school, ff);
-                player.AddNoise(2f * Vector3.Distance(player.transform.position, ff.transform.position) + 10f);
+                var before = FromPlayer(school, player);
+                player.AddNoise(Vector3.Distance(player.transform.position, ff.transform.position) / Wary.Hearing + 10f);
                 var away = false;
                 for (var waited = 0f; waited < 1f && !away; waited += Time.deltaTime)
                 {
@@ -73,10 +73,10 @@ namespace Rodnarok
                     yield return null;
                 }
                 for (var waited = 0f; waited < 2f; waited += Time.deltaTime) yield return null;
-                var after = Average(school, ff);
+                var after = FromPlayer(school, player);
                 check.That(away && Schools.StartledForTest == startledBefore + 1, "noise reaching the school startles it; startled " + (Schools.StartledForTest - startledBefore).ToString(CultureInfo.InvariantCulture) + " times");
-                check.That(after > before + 2f && after < before + Wary.DartDistance + 6f, "startled, the school darts a few metres off, not away for good: from "
-                    + before.ToString("0.0", CultureInfo.InvariantCulture) + " m to " + after.ToString("0.0", CultureInfo.InvariantCulture) + " m from the float on average");
+                check.That(after > before + 2f && after < before + Wary.DartDistance + 6f, "startled, the school darts a few metres away from the noise, not away for good: from "
+                    + before.ToString("0.0", CultureInfo.InvariantCulture) + " m to " + after.ToString("0.0", CultureInfo.InvariantCulture) + " m from the character on average");
 
                 // All quiet again: it comes back, not before the quiet has lasted.
                 var quietFrom = Time.time;
@@ -118,8 +118,9 @@ namespace Rodnarok
         private static float Nearest(List<Fish> school, FishingFloat ff) =>
             school == null || ff == null || !school.Any(f => f != null) ? float.MaxValue : school.Where(f => f != null).Min(f => Across(f.transform.position, ff.transform.position));
 
-        private static float Average(List<Fish> school, FishingFloat ff) =>
-            !school.Any(f => f != null) ? 0f : school.Where(f => f != null).Average(f => Across(f.transform.position, ff.transform.position));
+        private static float FromPlayer(List<Fish> school, Player player) =>
+            !school.Any(f => f != null) ? 0f : school.Where(f => f != null).Average(f => Across(f.transform.position, player.transform.position));
+
 
         private static float Across(Vector3 a, Vector3 b) => Vector2.Distance(new Vector2(a.x, a.z), new Vector2(b.x, b.z));
     }

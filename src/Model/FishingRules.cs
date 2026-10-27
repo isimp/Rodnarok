@@ -43,7 +43,7 @@ namespace Rodnarok
         public float SkillCostShare { get; private set; } = 0.2f;
 
         /// <summary>How far across the ground a calming item stand reaches a water corner, in metres.</summary>
-        public float CalmReach { get; private set; } = 40f;
+        public float CalmReach { get; private set; } = 48f;
 
         /// <summary>The share of the waves a calmed corner keeps.</summary>
         public float CalmKeep { get; private set; } = 0.1f;

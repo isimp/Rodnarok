@@ -77,7 +77,13 @@ namespace Rodnarok
                 check.That(Schools.CalledForTest == called + 1 && calledFish != null, "a fish of the world's own was called to the float");
                 if (calledFish == null) yield break;
                 check.That(calledFish.m_baits.Any(b => b.m_bait != null && b.m_bait.name == Bait), "the called fish takes Fishing Bait");
-                check.That(calledFish == put, "the Perch put a few metres off was the one called" + (calledFish == put ? "" : ", another nearer one was: " + Utils.GetPrefabName(calledFish.gameObject)));
+                // A fish of the world's own swimming nearer the float than the Perch put there is rightly called instead.
+                var calledOff = Vector3.Distance(calledFish.transform.position, ff.transform.position);
+                var putOff = put != null ? Vector3.Distance(put.transform.position, ff.transform.position) : float.MaxValue;
+                var nearerWild = calledFish != put && Schools.FloatOf(calledFish).IsNone() && calledOff <= putOff;
+                check.That(calledFish == put || nearerWild, "the nearest fish of the world's own was the one called: " + Utils.GetPrefabName(calledFish.gameObject) + " "
+                    + calledOff.ToString("0", CultureInfo.InvariantCulture) + " m off, the Perch put there " + putOff.ToString("0", CultureInfo.InvariantCulture) + " m off");
+                if (nearerWild) check.Note("a " + Utils.GetPrefabName(calledFish.gameObject) + " of the world's own swam nearer the float than the Perch put there and was called instead");
 
                 var bit = false;
                 for (var waited = 0f; waited < 45f && !bit; waited += Time.deltaTime)

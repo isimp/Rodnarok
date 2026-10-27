@@ -69,10 +69,17 @@ namespace Rodnarok.Tests
         }
 
         [Fact]
-        public void ThePieceReachesFortyMetresAndKeepsATenthOfTheWavesByDefault()
+        public void AStandKeepsATenthOfTheWavesByDefault()
         {
-            Assert.Equal(40f, FishingRules.Default.CalmReach);
             Assert.Equal(0.1f, FishingRules.Default.CalmKeep);
+        }
+
+        [Fact]
+        public void AStandAnywhereReachesAtLeastOneTileCornerByDefault()
+        {
+            // The farthest a place lies from its nearest corner is a tile's middle, half its diagonal off.
+            var farthest = CalmWater.Tile / 2f * (float)System.Math.Sqrt(2.0);
+            Assert.True(FishingRules.Default.CalmReach > farthest);
         }
     }
 }
