@@ -52,7 +52,7 @@ namespace Rodnarok
 
                 // The school of a scenario before may still be leaving, and a new one waits for it.
                 foreach (var frame in SelfTestArrival.UntilNoSchoolLeaves()) yield return frame;
-                PlayRules.ForTest = Settings.Rules.With(waitMin: 1f, waitMax: 1f, schools: true, callWorldFish: false);
+                PlayRules.ForTest = Settings.Rules.With(waitMin: 1f, waitMax: 1f, schools: true, callWorldFish: false, wary: false);
                 var bait = baitPrefab.GetComponent<ItemDrop>().m_itemData.Clone();
                 bait.m_dropPrefab = baitPrefab;
                 var go = Object.Instantiate(floatPrefab, spot.Value, Quaternion.identity);

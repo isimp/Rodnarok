@@ -68,6 +68,18 @@ namespace Rodnarok
             public bool Spooked;
             public Fish Called;
             public bool Hinted;
+
+            // How wary the school is (Wary): startled and off the float, since when all is quiet,
+            // how often startled, when it was first ready to bite and how shy it is then, and where
+            // and when the float was last seen, for its speed.
+            public bool Away;
+            public float QuietSince;
+            public int Startles;
+            public float ReadyAt = -1f;
+            public float Shyness;
+            public Vector3 FloatSeen;
+            public float FloatSeenAt = -1f;
+            public float FloatSpeed;
         }
 
         private static readonly Dictionary<FishingFloat, Cast> Casts = new Dictionary<FishingFloat, Cast>();
@@ -187,6 +199,18 @@ namespace Rodnarok
             }
         }
 
+        /// <summary>How many times a school this game steers was startled, for the self-test.</summary>
+        [ForTest]
+        public static int StartledForTest { get; private set; }
+
+        /// <summary>How many schools this game steers gave up and swam off without biting, for the self-test.</summary>
+        [ForTest]
+        public static int GaveUpForTest { get; private set; }
+
+        /// <summary>Whether the school of a float this game cast is startled and off the float now, for the self-test.</summary>
+        [ForTest]
+        public static bool AwayForTest(FishingFloat ff) => ff != null && Casts.TryGetValue(ff, out var cast) && cast.Away;
+
         /// <summary>How many schools this game spooked, for the self-test.</summary>
         [ForTest]
         public static int SpookedForTest { get; private set; }
@@ -284,6 +308,7 @@ namespace Rodnarok
             }
 
             cast.Fish.RemoveAll(f => f == null);
+            if (Startled(cast)) return;
             if (!cast.In) DriftIn(cast);
             // A school rising from deep leaps only once it is near its own depth.
             var rising = cast.StartUnder > cast.SwimUnder + 0.5f && Drift.Share(Time.time - cast.CameAt, cast.SwimSeconds) < 0.6f;
@@ -295,9 +320,114 @@ namespace Rodnarok
             var near = cast.Fish.Count(f => Across(f.transform.position, cast.Float.transform.position) < Near);
             if (School.ReadyToBite(Time.time - cast.CameAt, cast.SwimSeconds, near, cast.Fish.Count, cast.Spooked))
             {
+                if (Rules.Wary && Hesitates(cast)) return;
                 cast.Biter = School.Biter(cast.Fish.Count, Random.value);
                 cast.BiterFreeAt = Time.time + Random.Range(2f, 4f);
             }
+        }
+
+        /// <summary>
+        /// A wary school (<see cref="Wary"/>) listens before it bites: a player heard at the float or
+        /// at the school, or the float dragged quickly through it, startles it; startled, it darts off,
+        /// comes back once all has been quiet a while, and leaves at the next startle. True while the
+        /// school is off the float or gone.
+        /// </summary>
+        private static bool Startled(Cast cast)
+        {
+            if (!Rules.Wary || cast.Hooked || cast.Spooked || cast.Fish.Count == 0) return false;
+            var at = cast.Float.transform.position;
+            var now = Time.time;
+            if (cast.FloatSeenAt < 0f || now - cast.FloatSeenAt >= 0.5f)
+            {
+                cast.FloatSpeed = cast.FloatSeenAt < 0f ? 0f : Across(at, cast.FloatSeen) / (now - cast.FloatSeenAt);
+                cast.FloatSeen = at;
+                cast.FloatSeenAt = now;
+            }
+            var heard = Player.GetPlayerNoiseRange(at) ?? Player.GetPlayerNoiseRange(Centre(cast.Fish));
+            var near = cast.Fish.Any(f => Across(f.transform.position, at) < Near);
+            if (heard != null || Wary.FloatStartles(cast.FloatSpeed, near))
+            {
+                cast.QuietSince = now;
+                if (!cast.Away) Startle(cast, heard != null ? heard.transform.position : at);
+            }
+            else if (cast.Away && Wary.ComesBack(now - cast.QuietSince))
+            {
+                ComeBack(cast);
+            }
+            return cast.Away || cast.Spooked;
+        }
+
+        /// <summary>The school darts off from what startled it, or leaves for good at the last startle; no fish of it goes for the bait meanwhile.</summary>
+        private static void Startle(Cast cast, Vector3 from)
+        {
+            cast.Startles++;
+            StartledForTest++;
+            cast.Biter = -1;
+            cast.BiterFreeAt = float.MaxValue;
+            cast.ReadyAt = -1f;
+            if (Wary.Leaves(cast.Startles))
+            {
+                cast.Spooked = true;
+                foreach (var fish in cast.Fish.ToList())
+                {
+                    if (fish != null && !fish.IsHooked()) Leave(fish, from);
+                }
+                cast.Fish.RemoveAll(f => f == null || !f.IsHooked());
+                return;
+            }
+            cast.Away = true;
+            foreach (var fish in cast.Fish)
+            {
+                if (fish != null) Flee(fish, from);
+            }
+        }
+
+        /// <summary>All quiet again: the school swims back in from where it fled, as it swam in first.</summary>
+        private static void ComeBack(Cast cast)
+        {
+            cast.Away = false;
+            foreach (var fish in cast.Fish) Fled.Remove(fish);
+            var from = Centre(cast.Fish);
+            cast.Start = from;
+            cast.StartUnder = cast.SwimUnder;
+            cast.CameAt = Time.time;
+            cast.SwimSeconds = Drift.Swim(Across(from, cast.Float.transform.position), 0f, cast.OwnSpeed);
+            cast.In = false;
+        }
+
+        /// <summary>
+        /// A school ready to bite close to the one fishing or in shallow water is shy: once, as it is
+        /// first ready, it may give up and swim off; otherwise it hesitates the longer the shyer it is.
+        /// True while it hesitates or once it gave up.
+        /// </summary>
+        private static bool Hesitates(Cast cast)
+        {
+            if (cast.ReadyAt < 0f)
+            {
+                cast.ReadyAt = Time.time;
+                var at = cast.Float.transform.position;
+                var angler = Player.m_localPlayer;
+                cast.Shyness = Wary.Shyness(angler != null ? Across(angler.transform.position, at) : Wary.FarOut, WaterDepth(at));
+                if (Wary.GivesUp(cast.Shyness, Random.value))
+                {
+                    GaveUpForTest++;
+                    cast.Spooked = true;
+                    foreach (var fish in cast.Fish.ToList()) Leave(fish, at);
+                    cast.Fish.Clear();
+                    return true;
+                }
+            }
+            return Time.time - cast.ReadyAt < Wary.Hesitation(cast.Shyness);
+        }
+
+        /// <summary>Where a school's fish are, on average.</summary>
+        private static Vector3 Centre(List<Fish> fish)
+        {
+            var here = fish.Where(f => f != null).ToList();
+            if (here.Count == 0) return Vector3.zero;
+            var sum = Vector3.zero;
+            foreach (var f in here) sum += f.transform.position;
+            return sum / here.Count;
         }
 
         /// <summary>

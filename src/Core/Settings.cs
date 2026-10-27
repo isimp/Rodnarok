@@ -26,6 +26,7 @@ namespace Rodnarok
         private static ConfigEntry<float> _easeSeconds;
         private static ConfigEntry<float> _runSpeed;
         private static ConfigEntry<bool> _callWorldFish;
+        private static ConfigEntry<bool> _wary;
         private static ConfigEntry<bool> _castHints;
         private static ConfigEntry<bool> _seatedMotions;
 
@@ -61,7 +62,8 @@ namespace Rodnarok
                     snapSeconds: _snapSeconds.Value,
                     easeSeconds: _easeSeconds.Value,
                     runSpeed: _runSpeed.Value,
-                    callWorldFish: _callWorldFish.Value);
+                    callWorldFish: _callWorldFish.Value,
+                    wary: _wary.Value);
 
         public static void Bind(ConfigFile config)
         {
@@ -82,7 +84,7 @@ namespace Rodnarok
             _schools = Sync(config.Bind(Section, "Schools", rules.Schools,
                 "Whether the bait draws a school of its fish, as many as the world spawns together, of which one takes the bait. Off, a single fish comes."));
             _bumps = Sync(config.Bind(Section, "Bumps", rules.Bumps,
-                "Whether the fish that takes the bait first bumps the float lightly once or twice. A bump can never be hooked; the real bite pulls the float under."));
+                "Not built yet: does nothing whatever it is set to. Meant to have the fish that takes the bait first bump the float lightly once or twice, never hookable, before the real bite pulls the float under."));
             _tension = Sync(config.Bind(Section, "Tension", rules.Tension,
                 "Whether holding the line through a struggle strains it until it snaps, shown by the crosshair ring filling. Easing off lets the strain go while the fish takes line out. Off, holding through a struggle only stalls."));
             _snapSeconds = Sync(config.Bind(Section, "SnapSeconds", rules.SnapSeconds,
@@ -93,6 +95,8 @@ namespace Rodnarok
                 new ConfigDescription("Metres of line a second a struggling fish takes out while the line is eased off, with Tension on. The line breaks past the game's 30 m as ever.", new AcceptableValueRange<float>(0f, 10f))));
             _callWorldFish = Sync(config.Bind(Section, "CallWorldFish", rules.CallWorldFish,
                 "Whether a fish of the world's own that takes the bait, within the float's reach and able to swim to it, is called to the float instead of a school. Off, a school comes wherever the water allows one."));
+            _wary = Sync(config.Bind(Section, "Wary", rules.Wary,
+                "Whether a school is wary of the one fishing. On, a player walking or running near the float (the game's own noise; sneaking, sitting and standing still make none) or a float dragged quickly through the school startles it: it darts off and comes back once all is quiet for 8 s, and leaves at the second startle. Close in (within 5 m, not shy from 15 m) and in shallow water (under 1 m, not shy from 3 m) a fish hesitates up to 20 s before biting and up to half of such schools give up and swim off. Off, a school bites wherever it is."));
             // Shown only to this player, so each player sets it and the server never does.
             _castHints = config.Bind("Display", "CastHints", CastHint.OnByDefault,
                 "Whether each cast shows a short line at the top left saying which of the bait's fish can come to the water there, and which would need bigger or deeper water. Your own setting; the server's does not apply.");

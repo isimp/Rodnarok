@@ -54,6 +54,9 @@ namespace Rodnarok
         /// <summary>Whether a fish of the world's own that takes the bait within the float's reach is called to it instead of a school.</summary>
         public bool CallWorldFish { get; private set; } = true;
 
+        /// <summary>Whether a school is wary of the one fishing: startled by noise and a quickly dragged float, shy close in and in shallow water.</summary>
+        public bool Wary { get; private set; } = true;
+
         /// <summary>Whether the fish that takes the bait bumps the float lightly before it bites.</summary>
         public bool Bumps { get; private set; }
 
@@ -81,10 +84,12 @@ namespace Rodnarok
             float? snapSeconds = null,
             float? easeSeconds = null,
             float? runSpeed = null,
-            bool? callWorldFish = null)
+            bool? callWorldFish = null,
+            bool? wary = null)
         {
             var copy = (FishingRules)MemberwiseClone();
             copy.CallWorldFish = callWorldFish ?? CallWorldFish;
+            copy.Wary = wary ?? Wary;
             copy.Tension = tension ?? Tension;
             copy.SnapSeconds = snapSeconds ?? SnapSeconds;
             copy.EaseSeconds = easeSeconds ?? EaseSeconds;
