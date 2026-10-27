@@ -30,8 +30,12 @@ namespace Rodnarok
         private static readonly HashSet<FishingFloat> Bare = new HashSet<FishingFloat>();
         private static readonly Dictionary<FishingFloat, int> Misses = new Dictionary<FishingFloat, int>();
 
-        /// <summary>What a player is told at a missed bite that only nibbled the bait, and at the one that took it.</summary>
+        /// <summary>The fish that missed a float of this game and bite it no more.</summary>
+        private static readonly Dictionary<FishingFloat, HashSet<Fish>> Learned = new Dictionary<FishingFloat, HashSet<Fish>>();
+
+        /// <summary>What a player is told at a missed bite that only nibbled the bait, at one whose school then swam off, and at one that took the bait.</summary>
         private const string NibbledText = "The fish nibbled at the bait";
+        private const string SchoolOffText = "The fish nibbled at the bait, and the school swam off";
         private const string TakenText = "The fish took the bait";
 
         /// <summary>How many bites a float of this game missed, for the self-test.</summary>
@@ -95,14 +99,16 @@ namespace Rodnarok
             BumpedUntil.Remove(ff);
             Bare.Remove(ff);
             Misses.Remove(ff);
+            Learned.Remove(ff);
         }
 
         /// <summary>
         /// The float's step in the game that owns it: a bite neither hooked nor any longer within the
-        /// hook window is a miss, and the fish that bit can no longer be hooked. The first misses only
-        /// nibble the bait; the last takes it: the float is left bare, the game counts its bait as
-        /// used so reeling it in gives none back, and the school moves on. The one fishing is told
-        /// each time.
+        /// hook window is a miss, and the fish that bit can no longer be hooked; it has learned and
+        /// bites this float no more. Each miss may take the bait, more likely each time: then the
+        /// float is left bare, the game counts its bait as used so reeling it in gives none back, and
+        /// the school moves on. Otherwise another fish of the school may bite, until every one has
+        /// missed and the school swims off. The one fishing is told each time.
         /// </summary>
         public static void WatchBait(FishingFloat ff)
         {
@@ -111,21 +117,31 @@ namespace Rodnarok
             if (view == null || !view.IsValid() || !view.IsOwner()) return;
             var rules = PlayRules.Now;
             if (!rules.BaitLost || !BaitLoss.Missed(Nibbler(ff) != null, ff.GetCatch() != null, Time.time - NibbleTime(ff), rules.HookWindow)) return;
+            var fish = Nibbler(ff);
             Nibbler(ff) = null;
             Misses.TryGetValue(ff, out var misses);
             Misses[ff] = ++misses;
-            var taken = BaitLoss.Taken(rules.BaitLost, misses);
+            if (!Learned.TryGetValue(ff, out var learned)) Learned[ff] = learned = new HashSet<Fish>();
+            learned.Add(fish);
+            var taken = BaitLoss.Taken(rules.BaitLost, misses, Random.value);
+            var schoolOff = false;
             if (taken)
             {
                 Bare.Add(ff);
                 BaitConsumed(ff) = true;
                 Schools.BaitTaken(ff);
             }
-            if (Owner(ff) is Player player && player == Player.m_localPlayer) player.Message(MessageHud.MessageType.TopLeft, taken ? TakenText : NibbledText);
+            else
+            {
+                schoolOff = Schools.Missed(ff, fish);
+            }
+            if (Owner(ff) is Player player && player == Player.m_localPlayer)
+                player.Message(MessageHud.MessageType.TopLeft, taken ? TakenText : schoolOff ? SchoolOffText : NibbledText);
         }
 
-        /// <summary>Whether a float takes no bite: its bait was taken.</summary>
-        public static bool Refuses(FishingFloat ff) => ff != null && Bare.Contains(ff);
+        /// <summary>Whether a float takes this fish's bite: not once its bait was taken, nor from a fish that missed it before.</summary>
+        public static bool Refuses(FishingFloat ff, Fish fish) =>
+            ff != null && (Bare.Contains(ff) || (fish != null && Learned.TryGetValue(ff, out var learned) && learned.Contains(fish)));
 
         private static void PullFor(FishingFloat ff, Dictionary<FishingFloat, float> pulls, float pull)
         {

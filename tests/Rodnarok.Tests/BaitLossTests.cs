@@ -3,10 +3,11 @@ using Xunit;
 namespace Rodnarok.Tests
 {
     /// <summary>
-    /// Missed bites wear the bait down: a bite not hooked in time is a miss, and the third miss on a
-    /// float takes the bait: the float is bare, nothing bites it again, and reeling it in gives no
-    /// bait back. A hooked bite, or one still within the hook window, is no miss, and with the
-    /// setting off misses cost nothing, as in the game.
+    /// Missed bites wear the bait down, more likely each time: a bite not hooked in time is a miss;
+    /// the first miss on a float very seldom takes the bait, the second more often, the third almost
+    /// always, and so on. A fish that missed has learned and bites that float no more; once every
+    /// fish of the school has learned, the school swims off. A hooked bite, or one still within the
+    /// hook window, is no miss, and with the setting off misses cost nothing, as in the game.
     /// </summary>
     public class BaitLossTests
     {
@@ -37,22 +38,48 @@ namespace Rodnarok.Tests
         }
 
         [Fact]
-        public void TheFirstMissesOnlyNibbleTheBait()
+        public void TheFirstMissVerySeldomTakesTheBait()
         {
-            for (var misses = 1; misses < BaitLoss.MissesToTake; misses++) Assert.False(BaitLoss.Taken(on: true, misses));
-            Assert.InRange(BaitLoss.MissesToTake, 2, 4);
+            Assert.InRange(BaitLoss.TakeChance(1), 0.01, 0.15);
         }
 
         [Fact]
-        public void TheLastMissTakesTheBait()
+        public void EachMissIsMoreLikelyToTakeTheBaitThanTheOneBefore()
         {
-            Assert.True(BaitLoss.Taken(on: true, BaitLoss.MissesToTake));
+            for (var misses = 1; misses < 4; misses++) Assert.True(BaitLoss.TakeChance(misses + 1) > BaitLoss.TakeChance(misses));
+        }
+
+        [Fact]
+        public void TheThirdMissAlmostAlwaysTakesTheBait()
+        {
+            Assert.InRange(BaitLoss.TakeChance(3), 0.85, 0.95);
+        }
+
+        [Fact]
+        public void LaterMissesKeepTakingItAlmostSurely()
+        {
+            Assert.InRange(BaitLoss.TakeChance(10), 0.95, 1.0);
+        }
+
+        [Fact]
+        public void TheRollDecidesWithinTheChance()
+        {
+            Assert.True(BaitLoss.Taken(on: true, misses: 2, roll: BaitLoss.TakeChance(2) - 0.01));
+            Assert.False(BaitLoss.Taken(on: true, misses: 2, roll: BaitLoss.TakeChance(2) + 0.01));
         }
 
         [Fact]
         public void WithTheSettingOffMissesCostNothingAsInTheGame()
         {
-            Assert.False(BaitLoss.Taken(on: false, misses: 10));
+            Assert.False(BaitLoss.Taken(on: false, misses: 10, roll: 0.0));
+        }
+
+        [Fact]
+        public void ASchoolWhoseEveryFishMissedSwimsOff()
+        {
+            Assert.False(BaitLoss.SchoolLearned(learned: 2, size: 3));
+            Assert.True(BaitLoss.SchoolLearned(learned: 3, size: 3));
+            Assert.True(BaitLoss.SchoolLearned(learned: 1, size: 1));
         }
 
         [Fact]

@@ -83,6 +83,9 @@ namespace Rodnarok
             public float FloatSeenAt = -1f;
             public float FloatSpeed;
 
+            /// <summary>The fish of the school that missed the bait and bite this float no more (BaitLoss).</summary>
+            public readonly HashSet<Fish> Learned = new HashSet<Fish>();
+
             /// <summary>When the picked fish bumps the float before it goes for the hook, in order (Bumps).</summary>
             public readonly List<float> BumpsAt = new List<float>();
         }
@@ -230,6 +233,35 @@ namespace Rodnarok
             cast.Fish.RemoveAll(f => f == null || !f.IsHooked());
         }
 
+        /// <summary>
+        /// A fish missed the bait of a float this game cast without taking it: it has learned and goes
+        /// for it no more, and another fish of the school may; a called fish of the world's own is the
+        /// game's again. True when no fish is left that has not missed, and the school swam off.
+        /// </summary>
+        public static bool Missed(FishingFloat ff, Fish fish)
+        {
+            if (ff == null || !Casts.TryGetValue(ff, out var cast) || cast.Hooked) return false;
+            if (cast.Called is object && cast.Called == fish)
+            {
+                CalledBy.Remove(fish);
+                cast.Spooked = true;
+                return true;
+            }
+            if (fish == null || !cast.Fish.Contains(fish)) return false;
+            cast.Learned.Add(fish);
+            cast.Biter = -1;
+            cast.BiterFreeAt = float.MaxValue;
+            cast.BumpsAt.Clear();
+            if (!BaitLoss.SchoolLearned(cast.Fish.Count(f => f != null && cast.Learned.Contains(f)), cast.Fish.Count(f => f != null))) return false;
+            cast.Spooked = true;
+            foreach (var left in cast.Fish.ToList())
+            {
+                if (left != null && !left.IsHooked()) Leave(left, ff.transform.position);
+            }
+            cast.Fish.RemoveAll(f => f == null || !f.IsHooked());
+            return true;
+        }
+
         /// <summary>How many schools this game spooked, for the self-test.</summary>
         [ForTest]
         public static int SpookedForTest { get; private set; }
@@ -345,7 +377,10 @@ namespace Rodnarok
             if (School.ReadyToBite(Time.time - cast.CameAt, cast.SwimSeconds, near, cast.Fish.Count, cast.Spooked))
             {
                 if (Rules.Wary && Hesitates(cast)) return;
-                cast.Biter = School.Biter(cast.Fish.Count, Random.value);
+                // Only a fish that has not missed this bait yet goes for it.
+                var keen = Enumerable.Range(0, cast.Fish.Count).Where(i => !cast.Learned.Contains(cast.Fish[i])).ToList();
+                if (keen.Count == 0) return;
+                cast.Biter = keen[School.Biter(keen.Count, Random.value)];
                 cast.BiterFreeAt = Time.time + Random.Range(2f, 4f);
                 cast.BumpsAt.Clear();
                 foreach (var after in Bumps.Times(Rules.Bumps, cast.BiterFreeAt - Time.time, Random.value, Random.value, Random.value)) cast.BumpsAt.Add(Time.time + after);

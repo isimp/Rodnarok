@@ -42,11 +42,15 @@ namespace Rodnarok
         }
     }
 
-    /// <summary>A float whose bait a missed bite took takes no bite, at the game that owns it.</summary>
+    /// <summary>A float whose bait was taken takes no bite, nor one from a fish that missed it before, at the game that owns it.</summary>
     [HarmonyPatch(typeof(FishingFloat), "RPC_Nibble")]
     internal static class BareFloatTakesNoBite
     {
-        private static bool Prefix(FishingFloat __instance) => !Bites.Refuses(__instance);
+        private static bool Prefix(FishingFloat __instance, ZDOID fishID)
+        {
+            var fish = ZNetScene.instance != null ? ZNetScene.instance.FindInstance(fishID)?.GetComponent<Fish>() : null;
+            return !Bites.Refuses(__instance, fish);
+        }
     }
 
     /// <summary>A line the game breaks is told in the log with how it stood, as Rodnarök's own snaps are.</summary>
