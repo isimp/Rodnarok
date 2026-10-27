@@ -2,7 +2,7 @@
 
   <!-- Tests for the parts of Rodnarok that need no game: which fish a bait brings, when a fish
        counts as at the float, the hook window, holding the line through a fight, how long a fish
-       takes to come, the crosshair ring's state and which water corners the calm-water piece
+       takes to come, the crosshair ring's state and which water corners a calming item stand
        reaches. The model has no Unity or BepInEx reference, so nothing else is needed to build it
        here.
        Run with: dotnet test tests/Rodnarok.Tests -->

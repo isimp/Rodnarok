@@ -25,7 +25,6 @@ namespace Rodnarok
             foreach (var scenario in SelfTestBite.All()) yield return scenario;
             foreach (var scenario in SelfTestRodOnly.All()) yield return scenario;
             foreach (var scenario in SelfTestCalling.All()) yield return scenario;
-            foreach (var scenario in SelfTestPostLooks.All()) yield return scenario;
             foreach (var scenario in SelfTestCalm.All()) yield return scenario;
             foreach (var scenario in SelfTestSitting.All()) yield return scenario;
         }
@@ -77,7 +76,7 @@ namespace Rodnarok
 
         /// <summary>
         /// On a loaded water tile whose corners differ, the game's own depth read just inside each
-        /// corner the model names gives that corner's value, so the calm-water piece lowers the
+        /// corner the model names gives that corner's value, so a calming item stand lowers the
         /// corner it means to.
         /// </summary>
         private static IEnumerable WaterCornersInOrder(ScenarioCheck check)

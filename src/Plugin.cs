@@ -40,11 +40,13 @@ namespace Rodnarok
             if (ZNetScene.instance == null)
             {
                 CalmWaters.Forget();
+                CalmStands.Forget();
                 Lines.Clear();
                 SeatedRodPose.Forget();
             }
             else
             {
+                CalmStands.Tick();
                 CalmWaters.Tick();
             }
             SelfTestHost.Tick();

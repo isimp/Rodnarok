@@ -4,7 +4,7 @@ using Xunit;
 namespace Rodnarok.Tests
 {
     /// <summary>
-    /// The calm-water piece calms the waves around it. The game shapes waves by four corner values
+    /// A calming item stand calms the waves around it. The game shapes waves by four corner values
     /// on each 64 m water tile, the same values its water is drawn with, so the piece lowers the
     /// corners within its reach: what is seen and what floats stay calm together, and two tiles
     /// meeting at a corner always agree on it, so no seam shows.

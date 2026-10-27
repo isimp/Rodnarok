@@ -8,36 +8,37 @@ using UnityEngine;
 namespace Rodnarok
 {
     /// <summary>
-    /// The serpent post as a player builds it: it is on the hammer for the darkwood pole's cost
-    /// and a Serpent trophy, and a post standing beside the water calms the water tiles' corners
-    /// within its reach to their share, alike on every tile meeting at a corner, so the waves seen
-    /// and the waves floated on fall together; taken down, every corner is as the game made it.
-    /// Needs a character beside water; the post is taken down again.
+    /// A Serpent trophy on one of the game's item stands, as a player does it: the stand is built
+    /// on dry land beside the water, the trophy put up from the character's inventory, and the
+    /// stand tapped with the use key. Put up, the trophy calms nothing; tapped, the stand calms the
+    /// water tiles' corners within its reach to their share, alike on every tile meeting at a
+    /// corner, so the waves seen and the waves floated on fall together; the trophy taken off with
+    /// the held use key, the calm switches off and every corner is as the game made it. Needs a
+    /// character beside water; the stand and the dropped trophy are taken away again.
     /// </summary>
     internal static class SelfTestCalm
     {
-        /// <summary>The size of the game's water tiles, in metres: a post calms the corners of the tiles its reach touches.</summary>
+        /// <summary>The size of the game's water tiles, in metres: a stand calms the corners of the tiles its reach touches.</summary>
         private const float TileReach = 64f;
+
+        private const string StandPrefab = "itemstandh";
 
         private static readonly AccessTools.FieldRef<WaterVolume, float[]> Corners = AccessTools.FieldRefAccess<WaterVolume, float[]>("m_normalizedDepth");
 
         public static IEnumerable<Scenario> All()
         {
-            yield return new Scenario("ASerpentPostCalmsTheWaterNearItAndOnlyThere", PostCalms);
+            yield return new Scenario("ASerpentTrophyOnAStandCalmsTheWaterNearItOnceSwitchedOn", StandCalms);
         }
 
-        private static IEnumerable PostCalms(ScenarioCheck check)
+        private static IEnumerable StandCalms(ScenarioCheck check)
         {
             var player = Player.m_localPlayer;
-            var post = ZNetScene.instance.GetPrefab(SerpentPost.PrefabName);
-            check.That(post != null, "the serpent post is a prefab of the game");
-            if (post == null) yield break;
-            var hammer = ObjectDB.instance.GetItemPrefab("Hammer")?.GetComponent<ItemDrop>()?.m_itemData.m_shared.m_buildPieces;
-            check.That(hammer != null && hammer.m_pieces.Contains(post), "the serpent post is on the hammer");
-            var cost = post.GetComponent<Piece>().m_resources.Where(r => r.m_resItem != null).ToDictionary(r => r.m_resItem.name, r => r.m_amount);
-            var pole = ZNetScene.instance.GetPrefab("darkwood_pole").GetComponent<Piece>().m_resources.Where(r => r.m_resItem != null).ToList();
-            check.That(cost.TryGetValue("TrophySerpent", out var trophies) && trophies == 1, "it costs a Serpent trophy");
-            foreach (var r in pole) check.That(cost.TryGetValue(r.m_resItem.name, out var n) && n == r.m_amount, "it costs the darkwood pole's " + r.m_amount.ToString(CultureInfo.InvariantCulture) + " " + r.m_resItem.name);
+            var standPrefab = ZNetScene.instance.GetPrefab(StandPrefab);
+            var trophyPrefab = ObjectDB.instance.GetItemPrefab(CalmStand.Trophy);
+            check.That(standPrefab != null && standPrefab.GetComponentInChildren<ItemStand>() != null, "the game's horizontal item stand is a prefab of the game");
+            check.That(trophyPrefab != null, "the Serpent trophy is an item of the game");
+            if (standPrefab == null || trophyPrefab == null) yield break;
+            NoteOtherMods(check);
 
             var water = SelfTestArrival.DeepWaterBeside(player.transform.position, 1.5f);
             check.That(water.HasValue, "water within 6 to 20 m of the character");
@@ -45,13 +46,13 @@ namespace Rodnarok
 
             var rules = PlayRules.Now;
 
-            // A post already standing where it calms the water here leaves nothing for the test's post to
-            // show: its calm is measured only where no other post reaches the tiles around it.
-            var near = CalmWaters.PostsForTest.Where(p => Vector3.Distance(p, water.Value) < rules.CalmReach + 2f * TileReach).ToList();
+            // A stand already calming where it reaches the water here leaves nothing for the test's
+            // stand to show: its calm is measured only where no other reaches the tiles around it.
+            var near = CalmWaters.CalmingForTest.Where(p => Vector3.Distance(p, water.Value) < rules.CalmReach + 2f * TileReach).ToList();
             if (near.Count > 0)
             {
-                check.Note("a Serpent post already stands " + near.Min(p => Vector3.Distance(p, water.Value)).ToString("0", CultureInfo.InvariantCulture)
-                    + " m from the water here, so the calm was not measured; run it where no post stands within "
+                check.Note("a stand already calms the water " + near.Min(p => Vector3.Distance(p, water.Value)).ToString("0", CultureInfo.InvariantCulture)
+                    + " m from it here, so the calm was not measured; run it where no stand calms within "
                     + (rules.CalmReach + 2f * TileReach).ToString("0", CultureInfo.InvariantCulture) + " m");
                 yield break;
             }
@@ -65,30 +66,56 @@ namespace Rodnarok
                 yield return null;
             }
             var wavesBefore = StdDev(waves);
-            SelfTestPictures.Take("water-before-post");
+            SelfTestPictures.Take("water-before-stand");
             yield return null;
 
             GameObject placed = null;
+            var at = SelfTestPlaces.DryLandBeside(player.transform.position) ?? player.transform.position + FlatForward(player) * 3f;
             try
             {
-                // On dry land beside the character, where a player would build it, out of the camera's way.
-                var at = SelfTestPlaces.DryLandBeside(player.transform.position) ?? player.transform.position + FlatForward(player) * 3f;
-                placed = Object.Instantiate(post, at, Quaternion.identity);
+                // Built on dry land beside the character, where a player would put it, out of the camera's way.
+                placed = Object.Instantiate(standPrefab, at, Quaternion.identity);
+                for (var waited = 0f; waited < 0.5f; waited += Time.deltaTime) yield return null;
+                var stand = placed.GetComponentInChildren<ItemStand>();
+
+                // The trophy put up from the inventory, as a player puts one up.
+                var inventory = player.GetInventory();
+                var trophyName = trophyPrefab.GetComponent<ItemDrop>().m_itemData.m_shared.m_name;
+                var had = inventory.CountItems(trophyName);
+                var trophy = inventory.AddItem(trophyPrefab, 1) ? inventory.GetItem(trophyName) : null;
+                var put = trophy != null && stand.UseItem(player, trophy);
+                for (var waited = 0f; waited < 1f; waited += Time.deltaTime) yield return null;
+                check.That(put && stand.HaveAttachment(), "the Serpent trophy goes up on the stand; put up " + put);
+                if (!stand.HaveAttachment())
+                {
+                    if (inventory.CountItems(trophyName) > had) inventory.RemoveItem(trophyName, 1);
+                    yield break;
+                }
+                check.That(stand.GetHoverText().Contains("Calm the waters"), "the stand offers to calm the waters: " + stand.GetHoverText().Replace("\n", " | "));
+                for (var waited = 0f; waited < 1f; waited += Time.deltaTime) yield return null;
+                check.That(!CalmWaters.CalmingForTest.Any(), "put up, the trophy calms nothing yet");
+                check.That(tiles.All(t => t == null || Corners(t).SequenceEqual(before[t])), "put up, the trophy leaves every corner as the game made it");
+
+                // Tapped with the use key, as a player taps it.
+                var took = stand.Interact(player, false, false);
                 for (var waited = 0f; waited < 2f; waited += Time.deltaTime) yield return null;
+                check.That(took && CalmStands.SwitchedOnForTest(stand), "a tap of the use key switches the stand's calm on; the tap taken " + took);
+                check.That(stand.GetHoverText().Contains("Calming the waters"), "the stand says it calms the waters: " + stand.GetHoverText().Replace("\n", " | "));
 
                 // The corners within reach keep their share, those beyond are as they were.
-                var postSpot = new Spot(at.x, at.y, at.z);
+                var standSpot = new Spot(stand.transform.position.x, stand.transform.position.y, stand.transform.position.z);
                 var wrong = new List<string>();
                 foreach (var tile in tiles.Where(t => t != null))
                 {
                     var centre = tile.transform.position;
-                    var expected = CalmWater.Calmed(before[tile], new Spot(centre.x, centre.y, centre.z), new[] { postSpot }, rules.CalmReach, rules.CalmKeep);
+                    var expected = CalmWater.Calmed(before[tile], new Spot(centre.x, centre.y, centre.z), new[] { standSpot }, rules.CalmReach, rules.CalmKeep);
                     var now = Corners(tile);
                     for (var i = 0; i < 4; i++)
                         if (Mathf.Abs(now[i] - expected[i]) > 0.001f) wrong.Add(centre.x.ToString("0", CultureInfo.InvariantCulture) + "," + centre.z.ToString("0", CultureInfo.InvariantCulture) + " corner " + i.ToString(CultureInfo.InvariantCulture));
                 }
-                check.That(wrong.Count == 0, "every loaded tile's corners are calmed as the post's reach says; off: " + string.Join("; ", wrong.Take(8)));
-                check.That(tiles.Any(t => t != null && Corners(t).Where((v, i) => v < before[t][i] - 0.001f).Any()), "the post calmed at least one corner of the water beside it");
+                check.That(wrong.Count == 0, "every loaded tile's corners are calmed as the stand's reach says; off: " + string.Join("; ", wrong.Take(8)));
+                check.That(tiles.Any(t => t != null && Corners(t).Where((v, i) => v < before[t][i] - 0.001f).Any()), "the stand calmed at least one corner of the water beside it, "
+                    + Vector3.Distance(stand.transform.position, water.Value).ToString("0", CultureInfo.InvariantCulture) + " m off");
 
                 // What floats rides lower waves there; where the water was still to begin with there is nothing to compare.
                 waves.Clear();
@@ -98,19 +125,42 @@ namespace Rodnarok
                     yield return null;
                 }
                 var wavesAfter = StdDev(waves);
-                if (wavesBefore > 0.05f) check.That(wavesAfter < wavesBefore * 0.5f, "the waves beside the post fell from " + wavesBefore.ToString("0.00", CultureInfo.InvariantCulture) + " m to " + wavesAfter.ToString("0.00", CultureInfo.InvariantCulture) + " m");
-                SelfTestPictures.Take("water-with-post");
+                if (wavesBefore > 0.05f) check.That(wavesAfter < wavesBefore * 0.5f, "the waves beside the stand fell from " + wavesBefore.ToString("0.00", CultureInfo.InvariantCulture) + " m to " + wavesAfter.ToString("0.00", CultureInfo.InvariantCulture) + " m");
+                SelfTestPictures.Take("water-with-stand");
                 yield return null;
+
+                // The trophy taken off with the held use key, as a player takes it.
+                stand.Interact(player, true, false);
+                for (var waited = 0f; waited < 2f; waited += Time.deltaTime) yield return null;
+                check.That(!stand.HaveAttachment(), "holding the use key still takes the trophy off");
+                check.That(!CalmStands.SwitchedOnForTest(stand), "with the trophy taken, the stand's calm is switched off, so the next trophy put up starts off");
+                check.That(!CalmWaters.CalmingForTest.Any(), "with the trophy taken, nothing calms the water");
             }
             finally
             {
+                foreach (var drop in Object.FindObjectsByType<ItemDrop>(FindObjectsSortMode.None))
+                {
+                    if (drop != null && drop.name.StartsWith(CalmStand.Trophy, System.StringComparison.Ordinal) && Vector3.Distance(drop.transform.position, at) < 4f)
+                        ZNetScene.instance.Destroy(drop.gameObject);
+                }
                 if (placed != null) ZNetScene.instance.Destroy(placed);
             }
 
             // Taken down, every corner is as the game made it.
             for (var waited = 0f; waited < 2f; waited += Time.deltaTime) yield return null;
             var left = tiles.Where(t => t != null && !Corners(t).SequenceEqual(before[t])).ToList();
-            check.That(left.Count == 0, left.Count.ToString(CultureInfo.InvariantCulture) + " tiles kept calmed corners after the post was taken down");
+            check.That(left.Count == 0, left.Count.ToString(CultureInfo.InvariantCulture) + " tiles kept calmed corners after the trophy was taken");
+        }
+
+        /// <summary>Names the other mods that change how an item stand takes a key or tells what it holds, as they may meet the calm's tap and lines.</summary>
+        private static void NoteOtherMods(ScenarioCheck check)
+        {
+            var others = new[] { AccessTools.Method(typeof(ItemStand), nameof(ItemStand.Interact)), AccessTools.Method(typeof(ItemStand), nameof(ItemStand.GetHoverText)) }
+                .Select(m => (m, Harmony.GetPatchInfo(m)))
+                .Where(p => p.Item2 != null)
+                .SelectMany(p => p.Item2.Owners.Where(o => o != About.Guid).Select(o => "ItemStand." + p.m.Name + " by " + o))
+                .ToList();
+            if (others.Count > 0) check.Note("other mods change the item stand too: " + string.Join("; ", others));
         }
 
         /// <summary>The water surface the game floats things on at a place, waves included.</summary>

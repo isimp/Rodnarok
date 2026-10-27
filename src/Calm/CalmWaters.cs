@@ -6,10 +6,11 @@ using UnityEngine;
 namespace Rodnarok
 {
     /// <summary>
-    /// The water the serpent posts calm. The game shapes each water tile's waves by its four corner
-    /// values and draws the tile's water from the same values, so the corners within a post's
+    /// The water calmed around the item stands holding a switched-on Serpent trophy
+    /// (<see cref="CalmStands"/>). The game shapes each water tile's waves by its four corner
+    /// values and draws the tile's water from the same values, so the corners within a stand's
     /// reach are lowered to their share (<see cref="CalmWater"/>) and handed to the drawing again.
-    /// Each tile's own values are kept, and given back when no post reaches it any more. A tile
+    /// Each tile's own values are kept, and given back when no stand reaches it any more. A tile
     /// reads its values as it starts, so it is calmed only from then on.
     /// </summary>
     internal static class CalmWaters
@@ -21,37 +22,37 @@ namespace Rodnarok
         private static readonly AccessTools.FieldRef<WaterVolume, float> OneDepth = AccessTools.FieldRefAccess<WaterVolume, float>("m_oneDepth");
         private static readonly System.Reflection.MethodInfo SetupMaterial = AccessTools.Method(typeof(WaterVolume), "SetupMaterial");
 
-        private static readonly List<CalmPost> Posts = new List<CalmPost>();
+        /// <summary>How far a calming place must move before the water is calmed anew, in metres.</summary>
+        private const float Moved = 0.5f;
+
+        private static List<Vector3> _calming = new List<Vector3>();
         private static readonly HashSet<WaterVolume> Started = new HashSet<WaterVolume>();
         private static readonly Dictionary<WaterVolume, (float[] Corners, float One)> Own = new Dictionary<WaterVolume, (float[], float)>();
         private static bool _changed;
         private static float _reach = -1f;
         private static float _keep = -1f;
 
-        /// <summary>Where the posts standing in the loaded world are, for the self-test.</summary>
+        /// <summary>Where the water is calmed around in the loaded world, for the self-test.</summary>
         [ForTest]
-        public static IEnumerable<Vector3> PostsForTest => Posts.Where(p => p != null).Select(p => p.transform.position);
+        public static IEnumerable<Vector3> CalmingForTest => _calming;
 
-        public static void Add(CalmPost post)
+        /// <summary>The places the water is calmed around now; the tiles are brought up to date when they changed.</summary>
+        public static void CalmAround(List<Vector3> places)
         {
-            Posts.Add(post);
+            var same = places.Count == _calming.Count && places.All(p => _calming.Any(c => Vector3.Distance(c, p) < Moved));
+            if (same) return;
+            _calming = places;
             _changed = true;
         }
 
-        public static void Remove(CalmPost post)
-        {
-            Posts.Remove(post);
-            _changed = true;
-        }
-
-        /// <summary>A tile has read its corners; it is calmed at once if a post reaches it.</summary>
+        /// <summary>A tile has read its corners; it is calmed at once if a stand reaches it.</summary>
         public static void TileStarted(WaterVolume tile)
         {
             Started.Add(tile);
             _changed = true;
         }
 
-        /// <summary>Called every frame: brings the tiles up to date once posts, tiles or the settings changed.</summary>
+        /// <summary>Called every frame: brings the tiles up to date once the calming places, the tiles or the settings changed.</summary>
         public static void Tick()
         {
             var rules = PlayRules.Now;
@@ -68,17 +69,16 @@ namespace Rodnarok
 
         private static void Apply(FishingRules rules)
         {
-            Posts.RemoveAll(p => p == null);
             Started.RemoveWhere(t => t == null);
             foreach (var gone in Own.Keys.Where(t => t == null).ToList()) Own.Remove(gone);
-            var posts = Posts.Select(p => p.transform.position).Select(p => new Spot(p.x, p.y, p.z)).ToList();
+            var places = _calming.Select(p => new Spot(p.x, p.y, p.z)).ToList();
 
             foreach (var tile in Started)
             {
                 if (tile.m_heightmap == null) continue;
                 var c = tile.transform.position;
                 var centre = new Spot(c.x, c.y, c.z);
-                var near = posts.Where(p => p.Across(centre) <= rules.CalmReach + TileReach).ToList();
+                var near = places.Where(p => p.Across(centre) <= rules.CalmReach + TileReach).ToList();
                 if (near.Count == 0)
                 {
                     if (Own.TryGetValue(tile, out var own))
@@ -110,7 +110,7 @@ namespace Rodnarok
         /// <summary>Lets go of everything on leaving a world.</summary>
         public static void Forget()
         {
-            Posts.Clear();
+            _calming = new List<Vector3>();
             Started.Clear();
             Own.Clear();
         }

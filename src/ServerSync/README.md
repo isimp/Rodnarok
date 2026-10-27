@@ -10,7 +10,7 @@ config: what a world's server sets is sent to every player as they join, the ser
 winning while they are connected, the player's own kept on disk beneath it.
 
 Rodnarok uses it for its fishing rules (`Settings`): how long a fish takes to come, the hook
-window, what holding the line through a struggle costs and how far the calm-water piece reaches.
+window, what holding the line through a struggle costs and how far a calming item stand reaches.
 The server's values win for everyone on it, and the entries are locked, so only an admin changes
 them in game.
 

@@ -42,7 +42,7 @@ namespace Rodnarok
         /// <summary>The share of the reeling cost left at Fishing 100.</summary>
         public float SkillCostShare { get; private set; } = 0.2f;
 
-        /// <summary>How far across the ground the calm-water piece reaches a water corner, in metres.</summary>
+        /// <summary>How far across the ground a calming item stand reaches a water corner, in metres.</summary>
         public float CalmReach { get; private set; } = 40f;
 
         /// <summary>The share of the waves a calmed corner keeps.</summary>

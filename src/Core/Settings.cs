@@ -76,9 +76,9 @@ namespace Rodnarok
             _stallStamina = Sync(config.Bind(Section, "StallStamina", rules.StallStaminaPerSecond,
                 new ConfigDescription("Stamina a second for holding the line while a hooked fish struggles, before Fishing skill lowers it. The line gains nothing meanwhile.", new AcceptableValueRange<float>(0f, 20f))));
             _calmReach = Sync(config.Bind(Section, "CalmReach", rules.CalmReach,
-                new ConfigDescription("How far the calm-water piece reaches, in metres. Waves are calmed by the corners of the game's 64 m water tiles, so the calm water fades out over a tile.", new AcceptableValueRange<float>(0f, 128f))));
+                new ConfigDescription("How far an item stand calming the waters with a Serpent trophy reaches, in metres. Waves are calmed by the corners of the game's 64 m water tiles, so the calm water fades out over a tile.", new AcceptableValueRange<float>(0f, 128f))));
             _calmKeep = Sync(config.Bind(Section, "CalmKeep", rules.CalmKeep,
-                new ConfigDescription("The share of the waves left where the calm-water piece reaches: 0 is flat water, 1 leaves the waves as they are.", new AcceptableValueRange<float>(0f, 1f))));
+                new ConfigDescription("The share of the waves left where a calming item stand reaches: 0 is flat water, 1 leaves the waves as they are.", new AcceptableValueRange<float>(0f, 1f))));
             _schools = Sync(config.Bind(Section, "Schools", rules.Schools,
                 "Whether the bait draws a school of its fish, as many as the world spawns together, of which one takes the bait. Off, a single fish comes."));
             _bumps = Sync(config.Bind(Section, "Bumps", rules.Bumps,

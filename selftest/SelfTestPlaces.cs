@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace Rodnarok
 {
-    /// <summary>Places beside the character a scenario puts things: dry land for a chair or a post.</summary>
+    /// <summary>Places beside the character a scenario puts things: dry land for a chair or an item stand.</summary>
     internal static class SelfTestPlaces
     {
         /// <summary>How far above the water dry land must lie, and how level it must be across a metre.</summary>

@@ -5,7 +5,7 @@ using System.Linq;
 namespace Rodnarok
 {
     /// <summary>
-    /// Which water the calm-water piece calms. The game shapes the waves of each 64 m water tile by
+    /// Which water a calming item stand calms. The game shapes the waves of each 64 m water tile by
     /// four corner values, blended across the tile, and draws its water from the same values, so
     /// lowering a corner calms what is seen and what floats alike. A corner's value here depends on
     /// where it is alone, so two tiles meeting at a corner always lower it alike and no seam shows.
@@ -32,14 +32,14 @@ namespace Rodnarok
         }
 
         /// <summary>
-        /// A tile's four corner values with every corner within <paramref name="reach"/> of a piece,
+        /// A tile's four corner values with every corner within <paramref name="reach"/> of a calming stand,
         /// measured across the ground, keeping only the <paramref name="keep"/> share of its waves.
         /// Calming never raises a wave, whatever the share.
         /// </summary>
-        public static float[] Calmed(float[] depth, Spot tileCentre, IEnumerable<Spot> pieces, float reach, float keep)
+        public static float[] Calmed(float[] depth, Spot tileCentre, IEnumerable<Spot> stands, float reach, float keep)
         {
             var share = Math.Max(0f, Math.Min(1f, keep));
-            var all = (pieces ?? Enumerable.Empty<Spot>()).ToList();
+            var all = (stands ?? Enumerable.Empty<Spot>()).ToList();
             var corners = Corners(tileCentre);
             var result = (float[])depth.Clone();
             for (var i = 0; i < result.Length && i < corners.Length; i++)
