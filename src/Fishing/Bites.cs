@@ -16,16 +16,17 @@ namespace Rodnarok
         /// <summary>How near the hook, in metres, a fish's mouth must be for its bite to count.</summary>
         public const float Reach = 0.6f;
 
-        /// <summary>How long a bite holds the float under, and how hard, beyond what the float's own weight does.</summary>
-        private const float PullSeconds = 1f;
-        private const float PullDown = 14f;
-
         private static readonly AccessTools.FieldRef<FishingFloat, float> NibbleTime = AccessTools.FieldRefAccess<FishingFloat, float>("m_nibbleTime");
         private static readonly AccessTools.FieldRef<FishingFloat, Fish> Nibbler = AccessTools.FieldRefAccess<FishingFloat, Fish>("m_nibbler");
         private static readonly AccessTools.FieldRef<FishingFloat, Rigidbody> Body = AccessTools.FieldRefAccess<FishingFloat, Rigidbody>("m_body");
         private static readonly AccessTools.FieldRef<FishingFloat, float> LineLength = AccessTools.FieldRefAccess<FishingFloat, float>("m_lineLength");
 
         private static readonly Dictionary<FishingFloat, float> PulledUntil = new Dictionary<FishingFloat, float>();
+        private static readonly Dictionary<FishingFloat, float> BumpedUntil = new Dictionary<FishingFloat, float>();
+
+        /// <summary>How many bumps floats of this game took, for the self-test.</summary>
+        [ForTest]
+        public static int BumpsForTest { get; private set; }
 
         /// <summary>How far the fish's mouth was from the hook at the last bite that counted, for the self-test; below zero before any.</summary>
         [ForTest]
@@ -47,19 +48,40 @@ namespace Rodnarok
         /// <summary>A bite was taken by the float: it is pulled under for a while.</summary>
         public static void Bitten(FishingFloat ff)
         {
-            if (Nibbler(ff) != null && Time.time - NibbleTime(ff) < 0.01f) PulledUntil[ff] = Time.time + PullSeconds;
+            if (Nibbler(ff) != null && Time.time - NibbleTime(ff) < 0.01f) PulledUntil[ff] = Time.time + Bite.PullSeconds;
+        }
+
+        /// <summary>A fish bumps the float (<see cref="Bumps"/>): a short, light pull, and no nibble the game knows of, so nothing to hook.</summary>
+        public static void Bump(FishingFloat ff)
+        {
+            if (ff == null || ff.GetCatch() != null) return;
+            BumpedUntil[ff] = Time.time + Bumps.PullSeconds;
+            BumpsForTest++;
         }
 
         /// <summary>The float's step: a bitten float with nothing on the line is pulled under.</summary>
         public static void Pull(FishingFloat ff)
         {
-            if (!PulledUntil.TryGetValue(ff, out var until)) return;
+            PullFor(ff, PulledUntil, Bite.Pull);
+            PullFor(ff, BumpedUntil, Bumps.Pull);
+        }
+
+        /// <summary>Lets go of a float leaving the world.</summary>
+        public static void Forget(FishingFloat ff)
+        {
+            PulledUntil.Remove(ff);
+            BumpedUntil.Remove(ff);
+        }
+
+        private static void PullFor(FishingFloat ff, Dictionary<FishingFloat, float> pulls, float pull)
+        {
+            if (!pulls.TryGetValue(ff, out var until)) return;
             if (ff == null || Time.time >= until || ff.GetCatch() != null)
             {
-                PulledUntil.Remove(ff);
+                pulls.Remove(ff);
                 return;
             }
-            if (ff.IsInWater()) Body(ff).AddForce(Vector3.down * PullDown, ForceMode.Acceleration);
+            if (ff.IsInWater()) Body(ff).AddForce(Vector3.down * pull, ForceMode.Acceleration);
         }
 
         /// <summary>Reeling now hooks the fish that bit if the hook window still lasts; the game's own half second is then made to hold too.</summary>

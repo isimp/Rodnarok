@@ -48,11 +48,15 @@ namespace Rodnarok
         private static void Prefix(FishingFloat __instance, string msg) => Lines.BrokeMessage(__instance, msg);
     }
 
-    /// <summary>A float leaving the world takes its line's strain with it.</summary>
+    /// <summary>A float leaving the world takes its line's strain and its pulls with it.</summary>
     [HarmonyPatch(typeof(FishingFloat), "OnDestroy")]
     internal static class LineForgets
     {
-        private static void Postfix(FishingFloat __instance) => Lines.Forget(__instance);
+        private static void Postfix(FishingFloat __instance)
+        {
+            Lines.Forget(__instance);
+            Bites.Forget(__instance);
+        }
     }
 
     /// <summary>A struggling fish costs the stall cost to hold, the same for every fish.</summary>

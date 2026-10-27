@@ -7,6 +7,10 @@ namespace Rodnarok
     /// </summary>
     internal static class Bite
     {
+        /// <summary>How long a bite holds the float under, in seconds, and how hard beyond the float's own weight, in metres a second each second.</summary>
+        public const float PullSeconds = 1f;
+        public const float Pull = 14f;
+
         /// <summary>Whether the fish is at the hook: within reach of it, through all three axes.</summary>
         public static bool FishAtHook(Spot fish, Spot hook, float reach) => fish.To(hook) <= reach;
 

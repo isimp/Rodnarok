@@ -84,7 +84,7 @@ namespace Rodnarok
             _schools = Sync(config.Bind(Section, "Schools", rules.Schools,
                 "Whether the bait draws a school of its fish, as many as the world spawns together, of which one takes the bait. Off, a single fish comes."));
             _bumps = Sync(config.Bind(Section, "Bumps", rules.Bumps,
-                "Not built yet: does nothing whatever it is set to. Meant to have the fish that takes the bait first bump the float lightly once or twice, never hookable, before the real bite pulls the float under."));
+                "Whether the fish that takes the bait first bumps the float lightly once or twice before it goes for the hook. A bump is a short, light dip, far lighter than the bite, and can never be hooked; reeling at one drags the float and startles a wary school. The real bite pulls the float under."));
             _tension = Sync(config.Bind(Section, "Tension", rules.Tension,
                 "Whether holding the line through a struggle strains it until it snaps, shown by the crosshair ring filling. Easing off lets the strain go while the fish takes line out. Off, holding through a struggle only stalls."));
             _snapSeconds = Sync(config.Bind(Section, "SnapSeconds", rules.SnapSeconds,

@@ -80,6 +80,9 @@ namespace Rodnarok
             public Vector3 FloatSeen;
             public float FloatSeenAt = -1f;
             public float FloatSpeed;
+
+            /// <summary>When the picked fish bumps the float before it goes for the hook, in order (Bumps).</summary>
+            public readonly List<float> BumpsAt = new List<float>();
         }
 
         private static readonly Dictionary<FishingFloat, Cast> Casts = new Dictionary<FishingFloat, Cast>();
@@ -316,6 +319,11 @@ namespace Rodnarok
             {
                 foreach (var fish in cast.Fish) MaybeLeap(fish, cast.Float.transform.position);
             }
+            if (cast.BumpsAt.Count > 0 && !cast.Hooked && Time.time >= cast.BumpsAt[0])
+            {
+                cast.BumpsAt.RemoveAt(0);
+                Bites.Bump(cast.Float);
+            }
             if (cast.Hooked || cast.Fish.Count == 0 || cast.BiterFreeAt < float.MaxValue) return;
             var near = cast.Fish.Count(f => Across(f.transform.position, cast.Float.transform.position) < Near);
             if (School.ReadyToBite(Time.time - cast.CameAt, cast.SwimSeconds, near, cast.Fish.Count, cast.Spooked))
@@ -323,6 +331,8 @@ namespace Rodnarok
                 if (Rules.Wary && Hesitates(cast)) return;
                 cast.Biter = School.Biter(cast.Fish.Count, Random.value);
                 cast.BiterFreeAt = Time.time + Random.Range(2f, 4f);
+                cast.BumpsAt.Clear();
+                foreach (var after in Bumps.Times(Rules.Bumps, cast.BiterFreeAt - Time.time, Random.value, Random.value, Random.value)) cast.BumpsAt.Add(Time.time + after);
             }
         }
 
@@ -362,6 +372,7 @@ namespace Rodnarok
         {
             cast.Startles++;
             StartledForTest++;
+            cast.BumpsAt.Clear();
             cast.Biter = -1;
             cast.BiterFreeAt = float.MaxValue;
             cast.ReadyAt = -1f;
