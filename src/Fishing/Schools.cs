@@ -78,6 +78,21 @@ namespace Rodnarok
         private static readonly Dictionary<Fish, Cast> CalledBy = new Dictionary<Fish, Cast>();
         private static float _nextSweep;
 
+        /// <summary>Where each of the schools' fish was a while ago, for telling how one came to land: its time, nearest player and water beneath.</summary>
+        private struct Sample
+        {
+            public float At;
+            public float Player;
+            public float Water;
+        }
+
+        private static readonly Dictionary<Fish, Sample> Recent = new Dictionary<Fish, Sample>();
+        private static readonly Dictionary<Fish, Sample> Earlier = new Dictionary<Fish, Sample>();
+        private static float _nextSample;
+
+        /// <summary>How long ago, in seconds, the earlier of a fish's samples is kept.</summary>
+        private const float SampleBack = 5f;
+
         /// <summary>What a float with too little water for a school says, once.</summary>
         private const string TooLittleWaterText = "Too little water here for a school. Fish of the world's own still bite.";
 
@@ -195,6 +210,11 @@ namespace Rodnarok
             WatchFloats();
             foreach (var cast in Casts.Values.ToList()) Advance(cast);
             KeepOffLand();
+            if (Time.time >= _nextSample)
+            {
+                _nextSample = Time.time + 1f;
+                TakeSamples();
+            }
             if (Time.time >= _nextSweep)
             {
                 _nextSweep = Time.time + 2f;
@@ -643,7 +663,8 @@ namespace Rodnarok
         /// <summary>
         /// Whether a fish reaches this place through water deep enough for it every metre of the way:
         /// as deep as it swims at its float for a school's fish on its way in, which may still be rising
-        /// from deep, else as deep as it swims now.
+        /// from deep, else as deep as it swims now. A fish already in shallower water than that may
+        /// take any way that never gets shallower than where it is, so it can swim back out.
         /// </summary>
         public static bool DeepWayTo(Fish fish, Vector3 place)
         {
@@ -651,14 +672,18 @@ namespace Rodnarok
             var across = Across(from, place);
             if (across < 0.5f) return true;
             var need = CastOf.TryGetValue(fish, out var cast) && !cast.In ? Mathf.Min(fish.m_minDepth, cast.SwimUnder) : fish.m_minDepth;
+            var floor = Mathf.Min(need + 0.5f, WaterDepth(from) - 0.1f);
             var dir = Flat(place - from);
-            var surface = ZoneSystem.instance.m_waterLevel;
             for (var distance = 1f; distance < across; distance += 1f)
             {
-                if (!DeepEnough(from + dir * distance, surface, need)) return false;
+                if (WaterDepth(from + dir * distance) < floor) return false;
             }
-            return DeepEnough(place, surface, need);
+            return WaterDepth(place) >= floor;
         }
+
+        /// <summary>How deep the water is at a place, from the surface to the ground; none on land.</summary>
+        private static float WaterDepth(Vector3 p) =>
+            ZoneSystem.instance.GetSolidHeight(p, out var ground) ? Mathf.Max(0f, ZoneSystem.instance.m_waterLevel - ground) : 0f;
 
         /// <summary>Whether the water is deep enough every 2 m of the way, out to its end.</summary>
         private static bool DeepAlong(Vector3 from, Vector3 dir, float reach, float surface, float depth)
@@ -731,7 +756,26 @@ namespace Rodnarok
             WetOnce.Remove(fish);
             MadeAt.Remove(fish);
             LeaptAt.Remove(fish);
+            Recent.Remove(fish);
+            Earlier.Remove(fish);
         }
+
+        /// <summary>Notes where each of the schools' fish is, keeping one note from about five seconds before.</summary>
+        private static void TakeSamples()
+        {
+            var now = Time.time;
+            foreach (var fish in Ours)
+            {
+                if (fish == null) continue;
+                var had = Recent.TryGetValue(fish, out var last);
+                if (had && now - last.At < SampleBack) continue;
+                if (had) Earlier[fish] = last;
+                Recent[fish] = Here(fish);
+            }
+        }
+
+        private static Sample Here(Fish fish) =>
+            new Sample { At = Time.time, Player = NearestPlayer(fish.transform.position), Water = WaterDepth(fish.transform.position) };
 
         /// <summary>How far under the water the ground beneath a fish may lie and still count as the shore, in metres.</summary>
         private const float ShoreDepth = 0.3f;
@@ -756,6 +800,13 @@ namespace Rodnarok
             parts.Add("heading for a place " + Across(fish.transform.position, FishWaypoint(fish)).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " m off, its home "
                 + Across(fish.transform.position, SpawnPoint(fish)).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " m off, at "
                 + fish.m_speed.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " m/s");
+            var here = Here(fish);
+            parts.Add("now " + here.Player.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " m from the nearest player over "
+                + here.Water.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " m of water");
+            var before = Earlier.TryGetValue(fish, out var earlier) ? earlier : Recent.TryGetValue(fish, out var recent) ? recent : default(Sample?);
+            if (before.HasValue)
+                parts.Add((now - before.Value.At).ToString("0", System.Globalization.CultureInfo.InvariantCulture) + " s before " + before.Value.Player.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)
+                    + " m from the nearest player over " + before.Value.Water.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " m of water");
             parts.Add(WetOnce.Contains(fish) ? "had been in the water" : "never in the water");
             return string.Join(", ", parts);
         }
@@ -773,6 +824,8 @@ namespace Rodnarok
             WetOnce.Clear();
             MadeAt.Clear();
             LeaptAt.Clear();
+            Recent.Clear();
+            Earlier.Clear();
             CalledBy.Clear();
         }
 
