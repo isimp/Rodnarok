@@ -19,6 +19,7 @@ namespace Rodnarok
         private const string ChairPrefab = "piece_chair02";
 
         private static readonly AccessTools.FieldRef<FishingFloat, float> LineLength = AccessTools.FieldRefAccess<FishingFloat, float>("m_lineLength");
+        private static readonly AccessTools.FieldRef<Character, Animator> AnimatorOf = AccessTools.FieldRefAccess<Character, Animator>("m_animator");
         private static readonly System.Reflection.MethodInfo StopEmote = AccessTools.Method(typeof(Player), "StopEmote");
 
         public static IEnumerable<Scenario> All()
@@ -115,6 +116,7 @@ namespace Rodnarok
 
             // A moment with the key up, then the key held past the rod's least draw.
             for (var waited = 0f; waited < 0.3f; waited += Time.deltaTime) yield return null;
+            var legs = new LegWatch(player);
             SelfTestDraw.Drawing = true;
             var drew = false;
             var windUpShown = false;
@@ -128,6 +130,7 @@ namespace Rodnarok
                 stayed &= seated();
                 if (waited >= 0.5f) lowered &= posed();
                 if (waited >= 1f && !pictured) pictured = Picture(check, "sitting-" + seat + "-drawing");
+                legs.Look();
                 yield return null;
             }
             SelfTestDraw.Drawing = false;
@@ -158,6 +161,7 @@ namespace Rodnarok
                     goneWhile = "in an attack " + player.InAttack() + ", drawing " + player.IsDrawingBow() + ", attached " + player.IsAttached() + ", rod tip " + (Utils.FindChild(player.transform, "_RodTop") != null);
                 }
                 cast = OwnFloats().FirstOrDefault();
+                legs.Look();
                 yield return null;
             }
             var told = shownAt < 0f
@@ -166,11 +170,19 @@ namespace Rodnarok
                     + (goneAt < 0f ? "" : ", gone after " + goneAt.ToString("0.0", CultureInfo.InvariantCulture) + " s while " + goneWhile);
             check.That(cast != null, "sitting on the " + seat + ", the rod casts; " + told + "; the throw meets " + (SelfTestPlaces.ThrowBlockedBy(player.transform.position, water) ?? "nothing"));
             check.That(seated(), "the character is still seated on the " + seat + " after the cast");
-            for (var waited = 0f; waited < 1.5f; waited += Time.deltaTime) yield return null;
+            for (var waited = 0f; waited < 1.5f; waited += Time.deltaTime)
+            {
+                legs.Look();
+                yield return null;
+            }
             check.That(posed(), "a moment after the cast the character's head is lowered as seated on the " + seat + ", " + heads());
             Picture(check, "sitting-" + seat + "-cast");
             yield return null;
-            if (cast == null) yield break;
+            if (cast == null)
+            {
+                legs.Tell(check, seat);
+                yield break;
+            }
 
             // Reeling in.
             var line = LineLength(cast);
@@ -184,14 +196,97 @@ namespace Rodnarok
                 stayed &= seated();
                 pullShown |= SeatedRodPose.ShowingForTest(player) == SeatedPose.Reel;
                 if (!picturedReel && waited >= 0.8f) picturedReel = Picture(check, "sitting-" + seat + "-reeling");
+                legs.Look(hands: true);
                 yield return null;
             }
             SelfTestDraw.Reeling = false;
+            var reeledTo = cast != null ? LineLength(cast) : line;
+            // The pull hands back to the rod held out.
+            for (var waited = 0f; waited < 0.5f && cast != null; waited += Time.deltaTime)
+            {
+                legs.Look(hands: true);
+                yield return null;
+            }
             if (Settings.SeatedMotions) check.That(pullShown, "reeling on the " + seat + ", the arms show the pull");
-            check.That(cast != null && LineLength(cast) < line - 0.5f, "sitting on the " + seat + ", the line reels in, from " + line.ToString("0.0", CultureInfo.InvariantCulture) + " m");
+            check.That(cast != null && reeledTo < line - 0.5f, "sitting on the " + seat + ", the line reels in, from " + line.ToString("0.0", CultureInfo.InvariantCulture) + " m");
             check.That(stayed, "the character stayed seated on the " + seat + " while reeling");
+            legs.Tell(check, seat);
             if (cast != null) ZNetScene.instance.Destroy(cast.gameObject);
             yield return null;
+        }
+
+        /// <summary>
+        /// Watches the legs and the right hand of a seated character against the character itself:
+        /// how far the hips and legs move from where the seat had them before the draw, and the
+        /// fastest the hand moves between two frames, which a cut from one motion to the next shows
+        /// as a jump.
+        /// </summary>
+        private sealed class LegWatch
+        {
+            /// <summary>How far the hips and legs may move from the seat's pose, in metres.</summary>
+            private const float LegsHold = 0.06f;
+
+            /// <summary>The fastest the hand may move as the pull begins and ends, in metres a second.</summary>
+            private const float HandSpeed = 4f;
+
+            private static readonly HumanBodyBones[] LegBones =
+            {
+                HumanBodyBones.Hips, HumanBodyBones.LeftUpperLeg, HumanBodyBones.LeftLowerLeg, HumanBodyBones.LeftFoot,
+                HumanBodyBones.RightUpperLeg, HumanBodyBones.RightLowerLeg, HumanBodyBones.RightFoot,
+            };
+
+            private readonly Player _player;
+            private readonly Animator _animator;
+            private readonly Dictionary<HumanBodyBones, Vector3> _seated = new Dictionary<HumanBodyBones, Vector3>();
+            private float _moved;
+            private string _movedBone = "";
+            private Vector3? _hand;
+            private float _handFastest;
+
+            public LegWatch(Player player)
+            {
+                _player = player;
+                _animator = AnimatorOf(player);
+                foreach (var bone in LegBones)
+                {
+                    var at = Where(bone);
+                    if (at.HasValue) _seated[bone] = at.Value;
+                }
+            }
+
+            /// <summary>Takes this frame's look; the hand is followed only where asked.</summary>
+            public void Look(bool hands = false)
+            {
+                foreach (var pair in _seated)
+                {
+                    var at = Where(pair.Key);
+                    if (!at.HasValue) continue;
+                    var moved = Vector3.Distance(at.Value, pair.Value);
+                    if (moved <= _moved) continue;
+                    _moved = moved;
+                    _movedBone = pair.Key.ToString();
+                }
+                var hand = hands ? Where(HumanBodyBones.RightHand) : null;
+                if (hand.HasValue && _hand.HasValue && Time.deltaTime > 0f)
+                    _handFastest = Mathf.Max(_handFastest, Vector3.Distance(hand.Value, _hand.Value) / Time.deltaTime);
+                _hand = hand;
+            }
+
+            public void Tell(ScenarioCheck check, string seat)
+            {
+                check.That(_seated.Count == LegBones.Length, "the character's hips and legs are found on its rig, " + _seated.Count + " of " + LegBones.Length);
+                check.That(_moved <= LegsHold, "the hips and legs stay as seated on the " + seat + " through the draw, the cast and the reel, at most "
+                    + LegsHold.ToString("0.00", CultureInfo.InvariantCulture) + " m off, " + _moved.ToString("0.00", CultureInfo.InvariantCulture) + " m at " + _movedBone);
+                if (Settings.SeatedMotions)
+                    check.That(_handFastest <= HandSpeed, "on the " + seat + " the hand flows into the pull and back without a jump, at most "
+                        + HandSpeed.ToString("0", CultureInfo.InvariantCulture) + " m/s, " + _handFastest.ToString("0.0", CultureInfo.InvariantCulture) + " m/s");
+            }
+
+            private Vector3? Where(HumanBodyBones bone)
+            {
+                var t = _animator != null && _animator.isHuman ? _animator.GetBoneTransform(bone) : null;
+                return t != null ? _player.transform.InverseTransformPoint(t.position) : (Vector3?)null;
+            }
         }
 
         /// <summary>How long a cast is watched for its float, in seconds.</summary>
