@@ -27,8 +27,7 @@ namespace Rodnarok
         /// <summary>How near the float, across the ground, a fish counts as there.</summary>
         private const float Near = 6f;
 
-        /// <summary>How far out a school appears, and how far it swims off when it leaves.</summary>
-        private const float ComeFrom = 14f;
+        /// <summary>How far a school swims off when it leaves.</summary>
         private const float GoTo = 30f;
 
         /// <summary>How widely a school circles its float, and how often each fish picks a new place to swim.</summary>
@@ -49,6 +48,9 @@ namespace Rodnarok
             public float DueAt;
             public float CameAt;
             public bool Came;
+            public Vector3 Start;
+            public float OwnSpeed;
+            public bool In;
             public readonly List<Fish> Fish = new List<Fish>();
             public int Biter = -1;
             public float BiterFreeAt = float.MaxValue;
@@ -172,17 +174,39 @@ namespace Rodnarok
             }
 
             cast.Fish.RemoveAll(f => f == null);
+            if (!cast.In) DriftIn(cast);
             foreach (var fish in cast.Fish) MaybeLeap(fish, cast.Float.transform.position);
             if (cast.Hooked || cast.Fish.Count == 0 || cast.BiterFreeAt < float.MaxValue) return;
             var near = cast.Fish.Count(f => Across(f.transform.position, cast.Float.transform.position) < Near);
-            if (near * 2 >= cast.Fish.Count || Time.time - cast.CameAt > 20f)
+            if (School.ReadyToBite(Time.time - cast.CameAt, near, cast.Fish.Count))
             {
                 cast.Biter = School.Biter(cast.Fish.Count, Random.value);
                 cast.BiterFreeAt = Time.time + Random.Range(2f, 4f);
             }
         }
 
-        /// <summary>The school appears out in the water, one kind of the bait's fish, as many as the world spawns together.</summary>
+        /// <summary>
+        /// Moves the school's home from where it appeared toward the float, its fish wandering widely
+        /// around it at one slow pace, until it reaches the float and each fish swims at its own speed.
+        /// The game takes a new fish's home from its saved data once, on its first frame, so a fish
+        /// whose home jumped from the school's then picks a new place to swim at once.
+        /// </summary>
+        private static void DriftIn(Cast cast)
+        {
+            var share = Drift.Share(Time.time - cast.CameAt);
+            var home = Vector3.Lerp(cast.Start, cast.Float.transform.position, share);
+            foreach (var fish in cast.Fish)
+            {
+                if (Fled.Contains(fish)) continue;
+                if (Across(SpawnPoint(fish), home) > 1f) SwimTimer(fish) = 0f;
+                SpawnPoint(fish) = home;
+                fish.m_swimRange = Drift.SwimRange(share, CircleRange);
+                fish.m_speed = Drift.Speed(cast.OwnSpeed, share);
+            }
+            cast.In = share >= 1f;
+        }
+
+        /// <summary>The school appears loose out in the water, one kind of the bait's fish, as many as the world spawns together.</summary>
         private static void Come(Cast cast)
         {
             cast.Came = true;
@@ -201,13 +225,15 @@ namespace Rodnarok
                 return;
             }
 
+            cast.Start = start.Value;
+            cast.OwnSpeed = template.m_speed;
             var size = School.Size(book.Group(kind), Rules, Random.value);
             var depth = template.m_minDepth + 0.25f;
-            var facing = Quaternion.LookRotation(Flat(home - start.Value));
             for (var i = 0; i < size; i++)
             {
                 // Each fish where the water is deep enough for it, or else at the school's centre, which is.
-                var offset = Random.insideUnitCircle * 2f;
+                var offset = Random.insideUnitCircle * Drift.Spread;
+                var facing = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
                 var place = new Vector3(start.Value.x + offset.x, surface - depth, start.Value.z + offset.y);
                 if (!DeepEnough(place, surface, template.m_minDepth)) place = new Vector3(start.Value.x, surface - depth, start.Value.z);
                 var go = UnityEngine.Object.Instantiate(prefab, place, facing);
@@ -222,7 +248,9 @@ namespace Rodnarok
                 if (quality > 1) item?.SetQuality(quality);
 
                 var fish = go.GetComponent<Fish>();
-                fish.m_swimRange = CircleRange;
+                SpawnPoint(fish) = start.Value;
+                fish.m_swimRange = Drift.SwimRange(0f, CircleRange);
+                fish.m_speed = Drift.Speed(cast.OwnSpeed, 0f);
                 fish.m_wpDurationMin = RepickMin;
                 fish.m_wpDurationMax = RepickMax;
                 fish.m_maxDepth = Mathf.Min(fish.m_maxDepth, fish.m_minDepth + 0.5f);
@@ -275,7 +303,7 @@ namespace Rodnarok
         {
             if (!DeepEnough(home, surface, minDepth)) return null;
             var turn = Random.Range(0f, 360f);
-            for (var distance = ComeFrom; distance >= 6f; distance -= 4f)
+            for (var distance = Drift.From; distance >= 6f; distance -= 4f)
             {
                 for (var step = 0; step < 12; step++)
                 {
@@ -353,6 +381,8 @@ namespace Rodnarok
             fish.m_swimRange = CircleRange * 2f;
             if (fish.m_speed > 0f && Ours.Contains(fish) && !Fled.Contains(fish))
             {
+                // A school left on its way in still swims at the cruise; it flees at its own speed's flight.
+                if (CastOf.TryGetValue(fish, out var cast) && cast.OwnSpeed > 0f) fish.m_speed = cast.OwnSpeed;
                 fish.m_speed *= fish.m_avoidSpeedScale;
                 Fled.Add(fish);
             }

@@ -11,7 +11,8 @@ namespace Rodnarok
     /// <summary>
     /// The arrival as a player meets it: a float with Fishing Bait lands in deep water beside the
     /// character, and the school the bait draws must come, match the bait and the world's group
-    /// size, wear its stars as the game sizes them, have one of it take the bait, scatter when
+    /// size, wear its stars as the game sizes them, drift in loose and gather at the float only
+    /// after a while, have one of it take the bait only then, scatter when
     /// that one is hooked, and leave once the float is gone, while no fish of the world's own is
     /// taken away. Needs a character beside water at least 3 m deep. A fishing rod is put in
     /// its hands for the run (<see cref="SelfTestGear"/>) and its gear put back after; the float,
@@ -139,14 +140,31 @@ namespace Rodnarok
                     check.That(quality >= 1 && quality <= 5 && Mathf.Abs(fish.transform.localScale.x - size) < 0.01f, "a fish of quality " + quality.ToString(CultureInfo.InvariantCulture) + " is drawn " + size.ToString("0.00", CultureInfo.InvariantCulture) + " times its size");
                 }
 
-                // It swims to the float and one of it takes the bait.
-                var near = false;
-                for (var waited = 0f; waited < 45f && !near; waited += Time.deltaTime)
+                // It drifts in loose, taking its time, and gathers at the float only at the end.
+                var cameAt = Time.time;
+                var spreads = new List<float>();
+                var halfNearAfter = -1f;
+                var nibbledEarly = false;
+                var pictured = false;
+                for (var waited = 0f; waited < Drift.Seconds + 30f && halfNearAfter < 0f; waited += Time.deltaTime)
                 {
-                    near = school.Any(f => f != null && Across(f.transform.position, ff.transform.position) < 6f);
+                    var here = school.Where(f => f != null).ToList();
+                    var sinceCame = Time.time - cameAt;
+                    if (here.Count > 1 && sinceCame < Drift.Seconds * 0.75f) spreads.Add(Spread(here));
+                    if (here.Count(f => Across(f.transform.position, ff.transform.position) < 6f) * 2 >= here.Count) halfNearAfter = sinceCame;
+                    if (sinceCame < Drift.Seconds && NibbleTime(ff) > 0f && school.Contains(Nibbler(ff))) nibbledEarly = true;
+                    if (!pictured && sinceCame >= Drift.Seconds * 0.4f)
+                    {
+                        pictured = true;
+                        SelfTestPictures.Take("arrival-drifting");
+                    }
                     yield return null;
                 }
-                check.That(near, "the school reached the float within 45 s");
+                check.That(halfNearAfter >= 0f, "half the school reached the float within " + (Drift.Seconds + 30f).ToString("0", CultureInfo.InvariantCulture) + " s");
+                check.That(halfNearAfter < 0f || halfNearAfter >= Drift.Seconds * 0.6f, "the school drifts in rather than rushing, half of it at the float after " + halfNearAfter.ToString("0.0", CultureInfo.InvariantCulture) + " s");
+                check.That(school.Count < 2 || spreads.Count > 0 && spreads.Average() >= 2f, "the school is loose on its way in, its fish on average " + (spreads.Count > 0 ? spreads.Average() : 0f).ToString("0.0", CultureInfo.InvariantCulture) + " m from its middle");
+                check.That(!nibbledEarly, "no fish of the school took the bait before the school was in");
+                SelfTestPictures.Take("arrival-in");
                 var nibbled = false;
                 for (var waited = 0f; waited < 45f && !nibbled; waited += Time.deltaTime)
                 {
@@ -257,6 +275,15 @@ namespace Rodnarok
             Fish.Instances.OfType<Fish>().Where(f => f != null && Schools.FloatOf(f).IsNone()).Select(f => f.GetZDOID());
 
         private static string PrefabName(Fish fish) => Utils.GetPrefabName(fish.gameObject);
+
+        /// <summary>How far the fish are on average from their middle, across the ground.</summary>
+        private static float Spread(List<Fish> fish)
+        {
+            var middle = Vector3.zero;
+            foreach (var f in fish) middle += f.transform.position;
+            middle /= fish.Count;
+            return fish.Average(f => Across(f.transform.position, middle));
+        }
 
         private static float Across(Vector3 a, Vector3 b) => Vector2.Distance(new Vector2(a.x, a.z), new Vector2(b.x, b.z));
 

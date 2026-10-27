@@ -24,6 +24,9 @@ namespace Rodnarok.Tests
             new FishKind("Fish12", new[] { "FishingBaitMistlands" }),
         };
 
+        /// <summary>The speed of the game's slowest fish, the Anglerfish and the Tetra, in metres a second.</summary>
+        public const float SlowestSpeed = 2f;
+
         public static BaitTable Table() => new BaitTable(All);
     }
 }

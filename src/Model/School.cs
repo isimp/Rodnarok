@@ -46,6 +46,16 @@ namespace Rodnarok
         /// <summary>Which fish of a school this big takes the bait, counted from 0, for a roll from 0 to 1.</summary>
         public static int Biter(int size, double roll) => Pick(Math.Max(1, size), roll);
 
+        /// <summary>How long after it came a school gets a bite even with most of its fish still off.</summary>
+        private const float BiteBackstop = 20f;
+
+        /// <summary>
+        /// Whether a fish of the school may now be let go for the bait: once the school has come in
+        /// and half of it is near the float, or a while after it came whatever its fish are doing.
+        /// </summary>
+        public static bool ReadyToBite(float sinceCame, int near, int size) =>
+            sinceCame >= BiteBackstop || (sinceCame >= Drift.Seconds && near * 2 >= size);
+
         /// <summary>The fish of a school that scatter when one is hooked: all the others.</summary>
         public static IReadOnlyList<int> Scatter(int size, int hooked) => Enumerable.Range(0, Math.Max(0, size)).Where(i => i != hooked).ToList();
 

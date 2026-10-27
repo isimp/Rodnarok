@@ -27,7 +27,7 @@ namespace Rodnarok
             foreach (var scenario in SelfTestSitting.All()) yield return scenario;
         }
 
-        /// <summary>Every fish prefab takes some bait, the bait table built from them reaches every one, and each bait is ammunition the fishing rod casts.</summary>
+        /// <summary>Every fish prefab takes some bait, the bait table built from them reaches every one, swims no slower than a school cruises in, and each bait is ammunition the fishing rod casts.</summary>
         private static IEnumerable EveryFishComesToABait(ScenarioCheck check)
         {
             var fish = ZNetScene.instance.m_prefabs.Where(p => p != null && p.GetComponent<Fish>() != null).ToList();
@@ -37,6 +37,11 @@ namespace Rodnarok
             var table = new BaitTable(kinds);
             var reached = new HashSet<string>(table.Baits.SelectMany(table.FishFor));
             foreach (var kind in kinds) check.That(reached.Contains(kind.Prefab), kind.Prefab + " comes to some bait");
+            foreach (var p in fish)
+            {
+                var speed = p.GetComponent<Fish>().m_speed;
+                check.That(speed >= Drift.Cruise, p.name + " swims at least as fast as a school cruises in, " + speed.ToString("0.0", CultureInfo.InvariantCulture) + " m/s");
+            }
 
             var rod = ZNetScene.instance.GetPrefab("FishingRod")?.GetComponent<ItemDrop>();
             check.That(rod != null, "the fishing rod prefab is there");
