@@ -3,22 +3,22 @@ using System.Linq;
 using HarmonyLib;
 using UnityEngine;
 using UnityEngine.Animations;
-using UnityEngine.Experimental.Animations;
 using UnityEngine.Playables;
 
 namespace Rodnarok
 {
     /// <summary>
     /// A seated player with a rod shows the game's own fishing motions on the arms and head while
-    /// the legs stay seated. The game plays the throw, the pull and the stance of holding the rod
-    /// on the same animation layer as every sitting pose, and a layer plays one at a time, so a
-    /// seated cast showed nothing. Each such player gets a small animation graph of their own on
-    /// top of what the game's animator made that frame: the game's sitting clip for the body, and
-    /// over the arms and head the wind-up played and held while drawing, the throw as the cast goes
-    /// out, the pull while reeling and the stance while the float is out, crossing over from one to
-    /// the next and fading in and out as a whole. Every game shows it for every seated player it
-    /// sees, read from their animator's sitting state, the rod in their hand, their block and their
-    /// float; the draw and the throw only the player's own game knows of.
+    /// the hips and legs stay exactly as the game seats them. The game plays the throw, the pull
+    /// and the stance of holding the rod on the same animation layer as every sitting pose, and a
+    /// layer plays one at a time, so a seated cast showed nothing. The three clips are read once
+    /// per rig as still frames on a hidden copy of the skeleton; then, each frame after the game
+    /// has animated a seated player with a rod, only the shoulder, arm, hand, finger and head
+    /// bones are turned toward those frames: the wind-up played and held while drawing, the throw
+    /// as the cast goes out, the pull while reeling and the stance while the float is out,
+    /// crossing over from one to the next and fading in and out as a whole. Every game shows it
+    /// for every seated player it sees, read from their animator's sitting state, the rod in their
+    /// hand, their block and their float; the draw and the throw only the player's own game knows of.
     /// </summary>
     internal static class SeatedRodPose
     {
@@ -34,36 +34,67 @@ namespace Rodnarok
         private const string ReelClip = "ReelIn";
         private const string HoldClip = "Idle_Fishing";
 
-        /// <summary>Where the overlay's graph stands among the animator's outputs: after the game's own.</summary>
-        private const ushort Order = 1000;
+        /// <summary>The bones the motions turn; the hips, the spine and the legs are never touched.</summary>
+        private static readonly HumanBodyBones[] Turned = new[]
+        {
+            HumanBodyBones.LeftShoulder, HumanBodyBones.LeftUpperArm, HumanBodyBones.LeftLowerArm, HumanBodyBones.LeftHand,
+            HumanBodyBones.RightShoulder, HumanBodyBones.RightUpperArm, HumanBodyBones.RightLowerArm, HumanBodyBones.RightHand,
+            HumanBodyBones.Head,
+        }.Concat(Enumerable.Range((int)HumanBodyBones.LeftThumbProximal, (int)HumanBodyBones.RightLittleDistal - (int)HumanBodyBones.LeftThumbProximal + 1).Select(b => (HumanBodyBones)b)).ToArray();
+
+        /// <summary>One clip read as still frames: each frame the local turn of every turned bone.</summary>
+        private sealed class Track
+        {
+            public float Length;
+            public bool Loop;
+            public Quaternion[][] Frames;
+
+            public Quaternion At(float time, int bone)
+            {
+                ClipFrames.At(time, Length, Frames.Length, Loop, out var from, out var to, out var between);
+                return Quaternion.Slerp(Frames[from][bone], Frames[to][bone], between);
+            }
+        }
+
+        /// <summary>The three motions read for one rig, and which of the turned bones it has.</summary>
+        private sealed class Poses
+        {
+            public HumanBodyBones[] Bones;
+            public Track Throw;
+            public Track Reel;
+            public Track Hold;
+        }
 
         private sealed class Overlay
         {
-            public PlayableGraph Graph;
-            public AnimationLayerMixerPlayable Layers;
-            public AnimationMixerPlayable Motions;
-            public AnimationClipPlayable Sit;
-            public AnimationClip SitClip;
-            public AnimationClipPlayable Throw;
-            public AnimationClipPlayable Reel;
-            public AnimationClipPlayable Hold;
+            public Poses Poses;
+            public Transform[] Bones;
             public SeatedBlend Blend = new SeatedBlend();
+            public float ReelTime;
+            public float HoldTime;
             public float IdleSince;
         }
 
         private static readonly Dictionary<Player, Overlay> Overlays = new Dictionary<Player, Overlay>();
-        private static readonly HashSet<Animator> Unfit = new HashSet<Animator>();
+        private static readonly Dictionary<Avatar, Poses> Read = new Dictionary<Avatar, Poses>();
+        private static readonly HashSet<Avatar> Unfit = new HashSet<Avatar>();
 
         /// <summary>The motion shown on each player now, for the self-test.</summary>
         [ForTest]
         public static SeatedPose ShowingForTest(Player player) => player != null && Overlays.TryGetValue(player, out var o) && o.Blend.Overlay > 0.5f ? o.Blend.Showing : SeatedPose.None;
 
-        /// <summary>Called every frame in a world.</summary>
+        /// <summary>Why the motions could not be read from the game's clips the last time it was tried; null when they could.</summary>
+        [ForTest]
+        public static string TroubleForTest => _trouble;
+
+        private static string _trouble;
+
+        /// <summary>Called every frame in a world, before the game animates: decides what each seated player shows.</summary>
         public static void Tick()
         {
             if (!Settings.SeatedMotions)
             {
-                if (Overlays.Count > 0) Forget();
+                if (Overlays.Count > 0) Overlays.Clear();
                 return;
             }
             foreach (var player in Player.GetAllPlayers())
@@ -86,23 +117,50 @@ namespace Rodnarok
                     if (overlay == null) continue;
                     Overlays[player] = overlay;
                 }
-                Step(overlay, animator, seated, pose);
+                Step(overlay, seated, pose);
             }
 
             foreach (var pair in Overlays.ToList())
             {
                 if (pair.Key != null && AnimatorOf(pair.Key) != null && !(pair.Value.Blend.Overlay <= 0f && Time.time - pair.Value.IdleSince > 2f)) continue;
-                Drop(pair.Value);
                 Overlays.Remove(pair.Key);
+            }
+        }
+
+        /// <summary>Called every frame after the game has animated: turns the arm and head bones of each seated player toward the motion.</summary>
+        public static void Turn()
+        {
+            foreach (var pair in Overlays)
+            {
+                var o = pair.Value;
+                var weight = o.Blend.Overlay;
+                if (pair.Key == null || weight <= 0f) continue;
+                var b = o.Blend;
+                for (var i = 0; i < o.Bones.Length; i++)
+                {
+                    var bone = o.Bones[i];
+                    if (bone == null) continue;
+                    var target = Quaternion.identity;
+                    var taken = 0f;
+                    Mix(ref target, ref taken, o.Poses.Throw.At(b.ThrowShare * o.Poses.Throw.Length, i), b.Throw);
+                    Mix(ref target, ref taken, o.Poses.Reel.At(o.ReelTime, i), b.Reel);
+                    Mix(ref target, ref taken, o.Poses.Hold.At(o.HoldTime, i), b.Hold);
+                    if (taken > 0f) bone.localRotation = Quaternion.Slerp(bone.localRotation, target, weight);
+                }
             }
         }
 
         /// <summary>Lets go of every overlay on leaving a world.</summary>
         public static void Forget()
         {
-            foreach (var overlay in Overlays.Values) Drop(overlay);
             Overlays.Clear();
-            Unfit.Clear();
+        }
+
+        private static void Mix(ref Quaternion mixed, ref float taken, Quaternion pose, float share)
+        {
+            if (share <= 0f) return;
+            taken += share;
+            mixed = taken <= share ? pose : Quaternion.Slerp(mixed, pose, share / taken);
         }
 
         private static bool Seated(Animator animator)
@@ -124,122 +182,154 @@ namespace Rodnarok
         private static bool FloatOut(Player player) =>
             FishingFloat.GetAllInstances().Any(f => f != null && FloatOwner(f) == player);
 
-        /// <summary>
-        /// Moves the overlay on toward the motion called for. While seated, the game's own sitting
-        /// clip lies beneath the motions, so the hips and legs are the seat's; on standing up the
-        /// overlay lets go at once, leaving the game's own way up.
-        /// </summary>
-        private static void Step(Overlay o, Animator animator, bool seated, SeatedPose pose)
+        /// <summary>Moves the blend on toward the motion called for; standing up lets go at once, leaving the game's own way up.</summary>
+        private static void Step(Overlay o, bool seated, SeatedPose pose)
         {
             if (!seated)
             {
                 o.Blend = new SeatedBlend();
                 if (o.IdleSince <= 0f) o.IdleSince = Time.time;
-                o.Layers.SetInputWeight(0, 0f);
-                o.Layers.SetInputWeight(1, 0f);
                 return;
             }
-
-            var throwLength = o.Throw.GetAnimationClip().length;
-            o.Blend.Step(pose, Time.deltaTime, throwLength);
-            var b = o.Blend;
-            if (b.Overlay > 0f) o.IdleSince = 0f;
+            o.Blend.Step(pose, Time.deltaTime, o.Poses.Throw.Length);
+            o.ReelTime += Time.deltaTime;
+            o.HoldTime += Time.deltaTime;
+            if (o.Blend.Overlay > 0f) o.IdleSince = 0f;
             else if (o.IdleSince <= 0f) o.IdleSince = Time.time;
-
-            FollowSitting(o, animator);
-            o.Throw.SetTime(b.ThrowShare * throwLength);
-            o.Motions.SetInputWeight(0, b.Throw);
-            o.Motions.SetInputWeight(1, b.Reel);
-            o.Motions.SetInputWeight(2, b.Hold);
-            o.Layers.SetInputWeight(0, b.Overlay > 0f && o.SitClip != null ? 1f : 0f);
-            o.Layers.SetInputWeight(1, b.Overlay);
-            if (!o.Graph.IsPlaying()) o.Graph.Play();
         }
 
-        /// <summary>Plays the clip of the game's sitting state beneath the motions, at the time the game has it.</summary>
-        private static void FollowSitting(Overlay o, Animator animator)
-        {
-            AnimationClip clip = null;
-            var heaviest = 0f;
-            foreach (var info in animator.GetCurrentAnimatorClipInfo(0))
-            {
-                if (info.clip == null || info.weight <= heaviest) continue;
-                clip = info.clip;
-                heaviest = info.weight;
-            }
-            if (clip != o.SitClip)
-            {
-                o.Graph.Disconnect(o.Layers, 0);
-                if (o.Sit.IsValid()) o.Sit.Destroy();
-                o.SitClip = clip;
-                if (clip != null)
-                {
-                    o.Sit = AnimationClipPlayable.Create(o.Graph, clip);
-                    o.Sit.SetSpeed(0);
-                    o.Graph.Connect(o.Sit, 0, o.Layers, 0);
-                }
-            }
-            if (clip == null) return;
-            var at = animator.GetCurrentAnimatorStateInfo(0).normalizedTime;
-            o.Sit.SetTime((clip.isLooping ? at - Mathf.Floor(at) : Mathf.Clamp01(at)) * clip.length);
-        }
-
-        /// <summary>A graph for one player's animator, or none where the animator is not humanoid or lacks the game's clips.</summary>
+        /// <summary>The overlay for one player's animator, or none where its rig could not be read.</summary>
         private static Overlay Make(Animator animator)
         {
-            if (Unfit.Contains(animator)) return null;
+            var avatar = animator.avatar;
+            if (avatar == null || Unfit.Contains(avatar)) return null;
+            if (!Read.TryGetValue(avatar, out var poses))
+            {
+                // Counted unfit until read, so a rig whose reading throws is tried once, not every frame.
+                Unfit.Add(avatar);
+                _trouble = "reading the clips stopped with an error, see the log";
+                poses = ReadPoses(animator, out var trouble);
+                _trouble = trouble;
+                if (poses == null)
+                {
+                    Log.Warning("Seated fishing motions are not shown for " + animator.name + ": " + trouble);
+                    return null;
+                }
+                Unfit.Remove(avatar);
+                Read[avatar] = poses;
+            }
+            return new Overlay { Poses = poses, Bones = poses.Bones.Select(animator.GetBoneTransform).ToArray() };
+        }
+
+        /// <summary>
+        /// Reads the three clips as still frames on a hidden copy of the animator's skeleton: the copy
+        /// is made inside an inactive holder, so none of its scripts wake, stripped of everything but
+        /// its bones and its animator, posed frame by frame by a graph of its own, then thrown away.
+        /// </summary>
+        private static Poses ReadPoses(Animator animator, out string trouble)
+        {
+            trouble = null;
             var clips = animator.runtimeAnimatorController != null ? animator.runtimeAnimatorController.animationClips : null;
             var throwClip = clips?.FirstOrDefault(c => c != null && c.name == ThrowClip);
             var reelClip = clips?.FirstOrDefault(c => c != null && c.name == ReelClip);
             var holdClip = clips?.FirstOrDefault(c => c != null && c.name == HoldClip);
-            if (!animator.isHuman || throwClip == null || reelClip == null || holdClip == null)
+            if (!animator.isHuman)
             {
-                Unfit.Add(animator);
-                Log.Warning("Seated fishing motions are not shown for " + animator.name + ": " + (!animator.isHuman ? "its rig is not humanoid" : "the game's fishing clips are not on its controller"));
+                trouble = "its rig is not humanoid";
                 return null;
             }
+            if (throwClip == null || reelClip == null || holdClip == null)
+            {
+                trouble = "the game's fishing clips are not on its controller";
+                return null;
+            }
+            var bones = Turned.Where(b => animator.GetBoneTransform(b) != null).ToArray();
 
-            var o = new Overlay { Graph = PlayableGraph.Create("Rodnarok seated rod " + animator.name) };
-            o.Graph.SetTimeUpdateMode(DirectorUpdateMode.GameTime);
-            o.Throw = AnimationClipPlayable.Create(o.Graph, throwClip);
-            o.Throw.SetSpeed(0);
-            o.Reel = AnimationClipPlayable.Create(o.Graph, reelClip);
-            o.Hold = AnimationClipPlayable.Create(o.Graph, holdClip);
-            o.Motions = AnimationMixerPlayable.Create(o.Graph, 3);
-            o.Graph.Connect(o.Throw, 0, o.Motions, 0);
-            o.Graph.Connect(o.Reel, 0, o.Motions, 1);
-            o.Graph.Connect(o.Hold, 0, o.Motions, 2);
-            // Layer 0 takes the game's sitting clip for the whole body but its travel, so the hips
-            // and legs come from the seat itself; layer 1 lays the motion over the arms and head.
-            o.Layers = AnimationLayerMixerPlayable.Create(o.Graph, 2);
-            o.Graph.Connect(o.Motions, 0, o.Layers, 1);
-            o.Layers.SetLayerMaskFromAvatarMask(0, Mask(part => part != AvatarMaskBodyPart.Root));
-            o.Layers.SetLayerMaskFromAvatarMask(1, Mask(part => ArmsAndHead.Contains(part)));
-            o.Layers.SetInputWeight(0, 0f);
-            o.Layers.SetInputWeight(1, 0f);
-            var output = AnimationPlayableOutput.Create(o.Graph, "Rodnarok seated rod", animator);
-            output.SetSourcePlayable(o.Layers);
-            output.SetAnimationStreamSource(AnimationStreamSource.PreviousInputs);
-            output.SetSortingOrder(Order);
-            o.Graph.Play();
-            return o;
+            var holder = new GameObject("Rodnarok seated rod poses");
+            holder.SetActive(false);
+            var graph = default(PlayableGraph);
+            try
+            {
+                var copy = Object.Instantiate(animator.gameObject, holder.transform);
+                Strip(copy);
+                var copyAnimator = copy.GetComponent<Animator>();
+                copyAnimator.runtimeAnimatorController = null;
+                copyAnimator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+                copyAnimator.applyRootMotion = false;
+                holder.SetActive(true);
+                copyAnimator.Rebind();
+                var copyBones = bones.Select(copyAnimator.GetBoneTransform).ToArray();
+
+                graph = PlayableGraph.Create("Rodnarok seated rod poses");
+                graph.SetTimeUpdateMode(DirectorUpdateMode.Manual);
+                var output = AnimationPlayableOutput.Create(graph, "poses", copyAnimator);
+                var poses = new Poses
+                {
+                    Bones = bones,
+                    Throw = ReadTrack(graph, output, throwClip, false, copyBones),
+                    Reel = ReadTrack(graph, output, reelClip, true, copyBones),
+                    Hold = ReadTrack(graph, output, holdClip, true, copyBones),
+                };
+                if (Same(poses.Throw.Frames[0], poses.Reel.Frames[0]) && Same(poses.Reel.Frames[0], poses.Hold.Frames[0]))
+                {
+                    trouble = "the copy of its skeleton did not take the clips' poses";
+                    return null;
+                }
+                return poses;
+            }
+            finally
+            {
+                if (graph.IsValid()) graph.Destroy();
+                Object.Destroy(holder);
+            }
         }
 
-        private static readonly AvatarMaskBodyPart[] ArmsAndHead =
+        private static Track ReadTrack(PlayableGraph graph, AnimationPlayableOutput output, AnimationClip clip, bool loop, Transform[] bones)
         {
-            AvatarMaskBodyPart.LeftArm, AvatarMaskBodyPart.RightArm, AvatarMaskBodyPart.LeftFingers, AvatarMaskBodyPart.RightFingers, AvatarMaskBodyPart.Head,
-        };
-
-        private static AvatarMask Mask(System.Func<AvatarMaskBodyPart, bool> takes)
-        {
-            var mask = new AvatarMask();
-            for (var part = AvatarMaskBodyPart.Root; part < AvatarMaskBodyPart.LastBodyPart; part++) mask.SetHumanoidBodyPartActive(part, takes(part));
-            return mask;
+            var playable = AnimationClipPlayable.Create(graph, clip);
+            playable.SetApplyFootIK(false);
+            output.SetSourcePlayable(playable);
+            var count = ClipFrames.Count(clip.length);
+            var frames = new Quaternion[count][];
+            for (var f = 0; f < count; f++)
+            {
+                playable.SetTime(clip.length * f / (count - 1));
+                graph.Evaluate();
+                frames[f] = bones.Select(b => b.localRotation).ToArray();
+            }
+            playable.Destroy();
+            return new Track { Length = clip.length, Loop = loop, Frames = frames };
         }
 
-        private static void Drop(Overlay o)
+        private static bool Same(Quaternion[] a, Quaternion[] b)
         {
-            if (o.Graph.IsValid()) o.Graph.Destroy();
+            for (var i = 0; i < a.Length; i++)
+                if (Quaternion.Angle(a[i], b[i]) > 0.5f) return false;
+            return true;
+        }
+
+        /// <summary>Takes from a copy everything but its bones and its animator, scripts first and what others depend on last.</summary>
+        private static void Strip(GameObject copy)
+        {
+            var keep = copy.GetComponent<Animator>();
+            var gone = copy.GetComponentsInChildren<Component>(true)
+                .Where(c => c != null && !(c is Transform) && c != keep)
+                .OrderBy(StripOrder)
+                .ToList();
+            foreach (var c in gone)
+                if (c != null) Object.DestroyImmediate(c);
+        }
+
+        /// <summary>Scripts go first, then capes' cloth before the meshes it hangs on, joints before bodies, and what is drawn last.</summary>
+        private static int StripOrder(Component c)
+        {
+            if (c is MonoBehaviour) return 0;
+            if (c.GetType().Name == "Cloth") return 1;
+            if (c is Joint) return 2;
+            if (c is Collider) return 3;
+            if (c is Rigidbody) return 4;
+            if (c is Renderer) return 5;
+            return 6;
         }
     }
 }

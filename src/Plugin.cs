@@ -47,6 +47,11 @@ namespace Rodnarok
             SelfTestHost.Tick();
         }
 
+        private void LateUpdate()
+        {
+            if (ZNetScene.instance != null) SeatedRodPose.Turn();
+        }
+
         private void OnDestroy() => _harmony?.UnpatchSelf();
     }
 }

@@ -47,6 +47,12 @@ namespace Rodnarok.Tests
         }
 
         [Fact]
+        public void SeatedMotionsAreOffUntilAPlayerTurnsThemOn()
+        {
+            Assert.False(SeatedPoses.OnByDefault);
+        }
+
+        [Fact]
         public void TheCastShowsOverAReelHeldAtTheSameTime()
         {
             Assert.Equal(SeatedPose.Throw, SeatedPoses.For(seatedWithRod: true, drawing: false, casting: true, reeling: true, floatOut: true));

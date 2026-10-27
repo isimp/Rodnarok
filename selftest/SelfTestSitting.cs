@@ -48,6 +48,8 @@ namespace Rodnarok
             var gear = SelfTestGear.RodInHand(player);
             var standing = HeadHeight(player);
             GameObject chair = null;
+            // The motions are checked whatever the player's own setting, which is put back after.
+            var motionsWere = Settings.SeatedMotionsForTest(true);
             try
             {
                 check.That(gear.Rod != null, "a fishing rod is in hand: " + gear.Trouble);
@@ -97,6 +99,7 @@ namespace Rodnarok
                 if (player.InEmote()) StopEmote?.Invoke(player, null);
                 if (chair != null) ZNetScene.instance.Destroy(chair);
                 gear.PutBack();
+                Settings.SeatedMotionsForTest(motionsWere);
             }
 
             // Back where it stood.
@@ -137,7 +140,7 @@ namespace Rodnarok
             check.That(drew, "sitting on the " + seat + ", the rod draws");
             check.That(stayed, "the character stayed seated on the " + seat + " while drawing");
             check.That(lowered, "drawing on the " + seat + ", the character's head stays lowered as seated; at the end " + heads());
-            if (Settings.SeatedMotions) check.That(windUpShown, "drawing on the " + seat + ", the arms show the throw's wind-up");
+            check.That(windUpShown, "drawing on the " + seat + ", the arms show the throw's wind-up");
 
             // The float is watched for a while: when any float shows, whether this game owns it, and
             // what the character was doing should it go again, so a failed cast says what happened.
@@ -207,7 +210,7 @@ namespace Rodnarok
                 legs.Look(hands: true);
                 yield return null;
             }
-            if (Settings.SeatedMotions) check.That(pullShown, "reeling on the " + seat + ", the arms show the pull");
+            check.That(pullShown, "reeling on the " + seat + ", the arms show the pull");
             check.That(cast != null && reeledTo < line - 0.5f, "sitting on the " + seat + ", the line reels in, from " + line.ToString("0.0", CultureInfo.InvariantCulture) + " m");
             check.That(stayed, "the character stayed seated on the " + seat + " while reeling");
             legs.Tell(check, seat);
@@ -277,8 +280,8 @@ namespace Rodnarok
                 check.That(_seated.Count == LegBones.Length, "the character's hips and legs are found on its rig, " + _seated.Count + " of " + LegBones.Length);
                 check.That(_moved <= LegsHold, "the hips and legs stay as seated on the " + seat + " through the draw, the cast and the reel, at most "
                     + LegsHold.ToString("0.00", CultureInfo.InvariantCulture) + " m off, " + _moved.ToString("0.00", CultureInfo.InvariantCulture) + " m at " + _movedBone);
-                if (Settings.SeatedMotions)
-                    check.That(_handFastest <= HandSpeed, "on the " + seat + " the hand flows into the pull and back without a jump, at most "
+                check.That(SeatedRodPose.TroubleForTest == null, "the fishing motions are read from the game's clips for the character's rig: " + SeatedRodPose.TroubleForTest);
+                check.That(_handFastest <= HandSpeed, "on the " + seat + " the hand flows into the pull and back without a jump, at most "
                         + HandSpeed.ToString("0", CultureInfo.InvariantCulture) + " m/s, " + _handFastest.ToString("0.0", CultureInfo.InvariantCulture) + " m/s");
             }
 

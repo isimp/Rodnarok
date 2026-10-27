@@ -30,7 +30,16 @@ namespace Rodnarok
         private static ConfigEntry<bool> _seatedMotions;
 
         /// <summary>Whether seated players with a rod show the game's fishing motions on their arms; a player's own choice.</summary>
-        public static bool SeatedMotions => _seatedMotions == null || _seatedMotions.Value;
+        public static bool SeatedMotions => _seatedMotions != null ? _seatedMotions.Value : SeatedPoses.OnByDefault;
+
+        /// <summary>Sets SeatedMotions as a player would, so the self-test can check the motions and put the setting back; returns what it was.</summary>
+        [ForTest]
+        public static bool SeatedMotionsForTest(bool on)
+        {
+            var was = SeatedMotions;
+            if (_seatedMotions != null) _seatedMotions.Value = on;
+            return was;
+        }
 
         /// <summary>Whether this player's casts show which fish can come; a player's own choice, never the server's.</summary>
         public static bool CastHints => _castHints != null && _castHints.Value;
@@ -87,8 +96,8 @@ namespace Rodnarok
             // Shown only to this player, so each player sets it and the server never does.
             _castHints = config.Bind("Display", "CastHints", CastHint.OnByDefault,
                 "Whether each cast shows a short line at the top left saying which of the bait's fish can come to the water there, and which would need bigger or deeper water. Your own setting; the server's does not apply.");
-            _seatedMotions = config.Bind("Display", "SeatedMotions", true,
-                "Whether a seated player with a rod shows the game's casting, reeling and rod-holding motions on the arms while the legs stay seated, as your game sees every player. Your own setting; the server's does not apply.");
+            _seatedMotions = config.Bind("Display", "SeatedMotions", SeatedPoses.OnByDefault,
+                "Whether a seated player with a rod shows the game's casting, reeling and rod-holding motions on the arms and head while the hips and legs stay as seated, as your game sees every player. Your own setting; the server's does not apply.");
         }
 
         private static ConfigEntry<T> Sync<T>(ConfigEntry<T> entry)

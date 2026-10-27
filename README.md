@@ -14,7 +14,7 @@ A school of the bait's fish sets off from out of sight beyond the float as it la
 
 A fish bites only when it is really at the float, the float is pulled under with a splash, and the crosshair ring closes over the time you have to hook it by holding the line. In the fight the fish thrashes at the surface while it struggles and calms when it rests, and the ring turns red or yellow to show which. Hold the line while it rests to reel it in. Holding through a struggle gains nothing and strains the line, and the ring fills as it does: ease off before it closes or the line snaps, and the fish takes some line back while you do.
 
-You can cast and reel while sitting on a chair, a bench or a boat's bench, and the arms show the cast, the pull and the rod held out while the legs stay seated. The *Serpent post*, built with the hammer, calms the waves around it.
+You can cast and reel while sitting on a chair, a bench or a boat's bench. The *Serpent post*, built with the hammer, calms the waves around it.
 
 ## Multiplayer
 
@@ -22,7 +22,7 @@ Install Rodnarök on every player and on a dedicated server. The server's settin
 
 ## Settings
 
-All settings are in `BepInEx/config/isimp.Rodnarok.cfg`, and `/rodnarok` in the chat tells where. `CastHints`, your own setting and off at first, makes each cast say at the top left which of the bait's fish can come to the water there and which would need bigger or deeper water.
+All settings are in `BepInEx/config/isimp.Rodnarok.cfg`, and `/rodnarok` in the chat tells where. `CastHints`, your own setting and off at first, makes each cast say at the top left which of the bait's fish can come to the water there and which would need bigger or deeper water. `SeatedMotions`, also your own and off at first, makes seated players with a rod show the cast, the pull and the rod held out on their arms while they stay seated.
 
 ## Other mods
 
