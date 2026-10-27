@@ -66,10 +66,14 @@ namespace Rodnarok
         /// <summary>Whether this run takes the fight picture: only in daylight in game, since the water and the float are unseen at night.</summary>
         private static bool _wikiLight;
 
+        /// <summary>The frame the last whole-screen picture was taken in.</summary>
+        private static int _pictureFrame = -1;
+
         /// <summary>Grabs a panel of the fight picture once, noting why when it cannot.</summary>
         private static void WikiPanel(ScenarioCheck check, string name, string caption)
         {
-            if (!_wikiLight || SelfTestPictures.Has(name)) return;
+            // Never in a frame a whole-screen picture is taken, which would catch the caption.
+            if (!_wikiLight || SelfTestPictures.Has(name) || Time.frameCount == _pictureFrame) return;
             var trouble = SelfTestPictures.Grab(name, caption);
             check.That(trouble == null, "the fight picture's panel " + name + " is grabbed: " + trouble);
         }
@@ -110,6 +114,7 @@ namespace Rodnarok
         /// <summary>Takes a picture of the screen for looking at; notes why when none can be taken.</summary>
         private static bool Picture(ScenarioCheck check, string what)
         {
+            _pictureFrame = Time.frameCount;
             var trouble = SelfTestPictures.Take(what);
             check.That(trouble == null, "a picture of " + what + " is taken: " + trouble);
             return true;
@@ -196,8 +201,9 @@ namespace Rodnarok
                     {
                         pictured = true;
                         Picture(check, "ring-bite");
-                        WikiPanel(check, "bite", "Bite: hold to hook");
                     }
+                    // The panel a frame later than the picture, so the caption stays out of the picture.
+                    if (pictured && waited >= 0.33f) WikiPanel(check, "bite", "Bite: hold to hook");
                     Aim(player, ff);
                     yield return null;
                 }

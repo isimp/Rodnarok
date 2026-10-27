@@ -426,19 +426,37 @@ namespace Rodnarok
             var from = fish.transform.position;
             var surface = ZoneSystem.instance.m_waterLevel;
             place = default;
-            var bestDot = float.MinValue;
-            for (var step = 0; step < 16; step++)
+            // The whole way must be deep, or a fish heading for water beyond a spit of land crosses it;
+            // where no long way is, a shorter one does.
+            for (var reach = GoTo; reach >= GoShortest; reach -= 10f)
             {
-                var angle = step * Mathf.PI / 8f;
-                var dir = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle));
-                var p = from + dir * GoTo;
-                if (!DeepEnough(p, surface, depth) || !DeepEnough(from + dir * (GoTo / 2f), surface, depth)) continue;
-                var dot = Vector3.Dot(dir, away);
-                if (dot <= bestDot) continue;
-                bestDot = dot;
-                place = p;
+                var bestDot = float.MinValue;
+                for (var step = 0; step < 16; step++)
+                {
+                    var angle = step * Mathf.PI / 8f;
+                    var dir = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle));
+                    if (!DeepAlong(from, dir, reach, surface, depth)) continue;
+                    var dot = Vector3.Dot(dir, away);
+                    if (dot <= bestDot) continue;
+                    bestDot = dot;
+                    place = from + dir * reach;
+                }
+                if (bestDot > float.MinValue) return true;
             }
-            return bestDot > float.MinValue;
+            return false;
+        }
+
+        /// <summary>The shortest way a fleeing fish is sent, in metres.</summary>
+        private const float GoShortest = 10f;
+
+        /// <summary>Whether the water is deep enough every 2 m of the way, out to its end.</summary>
+        private static bool DeepAlong(Vector3 from, Vector3 dir, float reach, float surface, float depth)
+        {
+            for (var distance = 2f; distance < reach; distance += 2f)
+            {
+                if (!DeepEnough(from + dir * distance, surface, depth)) return false;
+            }
+            return DeepEnough(from + dir * reach, surface, depth);
         }
 
         /// <summary>Finds marked fish this game owns that it does not steer yet, such as those of a float cast before a restart, and lets those whose float is gone leave.</summary>

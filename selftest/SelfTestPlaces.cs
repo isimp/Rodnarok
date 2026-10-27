@@ -10,7 +10,10 @@ namespace Rodnarok
         private const float MostRise = 0.4f;
 
         /// <summary>A spot of dry, fairly level ground 1.5 to 4 m from the character, the nearest found; none where there is none.</summary>
-        public static Vector3? DryLandBeside(Vector3 from)
+        public static Vector3? DryLandBeside(Vector3 from) => DryLandBeside(from, null);
+
+        /// <summary>A spot of dry, fairly level ground 1.5 to 4 m from the character that also suits the scenario, the nearest found; none where there is none.</summary>
+        public static Vector3? DryLandBeside(Vector3 from, System.Func<Vector3, bool> suits)
         {
             var water = ZoneSystem.instance.m_waterLevel;
             for (var distance = 1.5f; distance <= 4f; distance += 0.5f)
@@ -21,10 +24,28 @@ namespace Rodnarok
                     var p = from + new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * distance;
                     if (!ZoneSystem.instance.GetSolidHeight(p, out var ground) || ground < water + AboveWater) continue;
                     if (!Level(p, ground)) continue;
-                    return new Vector3(p.x, ground, p.z);
+                    var spot = new Vector3(p.x, ground, p.z);
+                    if (suits != null && !suits(spot)) continue;
+                    return spot;
                 }
             }
             return null;
+        }
+
+        /// <summary>The layers a thrown or shot projectile hits, as the game's projectiles have them, characters left out.</summary>
+        private static readonly int Solids = LayerMask.GetMask("Default", "static_solid", "Default_small", "piece", "piece_nonsolid", "terrain", "vehicle");
+
+        /// <summary>How far ahead of the thrower a throw must be clear, in metres: what it meets so near ends the throw at once.</summary>
+        private const float ClearThrow = 8f;
+
+        /// <summary>What a throw from a seated thrower at this spot toward the target meets within its first metres; null when clear.</summary>
+        public static string ThrowBlockedBy(Vector3 spot, Vector3 target)
+        {
+            var eye = spot + Vector3.up * 1.2f;
+            var dir = (target + Vector3.up * 3f - eye).normalized;
+            return Physics.Raycast(eye, dir, out var hit, ClearThrow, Solids, QueryTriggerInteraction.Ignore)
+                ? hit.collider.name + " at " + hit.distance.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " m"
+                : null;
         }
 
         private static bool Level(Vector3 p, float ground)

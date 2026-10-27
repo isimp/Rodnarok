@@ -37,8 +37,9 @@ namespace Rodnarok
             if (chairPrefab == null) yield break;
 
             var stoodAt = player.transform.position;
-            var dry = SelfTestPlaces.DryLandBeside(stoodAt);
-            check.That(dry.HasValue, "dry, level land within 1.5 to 4 m of the character for a chair");
+            // A spot whose throw toward the water is clear: a cast that meets a branch at once ends there.
+            var dry = SelfTestPlaces.DryLandBeside(stoodAt, spot => SelfTestPlaces.ThrowBlockedBy(spot, water.Value) == null);
+            check.That(dry.HasValue, "dry, level land within 1.5 to 4 m of the character for a chair, with a clear throw toward the water");
             if (!dry.HasValue) yield break;
             var toWater = water.Value - dry.Value;
             toWater.y = 0f;
@@ -138,7 +139,7 @@ namespace Rodnarok
                 cast = OwnFloats().FirstOrDefault();
                 yield return null;
             }
-            check.That(cast != null, "sitting on the " + seat + ", the rod casts");
+            check.That(cast != null, "sitting on the " + seat + ", the rod casts; the throw meets " + (SelfTestPlaces.ThrowBlockedBy(player.transform.position, water) ?? "nothing"));
             check.That(seated(), "the character is still seated on the " + seat + " after the cast");
             for (var waited = 0f; waited < 1.5f; waited += Time.deltaTime) yield return null;
             check.That(posed(), "a moment after the cast the character's head is lowered as seated on the " + seat + ", " + heads());
