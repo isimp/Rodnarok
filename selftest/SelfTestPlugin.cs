@@ -18,8 +18,12 @@ namespace Rodnarok
 
         private Harmony _harmony;
 
+        /// <summary>The plugin as loaded, which runs what has to wait for a frame to be drawn.</summary>
+        internal static SelfTestPlugin Instance { get; private set; }
+
         private void Awake()
         {
+            Instance = this;
             // Only what stands in for the player's hands (SelfTestHold); it does nothing unless a scenario asks.
             _harmony = new Harmony(Guid);
             _harmony.PatchAll(typeof(SelfTestPlugin).Assembly);

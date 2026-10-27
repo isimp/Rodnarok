@@ -14,6 +14,9 @@ namespace Rodnarok
     /// cost and strain the line at the tension's pace, while easing off lets the strain go as the
     /// fish takes line out and holding through a rest reels in. The ring's arc must follow the
     /// strain, and held too long the line must snap. Tension is on for it, at the server's numbers.
+    /// The character watches the float throughout, and the bite, a held struggle, an eased one and
+    /// a rest are grabbed with captions into <c>wiki-fight.png</c>, the picture for the mod's pages;
+    /// the character's view is put back after.
     /// The fish is let go or freed before it is landed, so nothing reaches the inventory; the rod,
     /// the float and the school are taken away again.
     /// </summary>
@@ -37,8 +40,36 @@ namespace Rodnarok
         private static bool RingShown() => Ring != null && Ring.gameObject.activeSelf;
 
         /// <summary>The strain at which the scenario eases off in a struggle, and at which it holds again.</summary>
-        private const float EaseAt = 0.3f;
+        private const float EaseAt = 0.55f;
         private const float HoldAgainAt = 0.05f;
+
+        private static readonly AccessTools.FieldRef<Character, Quaternion> LookYaw = AccessTools.FieldRefAccess<Character, Quaternion>("m_lookYaw");
+        private static readonly AccessTools.FieldRef<Player, float> LookPitch = AccessTools.FieldRefAccess<Player, float>("m_lookPitch");
+
+        /// <summary>How far above the float the character looks, so the float shows under the crosshair ring.</summary>
+        private const float AimAbove = 1.2f;
+
+        /// <summary>The panels of the fight picture for the mod's pages, in reading order, with their captions.</summary>
+        private static readonly string[] WikiPanels = { "bite", "struggle", "ease", "rest" };
+        private const string WikiPicture = "wiki-fight";
+
+        /// <summary>The character looks just above the float, as a player watching it would.</summary>
+        private static void Aim(Player player, FishingFloat ff)
+        {
+            if (ff == null) return;
+            var dir = ff.transform.position + Vector3.up * AimAbove - player.m_eye.position;
+            if (dir.sqrMagnitude < 0.01f) return;
+            player.SetLookDir(dir);
+            LookPitch(player) = -Mathf.Asin(Mathf.Clamp(dir.normalized.y, -1f, 1f)) * Mathf.Rad2Deg;
+        }
+
+        /// <summary>Grabs a panel of the fight picture once, noting why when it cannot.</summary>
+        private static void WikiPanel(ScenarioCheck check, string name, string caption)
+        {
+            if (SelfTestPictures.Has(name)) return;
+            var trouble = SelfTestPictures.Grab(name, caption);
+            check.That(trouble == null, "the fight picture's panel " + name + " is grabbed: " + trouble);
+        }
 
         /// <summary>
         /// Whether the ring shows a struggle (red) or a rest (yellow) at its one size, its arc the
@@ -97,6 +128,8 @@ namespace Rodnarok
             if (floatPrefab == null || baitPrefab == null) yield break;
 
             var gear = SelfTestGear.RodInHand(player);
+            var yaw = LookYaw(player);
+            var pitch = LookPitch(player);
             FishingFloat ff = null;
             try
             {
@@ -110,6 +143,7 @@ namespace Rodnarok
                 }
                 if (!tipShown) yield break;
 
+                SelfTestPictures.Forget();
                 PlayRules.ForTest = Settings.Rules.With(waitMin: 1f, waitMax: 1f, schools: true, tension: true);
                 var rules = PlayRules.Now;
                 var bait = baitPrefab.GetComponent<ItemDrop>().m_itemData.Clone();
@@ -126,6 +160,7 @@ namespace Rodnarok
                 {
                     if (NibbleTime(ff) > since && Nibbler(ff) != null) biter = Nibbler(ff);
                     else resting = Mathf.Lerp(resting, ff.transform.position.y, 0.1f);
+                    Aim(player, ff);
                     yield return null;
                 }
                 check.That(biter != null, "a fish bit within 90 s");
@@ -157,7 +192,9 @@ namespace Rodnarok
                     {
                         pictured = true;
                         Picture(check, "ring-bite");
+                        WikiPanel(check, "bite", "Bite: hold to hook");
                     }
+                    Aim(player, ff);
                     yield return null;
                 }
                 check.That(deepest >= 0.3f, "the float went under by at least 0.3 m, by " + deepest.ToString("0.00", CultureInfo.InvariantCulture) + " m");
@@ -212,6 +249,7 @@ namespace Rodnarok
                     if (struggled) holding = strain >= EaseAt ? false : strain <= HoldAgainAt || holding;
                     else holding = line > LetGoAt + 3f;
                     SelfTestHold.Holding = holding;
+                    Aim(player, ff);
                     yield return null;
                     if (ff == null || ff.GetCatch() != fish) break;
                     var strainNow = Lines.StrainOf(ff);
@@ -237,6 +275,8 @@ namespace Rodnarok
                         }
                         if (!RingIs(red: true, strainNow)) { ringWrong++; ringSeen = RingSeen(); }
                         if (!picturedStruggle && holding && strainNow > 0.25f) picturedStruggle = Picture(check, "ring-struggle");
+                        if (holding && strainNow >= 0.45f) WikiPanel(check, "struggle", "Struggle: holding strains");
+                        if (!holding && easedTime > 0.2f && strainNow > 0.15f && strainNow < 0.35f) WikiPanel(check, "ease", "Ease off: it takes line");
                     }
                     else if (!struggled && !fish.IsEscaping())
                     {
@@ -246,6 +286,7 @@ namespace Rodnarok
                         if (holding) restLine += line - LineLength(ff);
                         if (!RingIs(red: false, strainNow)) { ringWrong++; ringSeen = RingSeen(); }
                         if (!picturedRest && restTime > 0.3f) picturedRest = Picture(check, "ring-rest");
+                        if (holding && restLine > 0.5f) WikiPanel(check, "rest", "Rest: reel it in");
                     }
                 }
                 SelfTestHold.Holding = false;
@@ -276,6 +317,11 @@ namespace Rodnarok
                 check.That(restTime >= 0.5f && restLine / Mathf.Max(restTime, 0.01f) > 0.5f * Mathf.Lerp(rules.ReelSpeed, rules.ReelSpeedMaxSkill, skill),
                     "holding while it rests reels it in, " + restLine.ToString("0.0", CultureInfo.InvariantCulture) + " m in " + restTime.ToString("0.0", CultureInfo.InvariantCulture) + " s");
 
+                // The four moments together, as the picture for the mod's pages.
+                yield return null;
+                var sheet = SelfTestPictures.Compose(WikiPicture, WikiPanels);
+                check.That(sheet == null, "the fight picture for the mod's pages is put together from bite, struggle, ease and rest: " + sheet);
+
                 // Held through a struggle too long, the line snaps as the game breaks one.
                 if (ff != null && ff.GetCatch() == fish)
                 {
@@ -300,6 +346,12 @@ namespace Rodnarok
                 PlayRules.ForTest = null;
                 if (ff != null) ZNetScene.instance.Destroy(ff.gameObject);
                 gear.PutBack();
+                SelfTestPictures.Forget();
+                if (player != null)
+                {
+                    LookYaw(player) = yaw;
+                    LookPitch(player) = pitch;
+                }
             }
         }
     }
