@@ -68,4 +68,24 @@ namespace Rodnarok
     {
         private static void Postfix(Fish __instance, FishingFloat ff) => Schools.Hooked(__instance, ff);
     }
+
+    /// <summary>
+    /// A place to swim the game turns down keeps no hold on a school's fish or a called one. The game
+    /// writes the new place before it finds the water there too shallow, and the fish swims for it
+    /// until a later choice holds; near a bank, and fleeing at speed, that can run it aground. For
+    /// these fish the place they swam for before stands instead.
+    /// </summary>
+    [HarmonyPatch(typeof(Fish), "RandomizeWaypoint")]
+    internal static class TurnedDownPlaceHoldsNoFish
+    {
+        private static readonly AccessTools.FieldRef<Fish, UnityEngine.Vector3> Waypoint = AccessTools.FieldRefAccess<Fish, UnityEngine.Vector3>("m_waypoint");
+
+        private static void Prefix(Fish __instance, out UnityEngine.Vector3 __state) => __state = Waypoint(__instance);
+
+        private static void Postfix(Fish __instance, bool __result, UnityEngine.Vector3 __state)
+        {
+            if (__result || (!Schools.IsOurs(__instance) && !Schools.IsCalled(__instance))) return;
+            Waypoint(__instance) = __state;
+        }
+    }
 }

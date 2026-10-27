@@ -133,13 +133,35 @@ namespace Rodnarok
             check.That(stayed, "the character stayed seated on the " + seat + " while drawing");
             check.That(lowered, "drawing on the " + seat + ", the character's head stays lowered as seated; at the end " + heads());
 
+            // The float is watched for a while: when any float shows, whether this game owns it, and
+            // what the character was doing should it go again, so a failed cast says what happened.
             FishingFloat cast = null;
-            for (var waited = 0f; waited < 3f && cast == null; waited += Time.deltaTime)
+            var shownAt = -1f;
+            var ownedShown = false;
+            var goneAt = -1f;
+            var goneWhile = "";
+            for (var waited = 0f; waited < CastWatch && cast == null; waited += Time.deltaTime)
             {
+                var any = FishingFloat.GetAllInstances().Where(f => f != null).ToList();
+                if (any.Count > 0 && shownAt < 0f)
+                {
+                    shownAt = waited;
+                    var view = any[0].GetComponent<ZNetView>();
+                    ownedShown = view != null && view.IsValid() && view.IsOwner();
+                }
+                if (shownAt >= 0f && any.Count == 0 && goneAt < 0f)
+                {
+                    goneAt = waited;
+                    goneWhile = "in an attack " + player.InAttack() + ", drawing " + player.IsDrawingBow() + ", attached " + player.IsAttached() + ", rod tip " + (Utils.FindChild(player.transform, "_RodTop") != null);
+                }
                 cast = OwnFloats().FirstOrDefault();
                 yield return null;
             }
-            check.That(cast != null, "sitting on the " + seat + ", the rod casts; the throw meets " + (SelfTestPlaces.ThrowBlockedBy(player.transform.position, water) ?? "nothing"));
+            var told = shownAt < 0f
+                ? "no float showed within " + CastWatch.ToString("0", CultureInfo.InvariantCulture) + " s"
+                : "a float showed after " + shownAt.ToString("0.0", CultureInfo.InvariantCulture) + " s, owned here " + ownedShown
+                    + (goneAt < 0f ? "" : ", gone after " + goneAt.ToString("0.0", CultureInfo.InvariantCulture) + " s while " + goneWhile);
+            check.That(cast != null, "sitting on the " + seat + ", the rod casts; " + told + "; the throw meets " + (SelfTestPlaces.ThrowBlockedBy(player.transform.position, water) ?? "nothing"));
             check.That(seated(), "the character is still seated on the " + seat + " after the cast");
             for (var waited = 0f; waited < 1.5f; waited += Time.deltaTime) yield return null;
             check.That(posed(), "a moment after the cast the character's head is lowered as seated on the " + seat + ", " + heads());
@@ -163,6 +185,9 @@ namespace Rodnarok
             if (cast != null) ZNetScene.instance.Destroy(cast.gameObject);
             yield return null;
         }
+
+        /// <summary>How long a cast is watched for its float, in seconds.</summary>
+        private const float CastWatch = 6f;
 
         /// <summary>How much lower than standing the head must be for the character to be seen seated, in metres.</summary>
         private const float SeatedDrop = 0.3f;
