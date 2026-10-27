@@ -35,7 +35,6 @@ namespace Rodnarok
         private void Update()
         {
             Schools.Tick();
-            BaitWatch.Tick();
             SeatedRodPose.Tick();
             if (ZNetScene.instance == null)
             {

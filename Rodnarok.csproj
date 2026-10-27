@@ -8,7 +8,7 @@
     <Version>0.1.0</Version>
     <Authors>isimp</Authors>
     <Product>Rodnarok</Product>
-    <Description>Fishing where the bait decides the fish, in any water: bites and fights you can read, a fight that stalls instead of breaking you, fishing from a seat, and a piece that calms the waves around it.</Description>
+    <Description>Fishing you can read: the bait decides the fish in any water, wary schools, bites and fights shown on the float and the crosshair, a line that snaps if held too long, fishing from a seat, and a trophy that calms the waves.</Description>
     <Copyright>Copyright (c) 2026 isimp</Copyright>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
