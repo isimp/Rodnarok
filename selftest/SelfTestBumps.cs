@@ -52,8 +52,9 @@ namespace Rodnarok
                 ff.Setup(player, Vector3.zero, 0f, null, null, bait);
 
                 // The first bump, with the float's height just before it.
+                // Heights are taken over the water at the float, so the waves lifting it count for nothing.
                 var bumpsBefore = Bites.BumpsForTest;
-                var lastHeight = ff.transform.position.y;
+                var lastHeight = OverWater(ff);
                 var heightBefore = lastHeight;
                 var bumpedAt = -1f;
                 for (var waited = 0f; waited < 60f && bumpedAt < 0f; waited += Time.deltaTime)
@@ -64,7 +65,7 @@ namespace Rodnarok
                         heightBefore = lastHeight;
                         break;
                     }
-                    lastHeight = ff.transform.position.y;
+                    lastHeight = OverWater(ff);
                     yield return null;
                 }
                 check.That(bumpedAt > 0f, "the fish picked to take the bait bumps the float within 60 s of the cast");
@@ -72,13 +73,13 @@ namespace Rodnarok
                 check.That(Nibbler(ff) == null || NibbleTime(ff) < bumpedAt - 0.5f, "a bump is no nibble the game knows of");
 
                 // The float dips a little; reeling as it does, as a player taking it for the bite would, hooks nothing.
-                var lowest = ff.transform.position.y;
-                for (var waited = 0f; waited < 0.3f; waited += Time.deltaTime)
+                var lowest = OverWater(ff);
+                for (var waited = 0f; waited < 0.4f; waited += Time.deltaTime)
                 {
-                    lowest = Mathf.Min(lowest, ff.transform.position.y);
+                    lowest = Mathf.Min(lowest, OverWater(ff));
                     yield return null;
                 }
-                check.That(lowest < heightBefore - 0.02f, "the bump dips the float, by " + (heightBefore - lowest).ToString("0.00", CultureInfo.InvariantCulture) + " m");
+                check.That(lowest < heightBefore - 0.05f, "the bump dips the float under the water's own rise and fall, by " + (heightBefore - lowest).ToString("0.00", CultureInfo.InvariantCulture) + " m");
                 SelfTestDraw.Reeling = true;
                 for (var waited = 0f; waited < 0.3f; waited += Time.deltaTime) yield return null;
                 SelfTestDraw.Reeling = false;
@@ -101,5 +102,8 @@ namespace Rodnarok
                 gear.PutBack();
             }
         }
+
+        /// <summary>How high the float rides over the water's surface at it, waves included.</summary>
+        private static float OverWater(FishingFloat ff) => ff.transform.position.y - SelfTestCalm.SurfaceAt(ff.transform.position);
     }
 }

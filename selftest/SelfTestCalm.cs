@@ -125,7 +125,15 @@ namespace Rodnarok
                     yield return null;
                 }
                 var wavesAfter = StdDev(waves);
-                if (wavesBefore > 0.05f) check.That(wavesAfter < wavesBefore * 0.5f, "the waves beside the stand fell from " + wavesBefore.ToString("0.00", CultureInfo.InvariantCulture) + " m to " + wavesAfter.ToString("0.00", CultureInfo.InvariantCulture) + " m");
+                // Compared only where the calm reaches the measured place strongly: the tiles' corners lie
+                // 64 m apart, so a place a few metres off the stand may lie mostly between corners beyond its reach.
+                var leftHere = ShareLeftAt(water.Value, before);
+                if (wavesBefore > 0.05f && leftHere <= StrongCalm)
+                    check.That(wavesAfter < wavesBefore * 0.5f, "the waves beside the stand fell from " + wavesBefore.ToString("0.00", CultureInfo.InvariantCulture) + " m to " + wavesAfter.ToString("0.00", CultureInfo.InvariantCulture)
+                        + " m, the calm leaving " + (leftHere * 100f).ToString("0", CultureInfo.InvariantCulture) + "% of them there");
+                else if (wavesBefore > 0.05f)
+                    check.Note("the calm leaves " + (leftHere * 100f).ToString("0", CultureInfo.InvariantCulture) + "% of the waves where they are measured, too much to tell apart from the wind's own change; waves "
+                        + wavesBefore.ToString("0.00", CultureInfo.InvariantCulture) + " m before, " + wavesAfter.ToString("0.00", CultureInfo.InvariantCulture) + " m after");
                 SelfTestPictures.Take("water-with-stand");
                 yield return null;
 
@@ -164,7 +172,37 @@ namespace Rodnarok
         }
 
         /// <summary>The water surface the game floats things on at a place, waves included.</summary>
-        private static float SurfaceAt(Vector3 place)
+        /// <summary>At most how much of its waves the calm may leave at the measured place for them to be compared.</summary>
+        private const float StrongCalm = 0.35f;
+
+        /// <summary>
+        /// The share of its own waves the calm leaves at a place: the corner values of its tile now
+        /// against before, blended across the tile as the game blends them; the waves there follow
+        /// that blend.
+        /// </summary>
+        private static float ShareLeftAt(Vector3 place, Dictionary<WaterVolume, float[]> before)
+        {
+            foreach (var pair in before)
+            {
+                var tile = pair.Key;
+                if (tile == null) continue;
+                var c = tile.transform.position;
+                if (Mathf.Abs(place.x - c.x) > CalmWater.Tile / 2f || Mathf.Abs(place.z - c.z) > CalmWater.Tile / 2f) continue;
+                var corners = CalmWater.Corners(new Spot(c.x, c.y, c.z));
+                var now = Corners(tile);
+                float after = 0f, was = 0f;
+                for (var i = 0; i < 4 && i < corners.Length; i++)
+                {
+                    var weight = (1f - Mathf.Abs(place.x - corners[i].X) / CalmWater.Tile) * (1f - Mathf.Abs(place.z - corners[i].Z) / CalmWater.Tile);
+                    after += weight * now[i];
+                    was += weight * pair.Value[i];
+                }
+                return was > 0f ? after / was : 1f;
+            }
+            return 1f;
+        }
+
+        internal static float SurfaceAt(Vector3 place)
         {
             foreach (var tile in WaterVolume.Instances)
             {

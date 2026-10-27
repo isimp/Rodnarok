@@ -311,7 +311,8 @@ namespace Rodnarok
             private string BaseState()
             {
                 if (_animator == null) return "nothing";
-                var now = Name(_animator.GetCurrentAnimatorStateInfo(0).shortNameHash);
+                var state = _animator.GetCurrentAnimatorStateInfo(0);
+                var now = Name(state.shortNameHash) + " " + (state.normalizedTime * state.length).ToString("0.0", CultureInfo.InvariantCulture) + " s in";
                 return _animator.IsInTransition(0) ? now + " crossing to " + Name(_animator.GetNextAnimatorStateInfo(0).shortNameHash) : now;
             }
 

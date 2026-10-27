@@ -13,6 +13,8 @@ namespace Rodnarok
     /// the game's base layer shows a sitting pose plainly, and put back right after the game's
     /// animation whenever it shows anything else, its standing throw, its pull or its sitting
     /// down again. Every game does this for every player it sees, whatever the motions setting.
+    /// The pose is kept only once the sitting state has lasted a while (<see cref="SeatedBody.SettleSeconds"/>),
+    /// so the game sitting the player down again inside that state is put back too.
     /// </summary>
     internal static class SeatedBodies
     {
@@ -35,6 +37,7 @@ namespace Rodnarok
             public Quaternion[] Turns;
             public Vector3 HipsAt;
             public bool Kept;
+            public float SwitchOffSince = -1f;
         }
 
         private static readonly Dictionary<Player, Body> Bodies = new Dictionary<Player, Body>();
@@ -51,20 +54,32 @@ namespace Rodnarok
             {
                 if (player == null) continue;
                 var animator = AnimatorOf(player);
-                if (animator == null || !animator.isHuman || !SeatSwitchOn(animator))
+                if (animator == null || !animator.isHuman)
                 {
                     Bodies.Remove(player);
                     continue;
                 }
-                if (!Bodies.TryGetValue(player, out var body))
+                Bodies.TryGetValue(player, out var body);
+                if (!SeatSwitchOn(animator))
+                {
+                    // A switch blinking off for a moment keeps the pose; off for longer, the player stood up.
+                    if (body == null) continue;
+                    if (body.SwitchOffSince < 0f) body.SwitchOffSince = Time.time;
+                    if (SeatedBody.Forgets(Time.time - body.SwitchOffSince)) Bodies.Remove(player);
+                    continue;
+                }
+                if (body == null)
                 {
                     body = new Body { Bones = Kept.Select(animator.GetBoneTransform).ToArray(), Turns = new Quaternion[Kept.Length] };
                     Bodies[player] = body;
                 }
-                var sittingPose = SitStates.Contains(animator.GetCurrentAnimatorStateInfo(0).shortNameHash);
+                body.SwitchOffSince = -1f;
+                var state = animator.GetCurrentAnimatorStateInfo(0);
+                var sittingPose = SitStates.Contains(state.shortNameHash);
+                var inPose = state.normalizedTime * state.length;
                 var crossing = animator.IsInTransition(0);
-                if (SeatedBody.Keeps(true, sittingPose, crossing)) Keep(body);
-                else if (SeatedBody.PutsBack(true, sittingPose, crossing, body.Kept)) PutBack(body);
+                if (SeatedBody.Keeps(true, sittingPose, crossing, inPose)) Keep(body);
+                else if (SeatedBody.PutsBack(true, sittingPose, crossing, inPose, body.Kept)) PutBack(body);
             }
             foreach (var gone in Bodies.Keys.Where(p => p == null).ToList()) Bodies.Remove(gone);
         }

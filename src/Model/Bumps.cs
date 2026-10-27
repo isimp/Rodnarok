@@ -20,8 +20,8 @@ namespace Rodnarok
         public const float Apart = 0.5f;
 
         /// <summary>How long a bump pulls the float, in seconds, and how hard, in metres a second each second.</summary>
-        public const float PullSeconds = 0.2f;
-        public const float Pull = 8f;
+        public const float PullSeconds = 0.25f;
+        public const float Pull = 12f;
 
         /// <summary>
         /// When the bumps come, in seconds after the fish is picked, in order, for a fish that goes for
