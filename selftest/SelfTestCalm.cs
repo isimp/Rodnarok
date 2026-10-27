@@ -16,6 +16,9 @@ namespace Rodnarok
     /// </summary>
     internal static class SelfTestCalm
     {
+        /// <summary>The size of the game's water tiles, in metres: a post calms the corners of the tiles its reach touches.</summary>
+        private const float TileReach = 64f;
+
         private static readonly AccessTools.FieldRef<WaterVolume, float[]> Corners = AccessTools.FieldRefAccess<WaterVolume, float[]>("m_normalizedDepth");
 
         public static IEnumerable<Scenario> All()
@@ -41,6 +44,18 @@ namespace Rodnarok
             if (!water.HasValue) yield break;
 
             var rules = PlayRules.Now;
+
+            // A post already standing where it calms the water here leaves nothing for the test's post to
+            // show: its calm is measured only where no other post reaches the tiles around it.
+            var near = CalmWaters.PostsForTest.Where(p => Vector3.Distance(p, water.Value) < rules.CalmReach + 2f * TileReach).ToList();
+            if (near.Count > 0)
+            {
+                check.Note("a Serpent post already stands " + near.Min(p => Vector3.Distance(p, water.Value)).ToString("0", CultureInfo.InvariantCulture)
+                    + " m from the water here, so the calm was not measured; run it where no post stands within "
+                    + (rules.CalmReach + 2f * TileReach).ToString("0", CultureInfo.InvariantCulture) + " m");
+                yield break;
+            }
+
             var tiles = WaterVolume.Instances.Where(w => w != null && w.m_heightmap != null).ToList();
             var before = tiles.ToDictionary(w => w, w => (float[])Corners(w).Clone());
             var waves = new List<float>();

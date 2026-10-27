@@ -61,5 +61,28 @@ namespace Rodnarok.Tests
         {
             Assert.Equal("Fish2", GameFish.Table().Choose("FishingBait", 1.0));
         }
+
+        [Fact]
+        public void WhereOnlyOneOfABaitsFishFitsTheWaterThatOneAlwaysComes()
+        {
+            var table = GameFish.Table();
+            for (var roll = 0.0; roll < 1.0; roll += 0.05)
+                Assert.Equal("Fish8", table.Choose("FishingBaitOcean", roll, fish => fish != "Fish3"));
+        }
+
+        [Fact]
+        public void WhereBothFitTheyStillComeInEqualShare()
+        {
+            var table = GameFish.Table();
+            var comes = Enumerable.Range(0, 100).Select(i => table.Choose("FishingBaitOcean", (i + 0.5) / 100, fish => true)).ToList();
+            Assert.Equal(50, comes.Count(f => f == "Fish3"));
+            Assert.Equal(50, comes.Count(f => f == "Fish8"));
+        }
+
+        [Fact]
+        public void WhereNoneOfABaitsFishFitsNoneComes()
+        {
+            Assert.Null(GameFish.Table().Choose("FishingBaitOcean", 0.3, fish => false));
+        }
     }
 }

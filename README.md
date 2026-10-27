@@ -22,7 +22,7 @@ Install Rodnarök on every player and on a dedicated server. The server's settin
 
 ## Settings
 
-All settings are in `BepInEx/config/isimp.Rodnarok.cfg`, and `/rodnarok` in the chat tells where.
+All settings are in `BepInEx/config/isimp.Rodnarok.cfg`, and `/rodnarok` in the chat tells where. `CastHints`, your own setting and off at first, makes each cast say at the top left which of the bait's fish can come to the water there and which would need bigger or deeper water.
 
 ## Other mods
 

@@ -50,9 +50,15 @@ namespace Rodnarok
             bait != null && _fish.TryGetValue(bait, out var list) ? list : NoFish;
 
         /// <summary>The fish that comes to a bait for a roll from 0 to 1, each of its fish taking an equal share of the rolls; null for what no fish takes.</summary>
-        public string Choose(string bait, double roll)
+        public string Choose(string bait, double roll) => Choose(bait, roll, null);
+
+        /// <summary>
+        /// The fish that comes to a bait for a roll from 0 to 1 among those of its fish that fit, such
+        /// as the water at a float; each fitting fish takes an equal share of the rolls; null for none.
+        /// </summary>
+        public string Choose(string bait, double roll, Func<string, bool> fits)
         {
-            var fish = FishFor(bait);
+            IReadOnlyList<string> fish = fits == null ? FishFor(bait) : FishFor(bait).Where(fits).ToList();
             if (fish.Count == 0) return null;
             var index = (int)Math.Floor(Math.Max(0.0, roll) * fish.Count);
             return fish[Math.Min(index, fish.Count - 1)];

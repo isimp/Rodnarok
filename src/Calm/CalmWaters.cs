@@ -28,6 +28,10 @@ namespace Rodnarok
         private static float _reach = -1f;
         private static float _keep = -1f;
 
+        /// <summary>Where the posts standing in the loaded world are, for the self-test.</summary>
+        [ForTest]
+        public static IEnumerable<Vector3> PostsForTest => Posts.Where(p => p != null).Select(p => p.transform.position);
+
         public static void Add(CalmPost post)
         {
             Posts.Add(post);

@@ -26,6 +26,10 @@ namespace Rodnarok
         private static ConfigEntry<float> _easeSeconds;
         private static ConfigEntry<float> _runSpeed;
         private static ConfigEntry<bool> _callWorldFish;
+        private static ConfigEntry<bool> _castHints;
+
+        /// <summary>Whether this player's casts show which fish can come; a player's own choice, never the server's.</summary>
+        public static bool CastHints => _castHints != null && _castHints.Value;
 
         /// <summary>The rules as the settings stand now; the defaults before they are bound.</summary>
         public static FishingRules Rules =>
@@ -76,6 +80,9 @@ namespace Rodnarok
                 new ConfigDescription("Metres of line a second a struggling fish takes out while the line is eased off, with Tension on. The line breaks past the game's 30 m as ever.", new AcceptableValueRange<float>(0f, 10f))));
             _callWorldFish = Sync(config.Bind(Section, "CallWorldFish", rules.CallWorldFish,
                 "Whether a fish of the world's own that takes the bait, within the float's reach and able to swim to it, is called to the float instead of a school. Off, a school comes wherever the water allows one."));
+            // Shown only to this player, so each player sets it and the server never does.
+            _castHints = config.Bind("Display", "CastHints", CastHint.OnByDefault,
+                "Whether each cast shows a short line at the top left saying which of the bait's fish can come to the water there, and which would need bigger or deeper water. Your own setting; the server's does not apply.");
         }
 
         private static ConfigEntry<T> Sync<T>(ConfigEntry<T> entry)

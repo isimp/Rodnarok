@@ -54,7 +54,7 @@ A fish needs water as deep as its own swimming depth: the Tuna swims no shallowe
 
 ## Settings
 
-All settings are in `BepInEx/config/isimp.Rodnarok.cfg`, section `Fishing`, and are synced to every player by ServerSync (vendored, see `src/ServerSync/README.md`). The server's values win for everyone on it, and the entries are locked, so only an admin changes them in game. A player without Rodnarök cannot join a server that has it.
+One setting is each player's own and never synced: `CastHints` in section `Display`, off by default, makes each cast show a line in the game's top-left messages naming the bait's fish the water there fits, those that would need bigger or deeper water, or the fish of the world's own called (`CastHint`). The fish of a bait are rolled only among those the water fits, each as likely, so a bait two fish take never turns a cast away for the one that does not fit. The others are in `BepInEx/config/isimp.Rodnarok.cfg`, section `Fishing`, and are synced to every player by ServerSync (vendored, see `src/ServerSync/README.md`). The server's values win for everyone on it, and the entries are locked, so only an admin changes them in game. A player without Rodnarök cannot join a server that has it.
 
 ## Building and testing
 

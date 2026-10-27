@@ -42,6 +42,7 @@ namespace Rodnarok
         private static readonly AccessTools.FieldRef<Fish, Vector3> SpawnPoint = AccessTools.FieldRefAccess<Fish, Vector3>("m_spawnPoint");
         private static readonly AccessTools.FieldRef<Fish, float> SwimTimer = AccessTools.FieldRefAccess<Fish, float>("m_swimTimer");
         private static readonly AccessTools.FieldRef<Fish, Vector3> FishWaypoint = AccessTools.FieldRefAccess<Fish, Vector3>("m_waypoint");
+        private static readonly AccessTools.FieldRef<Fish, FishingFloat> WaypointFloat = AccessTools.FieldRefAccess<Fish, FishingFloat>("m_waypointFF");
         private static readonly AccessTools.FieldRef<Fish, bool> Jumping = AccessTools.FieldRefAccess<Fish, bool>("m_isJumping");
         private static readonly Action<Fish> Jump = AccessTools.MethodDelegate<Action<Fish>>(AccessTools.Method(typeof(Fish), "Jump"));
 
@@ -66,6 +67,7 @@ namespace Rodnarok
             public bool Hooked;
             public bool Spooked;
             public Fish Called;
+            public bool Hinted;
         }
 
         private static readonly Dictionary<FishingFloat, Cast> Casts = new Dictionary<FishingFloat, Cast>();
@@ -78,20 +80,26 @@ namespace Rodnarok
         private static readonly Dictionary<Fish, Cast> CalledBy = new Dictionary<Fish, Cast>();
         private static float _nextSweep;
 
-        /// <summary>Where each of the schools' fish was a while ago, for telling how one came to land: its time, nearest player and water beneath.</summary>
+        /// <summary>
+        /// Where each of the schools' fish was over the last seconds, for telling how one came to land:
+        /// its time, nearest player, water beneath, how far its place to swim and its home lay, and
+        /// whether it was going for a float.
+        /// </summary>
         private struct Sample
         {
             public float At;
             public float Player;
             public float Water;
+            public float Place;
+            public float Home;
+            public bool ForFloat;
         }
 
-        private static readonly Dictionary<Fish, Sample> Recent = new Dictionary<Fish, Sample>();
-        private static readonly Dictionary<Fish, Sample> Earlier = new Dictionary<Fish, Sample>();
+        private static readonly Dictionary<Fish, List<Sample>> Trail = new Dictionary<Fish, List<Sample>>();
         private static float _nextSample;
 
-        /// <summary>How long ago, in seconds, the earlier of a fish's samples is kept.</summary>
-        private const float SampleBack = 5f;
+        /// <summary>How many one-second samples of a fish are kept.</summary>
+        private const int TrailLength = 8;
 
         /// <summary>What a float with too little water for a school says, once.</summary>
         private const string TooLittleWaterText = "Too little water here for a school. Fish of the world's own still bite.";
@@ -329,19 +337,39 @@ namespace Rodnarok
         {
             var book = FishBook.Current;
             var bait = cast.Float.GetBait();
-            var kind = book?.Baits.Choose(bait, Random.value);
-            var prefab = book?.Prefab(kind);
+            if (book == null)
+            {
+                cast.Came = true;
+                return;
+            }
+            var home = cast.Float.transform.position;
+            var surface = home.y;
+
+            // The fish is rolled among those of the bait's fish the water here fits, so a bait two fish
+            // take never turns a cast away for the one that does not fit while the other would.
+            var starts = new Dictionary<string, StartPlace?>();
+            bool Fits(string candidate)
+            {
+                var fish = book.Prefab(candidate)?.GetComponent<Fish>();
+                if (fish == null) return false;
+                var place = StartFor(home, surface, fish.m_minDepth);
+                var fits = place.HasValue && HasWayOut(home, surface, fish.m_minDepth);
+                starts[candidate] = fits ? place : null;
+                return fits;
+            }
+            var roll = Random.value;
+            var kind = book.Baits.Choose(bait, roll, Fits) ?? book.Baits.Choose(bait, roll);
+            var prefab = book.Prefab(kind);
             if (prefab == null)
             {
                 cast.Came = true;
                 return;
             }
             var template = prefab.GetComponent<Fish>();
-            var home = cast.Float.transform.position;
-            var surface = home.y;
             var worldFish = Callable(cast.Float, bait);
-            var start = StartFor(home, surface, template.m_minDepth);
-            var water = Arrival.WaterAllowsSchool(start.HasValue, start.HasValue && HasWayOut(home, surface, template.m_minDepth));
+            var start = starts.TryGetValue(kind, out var found) ? found : null;
+            Hint(cast, book, bait, starts, worldFish);
+            var water = Arrival.WaterAllowsSchool(start.HasValue, start.HasValue);
             switch (Arrival.Choose(worldFish != null, water, GoneSince.Count == 0, Rules))
             {
                 case ArrivalChoice.Call:
@@ -440,6 +468,31 @@ namespace Rodnarok
                 Drop(fish);
             }
         }
+
+        /// <summary>
+        /// With cast hints on, the cast says once which of the bait's fish the water here fits, which
+        /// would need bigger or deeper water, or which fish of the world's own is called.
+        /// </summary>
+        private static void Hint(Cast cast, FishBook book, string bait, Dictionary<string, StartPlace?> starts, Fish called)
+        {
+            if (cast.Hinted || !Settings.CastHints || Player.m_localPlayer == null) return;
+            cast.Hinted = true;
+            var here = new List<string>();
+            var better = new List<string>();
+            foreach (var kind in book.Baits.FishFor(bait))
+            {
+                var name = ShownName(book.Prefab(kind)?.GetComponent<Fish>());
+                if (name == null) continue;
+                if (starts.TryGetValue(kind, out var start) && start.HasValue) here.Add(name);
+                else better.Add(name);
+            }
+            var calledName = called != null && Rules.CallWorldFish ? ShownName(called) : null;
+            Player.m_localPlayer.Message(MessageHud.MessageType.TopLeft, CastHint.Text(here, better, calledName));
+        }
+
+        /// <summary>A fish's name as the player reads it, in the game's language.</summary>
+        private static string ShownName(Fish fish) =>
+            fish == null ? null : Localization.instance != null ? Localization.instance.Localize(fish.m_name) : fish.m_name;
 
         /// <summary>A fish of the world's own is called to the float: it goes for it at its next choice, hearing nobody meanwhile.</summary>
         private static void Call(Cast cast, Fish fish)
@@ -756,26 +809,46 @@ namespace Rodnarok
             WetOnce.Remove(fish);
             MadeAt.Remove(fish);
             LeaptAt.Remove(fish);
-            Recent.Remove(fish);
-            Earlier.Remove(fish);
+            Trail.Remove(fish);
         }
 
-        /// <summary>Notes where each of the schools' fish is, keeping one note from about five seconds before.</summary>
+        /// <summary>Notes where each of the schools' fish is, once a second, keeping the last few notes.</summary>
         private static void TakeSamples()
         {
-            var now = Time.time;
             foreach (var fish in Ours)
             {
                 if (fish == null) continue;
-                var had = Recent.TryGetValue(fish, out var last);
-                if (had && now - last.At < SampleBack) continue;
-                if (had) Earlier[fish] = last;
-                Recent[fish] = Here(fish);
+                if (!Trail.TryGetValue(fish, out var trail))
+                {
+                    trail = new List<Sample>();
+                    Trail[fish] = trail;
+                }
+                trail.Add(Here(fish));
+                if (trail.Count > TrailLength) trail.RemoveAt(0);
             }
         }
 
-        private static Sample Here(Fish fish) =>
-            new Sample { At = Time.time, Player = NearestPlayer(fish.transform.position), Water = WaterDepth(fish.transform.position) };
+        private static Sample Here(Fish fish)
+        {
+            var at = fish.transform.position;
+            return new Sample
+            {
+                At = Time.time,
+                Player = NearestPlayer(at),
+                Water = WaterDepth(at),
+                Place = Across(at, FishWaypoint(fish)),
+                Home = Across(at, SpawnPoint(fish)),
+                ForFloat = WaypointFloat(fish) != null,
+            };
+        }
+
+        private static string Told(Sample sample, float now)
+        {
+            var c = System.Globalization.CultureInfo.InvariantCulture;
+            return (now - sample.At).ToString("0", c) + " s before " + sample.Player.ToString("0.0", c) + " m from the nearest player over "
+                + sample.Water.ToString("0.0", c) + " m of water, its place " + sample.Place.ToString("0", c) + " m and home " + sample.Home.ToString("0", c) + " m off"
+                + (sample.ForFloat ? ", going for a float" : "");
+        }
 
         /// <summary>How far under the water the ground beneath a fish may lie and still count as the shore, in metres.</summary>
         private const float ShoreDepth = 0.3f;
@@ -803,10 +876,11 @@ namespace Rodnarok
             var here = Here(fish);
             parts.Add("now " + here.Player.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " m from the nearest player over "
                 + here.Water.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " m of water");
-            var before = Earlier.TryGetValue(fish, out var earlier) ? earlier : Recent.TryGetValue(fish, out var recent) ? recent : default(Sample?);
-            if (before.HasValue)
-                parts.Add((now - before.Value.At).ToString("0", System.Globalization.CultureInfo.InvariantCulture) + " s before " + before.Value.Player.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)
-                    + " m from the nearest player over " + before.Value.Water.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " m of water");
+            if (here.ForFloat) parts.Add("going for a float");
+            if (Trail.TryGetValue(fish, out var trail))
+            {
+                for (var i = trail.Count - 1; i >= 0; i--) parts.Add(Told(trail[i], now));
+            }
             parts.Add(WetOnce.Contains(fish) ? "had been in the water" : "never in the water");
             return string.Join(", ", parts);
         }
@@ -824,8 +898,7 @@ namespace Rodnarok
             WetOnce.Clear();
             MadeAt.Clear();
             LeaptAt.Clear();
-            Recent.Clear();
-            Earlier.Clear();
+            Trail.Clear();
             CalledBy.Clear();
         }
 

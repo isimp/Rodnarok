@@ -243,7 +243,7 @@ namespace Rodnarok
                 var skill = player.GetSkillFactor(Skills.SkillType.Fishing);
                 var expected = rules.StallStaminaPerSecond * Mathf.Lerp(1f, rules.SkillCostShare, skill) + Mathf.Lerp(ff.m_hookedStaminaPerSec, ff.m_hookedStaminaPerSecMaxSkill, skill);
                 float struggleTime = 0f, heldTime = 0f, heldStamina = 0f, heldLine = 0f, strained = 0f;
-                float easedTime = 0f, easedLineOut = 0f, eased = 0f, restTime = 0f, restLine = 0f;
+                float easedTime = 0f, easedLineOut = 0f, eased = 0f, restTime = 0f, restHeld = 0f, restLine = 0f;
                 var ringWrong = 0;
                 var ringSeen = "";
                 float struggleDepth = 0f, restDepth = 0f;
@@ -256,7 +256,7 @@ namespace Rodnarok
                 for (var waited = 0f; waited < 30f; waited += Time.deltaTime)
                 {
                     if (ff == null || ff.GetCatch() != fish) break;
-                    if (heldTime >= 0.5f && easedTime >= 0.5f && restTime >= 0.5f) break;
+                    if (heldTime >= 0.5f && easedTime >= 0.5f && restHeld >= 0.5f) break;
                     var struggled = fish.IsEscaping();
                     var line = LineLength(ff);
                     player.AddStamina(player.GetMaxStamina());
@@ -299,7 +299,11 @@ namespace Rodnarok
                         restDepth += depth * Time.deltaTime;
                         restTime += Time.deltaTime;
                         restSplashes += Thrash.SplashesForTest - splashesAtStep;
-                        if (holding) restLine += line - LineLength(ff);
+                        if (holding)
+                        {
+                            restHeld += Time.deltaTime;
+                            restLine += line - LineLength(ff);
+                        }
                         if (!RingIs(red: false, strainNow)) { ringWrong++; ringSeen = RingSeen(); }
                         if (!picturedRest && restTime > 0.3f) picturedRest = Picture(check, "ring-rest");
                         if (holding && restLine > 0.5f) WikiPanel(check, "rest", "Rest: reel it in");
@@ -330,8 +334,9 @@ namespace Rodnarok
                     check.That(Near(eased / easedTime, 1f / rules.EaseSeconds), "easing off lets the strain go over " + rules.EaseSeconds.ToString("0.0", CultureInfo.InvariantCulture) + " s, " + (eased / easedTime * 100f).ToString("0", CultureInfo.InvariantCulture) + "% a second");
                     check.That(Near(easedLineOut / easedTime, rules.RunSpeed), "eased off, the struggling fish takes line out at " + rules.RunSpeed.ToString("0.0", CultureInfo.InvariantCulture) + " m/s, " + (easedLineOut / easedTime).ToString("0.0", CultureInfo.InvariantCulture) + " m/s");
                 }
-                check.That(restTime >= 0.5f && restLine / Mathf.Max(restTime, 0.01f) > 0.5f * Mathf.Lerp(rules.ReelSpeed, rules.ReelSpeedMaxSkill, skill),
-                    "holding while it rests reels it in, " + restLine.ToString("0.0", CultureInfo.InvariantCulture) + " m in " + restTime.ToString("0.0", CultureInfo.InvariantCulture) + " s");
+                // Rests near the bank are left unreeled, so the reel is measured over the time the line was held.
+                check.That(restHeld >= 0.5f && restLine / Mathf.Max(restHeld, 0.01f) > 0.5f * Mathf.Lerp(rules.ReelSpeed, rules.ReelSpeedMaxSkill, skill),
+                    "holding while it rests reels it in, " + restLine.ToString("0.0", CultureInfo.InvariantCulture) + " m in " + restHeld.ToString("0.0", CultureInfo.InvariantCulture) + " s held");
 
                 // The four moments together, as the picture for the mod's pages.
                 yield return null;
