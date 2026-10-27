@@ -138,7 +138,7 @@ namespace Rodnarok
                 stayed &= seated();
                 if (waited >= 0.5f) lowered &= posed();
                 if (waited >= 1f && !pictured) pictured = Picture(check, "sitting-" + seat + "-drawing");
-                legs.Look();
+                legs.Look("drawing");
                 yield return null;
             }
             SelfTestDraw.Drawing = false;
@@ -169,7 +169,7 @@ namespace Rodnarok
                     goneWhile = "in an attack " + player.InAttack() + ", drawing " + player.IsDrawingBow() + ", attached " + player.IsAttached() + ", rod tip " + (Utils.FindChild(player.transform, "_RodTop") != null);
                 }
                 cast = OwnFloats().FirstOrDefault();
-                legs.Look();
+                legs.Look("casting");
                 yield return null;
             }
             var told = shownAt < 0f
@@ -180,7 +180,7 @@ namespace Rodnarok
             check.That(seated(), "the character is still seated on the " + seat + " after the cast");
             for (var waited = 0f; waited < 1.5f; waited += Time.deltaTime)
             {
-                legs.Look();
+                legs.Look("after the cast");
                 yield return null;
             }
             check.That(posed(), "a moment after the cast the character's head is lowered as seated on the " + seat + ", " + heads());
@@ -204,7 +204,7 @@ namespace Rodnarok
                 stayed &= seated();
                 pullShown |= SeatedRodPose.ShowingForTest(player) == SeatedPose.Reel;
                 if (!picturedReel && waited >= 0.8f) picturedReel = Picture(check, "sitting-" + seat + "-reeling");
-                legs.Look(hands: true);
+                legs.Look("reeling", hands: true);
                 yield return null;
             }
             SelfTestDraw.Reeling = false;
@@ -212,7 +212,7 @@ namespace Rodnarok
             // The pull hands back to the rod held out.
             for (var waited = 0f; waited < 0.5f && cast != null; waited += Time.deltaTime)
             {
-                legs.Look(hands: true);
+                legs.Look("after the reel", hands: true);
                 yield return null;
             }
             check.That(pullShown, "reeling on the " + seat + ", the arms show the pull");
@@ -248,6 +248,8 @@ namespace Rodnarok
             private readonly Dictionary<HumanBodyBones, Vector3> _seated = new Dictionary<HumanBodyBones, Vector3>();
             private float _moved;
             private string _movedBone = "";
+            private string _movedWhen = "";
+            private string _handWhen = "";
             private Vector3? _hand;
             private float _handFastest;
 
@@ -263,7 +265,7 @@ namespace Rodnarok
             }
 
             /// <summary>Takes this frame's look; the hand is followed only where asked.</summary>
-            public void Look(bool hands = false)
+            public void Look(string when, bool hands = false)
             {
                 foreach (var pair in _seated)
                 {
@@ -273,10 +275,18 @@ namespace Rodnarok
                     if (moved <= _moved) continue;
                     _moved = moved;
                     _movedBone = pair.Key.ToString();
+                    _movedWhen = when + ", the game playing " + BaseState();
                 }
                 var hand = hands ? Where(HumanBodyBones.RightHand) : null;
                 if (hand.HasValue && _hand.HasValue && Time.deltaTime > 0f)
-                    _handFastest = Mathf.Max(_handFastest, Vector3.Distance(hand.Value, _hand.Value) / Time.deltaTime);
+                {
+                    var speed = Vector3.Distance(hand.Value, _hand.Value) / Time.deltaTime;
+                    if (speed > _handFastest)
+                    {
+                        _handFastest = speed;
+                        _handWhen = when + ", the game playing " + BaseState() + ", the motions showing " + SeatedRodPose.ShowingForTest(_player);
+                    }
+                }
                 _hand = hand;
             }
 
@@ -284,12 +294,28 @@ namespace Rodnarok
             {
                 check.That(_seated.Count == LegBones.Length, "the character's hips and legs are found on its rig, " + _seated.Count + " of " + LegBones.Length);
                 check.That(_moved <= LegsHold, "the hips and legs stay as seated on the " + seat + " through the draw, the cast and the reel, at most "
-                    + LegsHold.ToString("0.00", CultureInfo.InvariantCulture) + " m off, " + _moved.ToString("0.00", CultureInfo.InvariantCulture) + " m at " + _movedBone);
+                    + LegsHold.ToString("0.00", CultureInfo.InvariantCulture) + " m off, " + _moved.ToString("0.00", CultureInfo.InvariantCulture) + " m at " + _movedBone + ", " + _movedWhen);
                 check.That(AfterAnimation.PlacesForTest() == 2, "the motions are turned right after the game's animation, before anything reads the bones: placed " + AfterAnimation.PlacesForTest() + " times in Unity's loop, 2 wanted");
                 check.That(SeatedRodPose.TroubleForTest == null, "the fishing motions are read from the game's clips for the character's rig: " + SeatedRodPose.TroubleForTest);
                 check.That(_handFastest <= HandSpeed, "on the " + seat + " the hand flows into the pull and back without a jump, at most "
-                        + HandSpeed.ToString("0", CultureInfo.InvariantCulture) + " m/s, " + _handFastest.ToString("0.0", CultureInfo.InvariantCulture) + " m/s");
+                        + HandSpeed.ToString("0", CultureInfo.InvariantCulture) + " m/s, " + _handFastest.ToString("0.0", CultureInfo.InvariantCulture) + " m/s, " + _handWhen);
             }
+
+            /// <summary>The game's sitting and fishing states its base animation layer can play, by name.</summary>
+            private static readonly Dictionary<int, string> States = new[]
+            {
+                "SitChair", "Emote_sit", "SitShip", "SitThrone", "SitDivan", "Fishing throw", "Fishing blocking (pull)", "Idle_Fishing",
+            }.ToDictionary(Animator.StringToHash, n => n);
+
+            /// <summary>What the game's base animation layer plays now, and what it is crossing over to.</summary>
+            private string BaseState()
+            {
+                if (_animator == null) return "nothing";
+                var now = Name(_animator.GetCurrentAnimatorStateInfo(0).shortNameHash);
+                return _animator.IsInTransition(0) ? now + " crossing to " + Name(_animator.GetNextAnimatorStateInfo(0).shortNameHash) : now;
+            }
+
+            private static string Name(int hash) => States.TryGetValue(hash, out var name) ? name : "state " + hash.ToString(CultureInfo.InvariantCulture);
 
             private Vector3? Where(HumanBodyBones bone)
             {
