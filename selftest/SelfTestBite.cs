@@ -237,6 +237,9 @@ namespace Rodnarok
                 // Holding the line in rhythm, as a player would: through a rest it reels in, through a
                 // struggle it stalls for the stall cost and strains the line, and eased off in time the
                 // strain goes while the fish takes line out. Near the bank the rests are left unreeled.
+                // A character without food has 50 stamina and a hooked fish lets none come back, so the
+                // character is kept on full stamina, topped up before each frame's reading so the cost
+                // the game takes within the frame is still measured as it is.
                 var skill = player.GetSkillFactor(Skills.SkillType.Fishing);
                 var expected = rules.StallStaminaPerSecond * Mathf.Lerp(1f, rules.SkillCostShare, skill) + Mathf.Lerp(ff.m_hookedStaminaPerSec, ff.m_hookedStaminaPerSecMaxSkill, skill);
                 float struggleTime = 0f, heldTime = 0f, heldStamina = 0f, heldLine = 0f, strained = 0f;
@@ -252,10 +255,11 @@ namespace Rodnarok
                 var holding = true;
                 for (var waited = 0f; waited < 30f; waited += Time.deltaTime)
                 {
-                    if (ff == null || ff.GetCatch() != fish || player.GetStamina() < 15f) break;
+                    if (ff == null || ff.GetCatch() != fish) break;
                     if (heldTime >= 0.5f && easedTime >= 0.5f && restTime >= 0.5f) break;
                     var struggled = fish.IsEscaping();
                     var line = LineLength(ff);
+                    player.AddStamina(player.GetMaxStamina());
                     var stamina = player.GetStamina();
                     var strain = Lines.StrainOf(ff);
                     if (struggled) holding = strain >= EaseAt ? false : strain <= HoldAgainAt || holding;
@@ -346,21 +350,19 @@ namespace Rodnarok
                 {
                     PlayRules.ForTest = rules.With(snapSeconds: 0.3f);
                     var snappedBefore = Lines.SnappedForTest;
-                    // The fight so far may have spent the stamina a hold needs, and a hooked fish lets none
-                    // come back; the character is given it, as the stamina is the game's to refill anyway.
-                    var staminaBefore = player.GetStamina();
-                    player.AddStamina(player.GetMaxStamina());
+                    // Kept on full stamina as above. The line is held only while the fish struggles, which
+                    // is all a snap needs; held through a rest it would be reeled in and landed instead.
                     var struggledSince = false;
-                    SelfTestHold.Holding = true;
-                    for (var waited = 0f; waited < 20f && ff != null && ff.GetCatch() == fish && player.GetStamina() >= 15f; waited += Time.deltaTime)
+                    for (var waited = 0f; waited < 20f && ff != null && ff.GetCatch() == fish; waited += Time.deltaTime)
                     {
-                        struggledSince |= fish.IsEscaping();
+                        player.AddStamina(player.GetMaxStamina());
+                        var struggling = fish.IsEscaping();
+                        struggledSince |= struggling;
+                        SelfTestHold.Holding = struggling;
                         yield return null;
                     }
                     SelfTestHold.Holding = false;
-                    check.That(Lines.SnappedForTest == snappedBefore + 1, "held through a struggle past the snap time, the line snapped; stamina "
-                        + staminaBefore.ToString("0", CultureInfo.InvariantCulture) + " before, given " + player.GetMaxStamina().ToString("0", CultureInfo.InvariantCulture)
-                        + ", " + player.GetStamina().ToString("0", CultureInfo.InvariantCulture) + " at the end, a struggle seen " + struggledSince);
+                    check.That(Lines.SnappedForTest == snappedBefore + 1, "held through a struggle past the snap time, the line snapped; a struggle came within 20 s " + struggledSince);
                     check.That(ff == null || ff.GetCatch() == null, "after the snap nothing is on the line");
                     check.That(fish == null || !fish.IsHooked(), "after the snap the fish swims free");
                     PlayRules.ForTest = rules;
