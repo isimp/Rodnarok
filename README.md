@@ -20,6 +20,10 @@ Install Rodnarök on every player and on a dedicated server. The server's settin
 
 All settings are in `BepInEx/config/isimp.Rodnarok.cfg`, and `/rodnarok` in the chat tells where.
 
+## Thanks
+
+Several ideas come from ChillFishing by Lenson: above all calming the water where you fish, and also fishing while seated and fish that come to you rather than you travelling to them.
+
 ## More
 
 Technical notes and build instructions are on GitHub at https://github.com/isimp/Rodnarok
