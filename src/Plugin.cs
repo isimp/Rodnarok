@@ -18,6 +18,7 @@ namespace Rodnarok
     public class Plugin : BaseUnityPlugin
     {
         private Harmony _harmony;
+        private bool _afterAnimation;
 
         private void Awake()
         {
@@ -27,6 +28,8 @@ namespace Rodnarok
             _harmony = new Harmony(About.Guid);
             _harmony.PatchAll(typeof(Plugin).Assembly);
             Commands.Register();
+            _afterAnimation = AfterAnimation.Hook(SeatedRodPose.Turn);
+            if (!_afterAnimation) Log.Warning("Unity's loop has no place after its animation; seated fishing motions are turned in the late scripts instead, and a line or cape may flicker.");
         }
 
         private void Update()
@@ -49,9 +52,13 @@ namespace Rodnarok
 
         private void LateUpdate()
         {
-            if (ZNetScene.instance != null) SeatedRodPose.Turn();
+            if (!_afterAnimation) SeatedRodPose.Turn();
         }
 
-        private void OnDestroy() => _harmony?.UnpatchSelf();
+        private void OnDestroy()
+        {
+            if (_afterAnimation) AfterAnimation.Unhook();
+            _harmony?.UnpatchSelf();
+        }
     }
 }

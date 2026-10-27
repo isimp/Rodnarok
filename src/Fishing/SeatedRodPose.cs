@@ -77,6 +77,9 @@ namespace Rodnarok
             public float ReelTime;
             public float HoldTime;
             public float IdleSince;
+
+            /// <summary>Each bone's turn as last set here, to tell whether the animator has posed it since.</summary>
+            public Quaternion[] Written;
         }
 
         private static readonly Dictionary<Player, Overlay> Overlays = new Dictionary<Player, Overlay>();
@@ -131,9 +134,14 @@ namespace Rodnarok
             }
         }
 
-        /// <summary>Called every frame after the game has animated: turns the arm and head bones of each seated player toward the motion.</summary>
+        /// <summary>
+        /// Called right after the game's animators have posed the characters: turns the arm and head
+        /// bones of each seated player toward the motion. A bone the animator has not posed again since
+        /// the last turn keeps that turn, so a step without new animation turns nothing twice.
+        /// </summary>
         public static void Turn()
         {
+            if (ZNetScene.instance == null) return;
             foreach (var pair in Overlays)
             {
                 var o = pair.Value;
@@ -143,7 +151,7 @@ namespace Rodnarok
                 for (var i = 0; i < o.Bones.Length; i++)
                 {
                     var bone = o.Bones[i];
-                    if (bone == null) continue;
+                    if (bone == null || o.Written[i] == bone.localRotation) continue;
                     var target = Quaternion.identity;
                     var taken = 0f;
                     Mix(ref target, ref taken, o.Poses.Throw.At(b.ThrowShare * o.Poses.Throw.Length, i), b.Throw);
@@ -152,6 +160,7 @@ namespace Rodnarok
                     if (taken <= 0f) continue;
                     if (o.Poses.Anchored[i]) bone.rotation = Quaternion.Slerp(bone.rotation, o.Root.rotation * target, weight);
                     else bone.localRotation = Quaternion.Slerp(bone.localRotation, target, weight);
+                    o.Written[i] = bone.localRotation;
                 }
             }
         }
@@ -224,7 +233,7 @@ namespace Rodnarok
                 Unfit.Remove(avatar);
                 Read[avatar] = poses;
             }
-            return new Overlay { Poses = poses, Bones = poses.Bones.Select(animator.GetBoneTransform).ToArray(), Root = animator.transform };
+            return new Overlay { Poses = poses, Bones = poses.Bones.Select(animator.GetBoneTransform).ToArray(), Root = animator.transform, Written = new Quaternion[poses.Bones.Length] };
         }
 
         /// <summary>

@@ -285,6 +285,7 @@ namespace Rodnarok
                 check.That(_seated.Count == LegBones.Length, "the character's hips and legs are found on its rig, " + _seated.Count + " of " + LegBones.Length);
                 check.That(_moved <= LegsHold, "the hips and legs stay as seated on the " + seat + " through the draw, the cast and the reel, at most "
                     + LegsHold.ToString("0.00", CultureInfo.InvariantCulture) + " m off, " + _moved.ToString("0.00", CultureInfo.InvariantCulture) + " m at " + _movedBone);
+                check.That(AfterAnimation.PlacesForTest() == 2, "the motions are turned right after the game's animation, before anything reads the bones: placed " + AfterAnimation.PlacesForTest() + " times in Unity's loop, 2 wanted");
                 check.That(SeatedRodPose.TroubleForTest == null, "the fishing motions are read from the game's clips for the character's rig: " + SeatedRodPose.TroubleForTest);
                 check.That(_handFastest <= HandSpeed, "on the " + seat + " the hand flows into the pull and back without a jump, at most "
                         + HandSpeed.ToString("0", CultureInfo.InvariantCulture) + " m/s, " + _handFastest.ToString("0.0", CultureInfo.InvariantCulture) + " m/s");
