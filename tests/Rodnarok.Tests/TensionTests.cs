@@ -19,17 +19,17 @@ namespace Rodnarok.Tests
         }
 
         [Fact]
-        public void HoldingThroughAStruggleSnapsTheLineAfterTwoSeconds()
+        public void HoldingThroughAStruggleSnapsTheLineAfterOneSecond()
         {
-            Assert.Equal(2f, Rules.SnapSeconds);
-            Assert.False(Tension.Snaps(Hold(0f, struggling: true, holding: true, seconds: 1.9f)));
-            Assert.True(Tension.Snaps(Hold(0f, struggling: true, holding: true, seconds: 2.02f)));
+            Assert.Equal(1f, Rules.SnapSeconds);
+            Assert.False(Tension.Snaps(Hold(0f, struggling: true, holding: true, seconds: 0.9f)));
+            Assert.True(Tension.Snaps(Hold(0f, struggling: true, holding: true, seconds: 1.02f)));
         }
 
         [Fact]
         public void HalfTheSnapTimeHeldStrainsTheLineHalfway()
         {
-            Assert.Equal(0.5f, Hold(0f, struggling: true, holding: true, seconds: 1f), 2);
+            Assert.Equal(0.5f, Hold(0f, struggling: true, holding: true, seconds: Rules.SnapSeconds / 2f), 2);
         }
 
         [Fact]
@@ -50,10 +50,10 @@ namespace Rodnarok.Tests
         [Fact]
         public void EasingOffBetweenHoldsCarriesAStruggleLongerThanTheSnapTime()
         {
-            var strain = Hold(0f, struggling: true, holding: true, seconds: 1.5f);
-            strain = Hold(strain, struggling: true, holding: false, seconds: 0.75f);
-            strain = Hold(strain, struggling: true, holding: true, seconds: 1.5f);
-            Assert.False(Tension.Snaps(strain), "3 s held in one struggle with a short ease between");
+            var strain = Hold(0f, struggling: true, holding: true, seconds: Rules.SnapSeconds * 0.75f);
+            strain = Hold(strain, struggling: true, holding: false, seconds: Rules.EaseSeconds * 0.4f);
+            strain = Hold(strain, struggling: true, holding: true, seconds: Rules.SnapSeconds * 0.6f);
+            Assert.False(Tension.Snaps(strain), "1.35 snap times held in one struggle with a short ease between");
         }
 
         [Fact]

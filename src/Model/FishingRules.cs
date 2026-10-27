@@ -25,7 +25,7 @@ namespace Rodnarok
         public bool Tension { get; private set; } = true;
 
         /// <summary>Seconds of holding through a struggle until the line snaps.</summary>
-        public float SnapSeconds { get; private set; } = 2f;
+        public float SnapSeconds { get; private set; } = 1f;
 
         /// <summary>Seconds of easing off until a line strained to snapping is unstrained.</summary>
         public float EaseSeconds { get; private set; } = 1f;
