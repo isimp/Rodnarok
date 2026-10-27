@@ -22,8 +22,8 @@ namespace Rodnarok
     /// <summary>Which fishing motion a seated player shows, from what they are doing.</summary>
     internal static class SeatedPoses
     {
-        /// <summary>Whether seated players show the fishing motions before a player switches them on.</summary>
-        public const bool OnByDefault = false;
+        /// <summary>Whether seated players show the fishing motions before a player switches them.</summary>
+        public const bool OnByDefault = true;
 
         public static SeatedPose For(bool seatedWithRod, bool drawing, bool casting, bool reeling, bool floatOut)
         {

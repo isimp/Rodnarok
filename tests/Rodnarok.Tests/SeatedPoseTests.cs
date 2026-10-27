@@ -47,9 +47,9 @@ namespace Rodnarok.Tests
         }
 
         [Fact]
-        public void SeatedMotionsAreOffUntilAPlayerTurnsThemOn()
+        public void SeatedMotionsAreOnUntilAPlayerTurnsThemOff()
         {
-            Assert.False(SeatedPoses.OnByDefault);
+            Assert.True(SeatedPoses.OnByDefault);
         }
 
         [Fact]
