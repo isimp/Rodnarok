@@ -74,7 +74,9 @@ namespace Rodnarok
             // and when the float was last seen, for its speed.
             public bool Away;
             public float QuietSince;
-            public int Startles;
+            public int Fright;
+            public bool Flinched;
+            public float FastSince = -1f;
             public float ReadyAt = -1f;
             public float Shyness;
             public Vector3 FloatSeen;
@@ -338,9 +340,10 @@ namespace Rodnarok
 
         /// <summary>
         /// A wary school (<see cref="Wary"/>) listens before it bites: a player heard at the float or
-        /// at the school, or the float dragged quickly through it, startles it; startled, it darts off,
-        /// comes back once all has been quiet a while, and leaves at the next startle. True while the
-        /// school is off the float or gone.
+        /// at the school startles it, and it darts a few metres off the noise; the float moved quickly
+        /// makes it flinch a little sidestep off the float. Either way it comes back once all is quiet
+        /// again, the flinch sooner; frights add up and many of them drive it off, as does the float
+        /// dragged through it a while. True while the school is off the float or gone.
         /// </summary>
         private static bool Startled(Cast cast)
         {
@@ -353,51 +356,96 @@ namespace Rodnarok
                 cast.FloatSeen = at;
                 cast.FloatSeenAt = now;
             }
-            var heard = Player.GetPlayerNoiseRange(at) ?? Player.GetPlayerNoiseRange(Centre(cast.Fish));
+            var heard = HeardAt(at) ?? HeardAt(Centre(cast.Fish));
             var near = cast.Fish.Any(f => Across(f.transform.position, at) < Near);
-            if (heard != null || Wary.FloatStartles(cast.FloatSpeed, near))
+            var fast = Wary.FloatStartles(cast.FloatSpeed, near);
+            if (!fast) cast.FastSince = -1f;
+            else if (cast.FastSince < 0f) cast.FastSince = now;
+            if (fast && Wary.Dragged(now - cast.FastSince))
+            {
+                StartledForTest++;
+                DriveOff(cast, at);
+                return true;
+            }
+            if (heard != null || fast)
             {
                 cast.QuietSince = now;
-                if (!cast.Away) Startle(cast, heard != null ? heard.transform.position : at);
+                // A flinching school heard to as well darts; a darting one is not made to flinch.
+                if (!cast.Away || (heard != null && cast.Flinched)) Fright(cast, heard != null ? heard.transform.position : at, heard != null);
             }
-            else if (cast.Away && Wary.ComesBack(now - cast.QuietSince))
+            else if (cast.Away && Wary.ComesBack(now - cast.QuietSince, cast.Flinched))
             {
                 ComeBack(cast);
             }
             return cast.Away || cast.Spooked;
         }
 
-        /// <summary>The school darts off from what startled it, or leaves for good at the last startle; no fish of it goes for the bait meanwhile.</summary>
-        private static void Startle(Cast cast, Vector3 from)
+        /// <summary>The player heard by a school at a place: the game's noise ranges, halved under water.</summary>
+        private static Player HeardAt(Vector3 place)
         {
-            cast.Startles++;
+            foreach (var player in Player.GetAllPlayers())
+            {
+                if (player != null && Wary.Heard(Vector3.Distance(player.transform.position, place), player.GetNoiseRange())) return player;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// A fright: a startle by noise darts the school a few metres off the noise, a flinch at the
+        /// float sidesteps it off the float; enough frights drive it off. No fish of it goes for the
+        /// bait meanwhile.
+        /// </summary>
+        private static void Fright(Cast cast, Vector3 from, bool heard)
+        {
+            cast.Fright += Wary.Fright(heard);
             StartledForTest++;
             cast.BumpsAt.Clear();
             cast.Biter = -1;
             cast.BiterFreeAt = float.MaxValue;
             cast.ReadyAt = -1f;
-            if (Wary.Leaves(cast.Startles))
+            if (Wary.Leaves(cast.Fright))
             {
-                cast.Spooked = true;
-                foreach (var fish in cast.Fish.ToList())
-                {
-                    if (fish != null && !fish.IsHooked()) Leave(fish, from);
-                }
-                cast.Fish.RemoveAll(f => f == null || !f.IsHooked());
+                DriveOff(cast, from);
                 return;
             }
             cast.Away = true;
+            cast.Flinched = !heard;
             foreach (var fish in cast.Fish)
             {
-                if (fish != null) Flee(fish, from);
+                if (fish != null) Sidestep(cast, fish, from, heard ? Wary.DartDistance : Wary.FlinchDistance);
             }
         }
 
-        /// <summary>All quiet again: the school swims back in from where it fled, as it swam in first.</summary>
+        /// <summary>The school leaves for good, diving out of sight as a school whose float is gone.</summary>
+        private static void DriveOff(Cast cast, Vector3 from)
+        {
+            cast.Spooked = true;
+            foreach (var fish in cast.Fish.ToList())
+            {
+                if (fish != null && !fish.IsHooked()) Leave(fish, from);
+            }
+            cast.Fish.RemoveAll(f => f == null || !f.IsHooked());
+        }
+
+        /// <summary>A fish swims quickly a few metres away from what frightened it, where the water lets it, and waits there.</summary>
+        private static void Sidestep(Cast cast, Fish fish, Vector3 from, float distance)
+        {
+            var view = fish.GetComponent<ZNetView>();
+            if (view == null || !view.IsValid() || !view.IsOwner()) return;
+            var place = fish.transform.position + Flat(fish.transform.position - from) * distance;
+            if (!DeepEnough(place, ZoneSystem.instance.m_waterLevel, fish.m_minDepth)) place = fish.transform.position;
+            SpawnPoint(fish) = place;
+            view.GetZDO().Set(ZDOVars.s_spawnPoint, place);
+            fish.m_swimRange = 1.5f;
+            if (cast.OwnSpeed > 0f) fish.m_speed = cast.OwnSpeed * fish.m_avoidSpeedScale;
+            SwimTimer(fish) = 0f;
+        }
+
+        /// <summary>All quiet again: the school swims back in from where it waited, as it swam in first.</summary>
         private static void ComeBack(Cast cast)
         {
             cast.Away = false;
-            foreach (var fish in cast.Fish) Fled.Remove(fish);
+            cast.Flinched = false;
             var from = Centre(cast.Fish);
             cast.Start = from;
             cast.StartUnder = cast.SwimUnder;

@@ -3,10 +3,13 @@ using Xunit;
 namespace Rodnarok.Tests
 {
     /// <summary>
-    /// A school is wary of the one fishing. It hears the game's noise: a player walking or running
-    /// near the float startles it, one sneaking, sitting or standing still does not. A float dragged
-    /// quickly through the school startles it too. Startled, it darts off and comes back once all is
-    /// quiet a while; startled a second time, it leaves. Close to the one fishing and in shallow
+    /// A school is wary of the one fishing, without vanishing at every step. Under water it hears
+    /// half of the game's noise: a player walking or running close to it startles it, one sneaking,
+    /// sitting or standing still never does; startled, it darts a few metres off and comes back once
+    /// all is quiet a moment. A float moved quickly, as a short reel does, only makes it flinch: a
+    /// little sidestep, back as soon as the float is still. Frights add up, a startle counting twice
+    /// a flinch, and only many of them make it leave; so does a float dragged through it for a
+    /// while, as reeling in does. Close to the one fishing and in shallow
     /// water it hesitates long before biting and often gives up and swims off; far out over deep
     /// water it bites as before.
     /// </summary>
@@ -16,27 +19,23 @@ namespace Rodnarok.Tests
         private const float Running = 30f;
 
         [Fact]
-        public void WalkingNearTheFloatIsHeard()
+        public void WalkingCloseToTheSchoolIsHeard()
         {
-            Assert.True(Wary.Heard(distance: 10f, noise: Walking));
+            Assert.True(Wary.Heard(distance: 5f, noise: Walking));
         }
 
         [Fact]
-        public void WalkingFarFromTheFloatIsNotHeard()
+        public void UnderWaterHalfTheGamesNoiseIsHeard()
         {
-            Assert.False(Wary.Heard(distance: 20f, noise: Walking));
-        }
-
-        [Fact]
-        public void AtTheEdgeOfTheNoiseNothingIsHeardAsInTheGame()
-        {
-            Assert.False(Wary.Heard(distance: Walking, noise: Walking));
+            Assert.False(Wary.Heard(distance: 10f, noise: Walking));
+            Assert.False(Wary.Heard(distance: Walking * Wary.Hearing, noise: Walking));
         }
 
         [Fact]
         public void RunningIsHeardFartherOut()
         {
-            Assert.True(Wary.Heard(distance: 20f, noise: Running));
+            Assert.True(Wary.Heard(distance: 12f, noise: Running));
+            Assert.False(Wary.Heard(distance: 20f, noise: Running));
         }
 
         [Fact]
@@ -46,17 +45,54 @@ namespace Rodnarok.Tests
         }
 
         [Fact]
-        public void AStartledSchoolComesBackOnlyOnceAllIsQuietAWhile()
+        public void AScaredSchoolComesBackOnlyOnceAllIsQuietAWhile()
         {
-            Assert.False(Wary.ComesBack(quietFor: Wary.QuietBeforeComingBack - 1f));
-            Assert.True(Wary.ComesBack(quietFor: Wary.QuietBeforeComingBack));
+            Assert.False(Wary.ComesBack(quietFor: Wary.QuietBeforeComingBack - 1f, flinched: false));
+            Assert.True(Wary.ComesBack(quietFor: Wary.QuietBeforeComingBack, flinched: false));
         }
 
         [Fact]
-        public void TheFirstStartleIsDartingOffTheSecondIsLeaving()
+        public void AFlinchingSchoolComesBackAsSoonAsTheFloatIsStill()
         {
-            Assert.False(Wary.Leaves(startles: 1));
-            Assert.True(Wary.Leaves(startles: 2));
+            Assert.False(Wary.ComesBack(quietFor: Wary.StillBeforeComingBack - 0.5f, flinched: true));
+            Assert.True(Wary.ComesBack(quietFor: Wary.StillBeforeComingBack, flinched: true));
+            Assert.True(Wary.StillBeforeComingBack < Wary.QuietBeforeComingBack);
+        }
+
+        [Fact]
+        public void AFlinchIsALittleSidestepAndAStartleAShortDart()
+        {
+            Assert.InRange(Wary.FlinchDistance, 2f, 5f);
+            Assert.InRange(Wary.DartDistance, Wary.FlinchDistance, 10f);
+        }
+
+        [Fact]
+        public void FiveShortReelsAreOnlyFlinchesTheSixthDrivesTheSchoolOff()
+        {
+            var fright = 0;
+            for (var i = 0; i < 5; i++) fright += Wary.Fright(heard: false);
+            Assert.False(Wary.Leaves(fright));
+            Assert.True(Wary.Leaves(fright + Wary.Fright(heard: false)));
+        }
+
+        [Fact]
+        public void TwoStartlesByNoiseDoNotDriveTheSchoolOffAThirdDoes()
+        {
+            Assert.False(Wary.Leaves(Wary.Fright(heard: true) * 2));
+            Assert.True(Wary.Leaves(Wary.Fright(heard: true) * 3));
+        }
+
+        [Fact]
+        public void AStartleCountsTwiceAFlinch()
+        {
+            Assert.Equal(2 * Wary.Fright(heard: false), Wary.Fright(heard: true));
+        }
+
+        [Fact]
+        public void AFloatDraggedThroughTheSchoolAWhileDrivesItOff()
+        {
+            Assert.False(Wary.Dragged(fastFor: Wary.DraggedSeconds - 0.1f));
+            Assert.True(Wary.Dragged(fastFor: Wary.DraggedSeconds));
         }
 
         [Fact]
