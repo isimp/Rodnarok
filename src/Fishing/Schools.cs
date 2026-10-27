@@ -216,6 +216,20 @@ namespace Rodnarok
         [ForTest]
         public static bool AwayForTest(FishingFloat ff) => ff != null && Casts.TryGetValue(ff, out var cast) && cast.Away;
 
+        /// <summary>A missed bite took the bait of a float this game cast: its school, or the fish called to it, moves on.</summary>
+        public static void BaitTaken(FishingFloat ff)
+        {
+            if (ff == null || !Casts.TryGetValue(ff, out var cast) || cast.Hooked) return;
+            if (cast.Called is object) CalledBy.Remove(cast.Called);
+            cast.Spooked = true;
+            cast.BumpsAt.Clear();
+            foreach (var fish in cast.Fish.ToList())
+            {
+                if (fish != null && !fish.IsHooked()) Leave(fish, ff.transform.position);
+            }
+            cast.Fish.RemoveAll(f => f == null || !f.IsHooked());
+        }
+
         /// <summary>How many schools this game spooked, for the self-test.</summary>
         [ForTest]
         public static int SpookedForTest { get; private set; }

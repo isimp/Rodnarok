@@ -23,6 +23,28 @@ namespace Rodnarok
 
         private static readonly Dictionary<FishingFloat, float> PulledUntil = new Dictionary<FishingFloat, float>();
         private static readonly Dictionary<FishingFloat, float> BumpedUntil = new Dictionary<FishingFloat, float>();
+        private static readonly AccessTools.FieldRef<FishingFloat, bool> BaitConsumed = AccessTools.FieldRefAccess<FishingFloat, bool>("m_baitConsumed");
+        private static readonly System.Func<FishingFloat, Character> Owner = AccessTools.MethodDelegate<System.Func<FishingFloat, Character>>(AccessTools.Method(typeof(FishingFloat), "GetOwner"));
+
+        /// <summary>The floats of this game whose bait missed bites took (<see cref="BaitLoss"/>), and how many bites each float missed.</summary>
+        private static readonly HashSet<FishingFloat> Bare = new HashSet<FishingFloat>();
+        private static readonly Dictionary<FishingFloat, int> Misses = new Dictionary<FishingFloat, int>();
+
+        /// <summary>What a player is told at a missed bite that only nibbled the bait, and at the one that took it.</summary>
+        private const string NibbledText = "The fish nibbled at the bait";
+        private const string TakenText = "The fish took the bait";
+
+        /// <summary>How many bites a float of this game missed, for the self-test.</summary>
+        [ForTest]
+        public static int MissesForTest(FishingFloat ff) => ff != null && Misses.TryGetValue(ff, out var n) ? n : 0;
+
+        /// <summary>Whether a float of this game is bare, for the self-test.</summary>
+        [ForTest]
+        public static bool BareForTest(FishingFloat ff) => ff != null && Bare.Contains(ff);
+
+        /// <summary>Whether the game counts a float's bait as used, so reeling it in gives none back, for the self-test.</summary>
+        [ForTest]
+        public static bool BaitUsedForTest(FishingFloat ff) => ff != null && BaitConsumed(ff);
 
         /// <summary>How many bumps floats of this game took, for the self-test.</summary>
         [ForTest]
@@ -71,7 +93,39 @@ namespace Rodnarok
         {
             PulledUntil.Remove(ff);
             BumpedUntil.Remove(ff);
+            Bare.Remove(ff);
+            Misses.Remove(ff);
         }
+
+        /// <summary>
+        /// The float's step in the game that owns it: a bite neither hooked nor any longer within the
+        /// hook window is a miss, and the fish that bit can no longer be hooked. The first misses only
+        /// nibble the bait; the last takes it: the float is left bare, the game counts its bait as
+        /// used so reeling it in gives none back, and the school moves on. The one fishing is told
+        /// each time.
+        /// </summary>
+        public static void WatchBait(FishingFloat ff)
+        {
+            if (ff == null || Bare.Contains(ff)) return;
+            var view = ff.GetComponent<ZNetView>();
+            if (view == null || !view.IsValid() || !view.IsOwner()) return;
+            var rules = PlayRules.Now;
+            if (!rules.BaitLost || !BaitLoss.Missed(Nibbler(ff) != null, ff.GetCatch() != null, Time.time - NibbleTime(ff), rules.HookWindow)) return;
+            Nibbler(ff) = null;
+            Misses.TryGetValue(ff, out var misses);
+            Misses[ff] = ++misses;
+            var taken = BaitLoss.Taken(rules.BaitLost, misses);
+            if (taken)
+            {
+                Bare.Add(ff);
+                BaitConsumed(ff) = true;
+                Schools.BaitTaken(ff);
+            }
+            if (Owner(ff) is Player player && player == Player.m_localPlayer) player.Message(MessageHud.MessageType.TopLeft, taken ? TakenText : NibbledText);
+        }
+
+        /// <summary>Whether a float takes no bite: its bait was taken.</summary>
+        public static bool Refuses(FishingFloat ff) => ff != null && Bare.Contains(ff);
 
         private static void PullFor(FishingFloat ff, Dictionary<FishingFloat, float> pulls, float pull)
         {

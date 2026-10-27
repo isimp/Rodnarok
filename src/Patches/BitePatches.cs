@@ -38,7 +38,15 @@ namespace Rodnarok
             Bites.StallLine(__instance, __state);
             Lines.Step(__instance);
             Bites.Pull(__instance);
+            Bites.WatchBait(__instance);
         }
+    }
+
+    /// <summary>A float whose bait a missed bite took takes no bite, at the game that owns it.</summary>
+    [HarmonyPatch(typeof(FishingFloat), "RPC_Nibble")]
+    internal static class BareFloatTakesNoBite
+    {
+        private static bool Prefix(FishingFloat __instance) => !Bites.Refuses(__instance);
     }
 
     /// <summary>A line the game breaks is told in the log with how it stood, as Rodnarök's own snaps are.</summary>

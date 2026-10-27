@@ -155,7 +155,7 @@ namespace Rodnarok
                 _wikiLight = EnvMan.IsDaylight();
                 // The school of a scenario before may still be leaving, and a new one waits for it.
                 foreach (var frame in SelfTestArrival.UntilNoSchoolLeaves()) yield return frame;
-                PlayRules.ForTest = Settings.Rules.With(waitMin: 1f, waitMax: 1f, schools: true, tension: true, callWorldFish: false, wary: false);
+                PlayRules.ForTest = Settings.Rules.With(waitMin: 1f, waitMax: 1f, schools: true, tension: true, callWorldFish: false, wary: false, baitLost: false);
                 var rules = PlayRules.Now;
                 var bait = baitPrefab.GetComponent<ItemDrop>().m_itemData.Clone();
                 bait.m_dropPrefab = baitPrefab;
