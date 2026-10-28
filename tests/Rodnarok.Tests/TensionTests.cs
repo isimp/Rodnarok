@@ -57,17 +57,43 @@ namespace Rodnarok.Tests
         }
 
         [Fact]
-        public void WhileEasedOffAStrugglingFishTakesLineOut()
+        public void WithTheArcEmptyAnEasedOffFishRunsAtFullSpeed()
         {
-            Assert.Equal(Rules.RunSpeed, Tension.LineOut(struggling: true, holding: false, seconds: 1f, Rules), 3);
+            Assert.Equal(Rules.RunSpeed, Tension.LineOut(0f, struggling: true, holding: false, seconds: 1f, Rules), 3);
             Assert.Equal(2f, Rules.RunSpeed);
+        }
+
+        [Fact]
+        public void TheMoreStrainStillOnTheLineTheSlowerAnEasedOffFishRuns()
+        {
+            Assert.Equal(Rules.RunSpeed * 0.5f, Tension.LineOut(0.5f, struggling: true, holding: false, seconds: 1f, Rules), 3);
+            Assert.Equal(Rules.RunSpeed * 0.1f, Tension.LineOut(0.9f, struggling: true, holding: false, seconds: 1f, Rules), 3);
+            Assert.True(Tension.LineOut(0.9f, true, false, 1f, Rules) < Tension.LineOut(0.3f, true, false, 1f, Rules));
+        }
+
+        [Fact]
+        public void TappingToKeepTheArcPartlyFilledLosesLessLineThanEasingRightOff()
+        {
+            // A player tapping the block button to keep the strain between a fifth and two fifths.
+            float strain = 0f, tappedOut = 0f, easedTime = 0f;
+            var holding = true;
+            for (var t = 0f; t < 3f; t += 0.02f)
+            {
+                holding = strain >= 0.4f ? false : strain <= 0.2f || holding;
+                strain = Tension.Step(strain, struggling: true, holding, 0.02f, Rules);
+                tappedOut += Tension.LineOut(strain, struggling: true, holding, 0.02f, Rules);
+                if (!holding) easedTime += 0.02f;
+            }
+            Assert.False(Tension.Snaps(strain));
+            Assert.True(easedTime > 1f, "the tapping eased off for more than a second");
+            Assert.InRange(tappedOut / easedTime, Rules.RunSpeed * 0.5f, Rules.RunSpeed * 0.85f);
         }
 
         [Fact]
         public void HeldOrRestingTheFishTakesNoLine()
         {
-            Assert.Equal(0f, Tension.LineOut(struggling: true, holding: true, seconds: 1f, Rules));
-            Assert.Equal(0f, Tension.LineOut(struggling: false, holding: false, seconds: 1f, Rules));
+            Assert.Equal(0f, Tension.LineOut(0f, struggling: true, holding: true, seconds: 1f, Rules));
+            Assert.Equal(0f, Tension.LineOut(0f, struggling: false, holding: false, seconds: 1f, Rules));
         }
 
         [Fact]
@@ -75,7 +101,7 @@ namespace Rodnarok.Tests
         {
             var off = Rules.With(tension: false);
             Assert.Equal(0f, Hold(0f, struggling: true, holding: true, seconds: 10f, off));
-            Assert.Equal(0f, Tension.LineOut(struggling: true, holding: false, seconds: 1f, off));
+            Assert.Equal(0f, Tension.LineOut(0f, struggling: true, holding: false, seconds: 1f, off));
         }
 
         [Theory]

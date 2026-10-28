@@ -7,7 +7,8 @@ namespace Rodnarok
     /// strains the line. Holding the line through a struggle strains it from none to snapped over
     /// the snap time. Easing off lets the strain go over the ease time, and while the fish rests it
     /// eases whether the line is held or not. A struggling fish takes line out while the line is
-    /// eased off. Without tension, holding never strains and no line goes out.
+    /// eased off, slower the more strain is still on it, so easing off in short taps loses less line
+    /// than letting go. Without tension, holding never strains and no line goes out.
     /// </summary>
     internal static class Tension
     {
@@ -23,8 +24,8 @@ namespace Rodnarok
         /// <summary>Whether a line this strained snaps.</summary>
         public static bool Snaps(float strain) => strain >= 1f;
 
-        /// <summary>Metres of line a struggling fish takes out in a step while the line is eased off.</summary>
-        public static float LineOut(bool struggling, bool holding, float seconds, FishingRules rules) =>
-            rules.Tension && struggling && !holding ? rules.RunSpeed * seconds : 0f;
+        /// <summary>Metres of line a struggling fish takes out in a step while the line is eased off: the run speed with no strain left, none at snapping.</summary>
+        public static float LineOut(float strain, bool struggling, bool holding, float seconds, FishingRules rules) =>
+            rules.Tension && struggling && !holding && !float.IsNaN(strain) ? rules.RunSpeed * seconds * (1f - Math.Max(0f, Math.Min(1f, strain))) : 0f;
     }
 }

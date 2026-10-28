@@ -74,7 +74,7 @@ namespace Rodnarok
                 Snap(ff, fish, view);
                 return;
             }
-            var lineOut = Tension.LineOut(struggling, holding, seconds, rules);
+            var lineOut = Tension.LineOut(line.Strain, struggling, holding, seconds, rules);
             if (lineOut > 0f)
             {
                 if (Running.Add(fish))

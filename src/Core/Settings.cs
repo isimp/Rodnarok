@@ -94,7 +94,7 @@ namespace Rodnarok
             _easeSeconds = Sync(config.Bind(Section, "EaseSeconds", rules.EaseSeconds,
                 new ConfigDescription("Seconds of easing off, or of the fish resting, until a line strained to snapping is unstrained, with Tension on.", new AcceptableValueRange<float>(0.1f, 10f))));
             _runSpeed = Sync(config.Bind(Section, "RunSpeed", rules.RunSpeed,
-                new ConfigDescription("Metres of line a second a struggling fish takes out while the line is eased off, with Tension on. The line breaks past the game's 30 m as ever.", new AcceptableValueRange<float>(0f, 10f))));
+                new ConfigDescription("Metres of line a second a struggling fish takes out while the line is eased off with no strain left on it, with Tension on; with strain still on the line it runs slower, half as fast at half strain. The line breaks past the game's 30 m as ever.", new AcceptableValueRange<float>(0f, 10f))));
             _callWorldFish = Sync(config.Bind(Section, "CallWorldFish", rules.CallWorldFish,
                 "Whether a fish of the world's own that takes the bait, within the float's reach and able to swim to it, is called to the float instead of a school. Off, a school comes wherever the water allows one."));
             _baitLost = Sync(config.Bind(Section, "BaitLost", rules.BaitLost,
