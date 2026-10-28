@@ -18,11 +18,14 @@ namespace Rodnarok
         private static readonly AccessTools.FieldRef<FishingFloat, float> LineLength = AccessTools.FieldRefAccess<FishingFloat, float>("m_lineLength");
         private static readonly Func<FishingFloat, Character> Owner = AccessTools.MethodDelegate<Func<FishingFloat, Character>>(AccessTools.Method(typeof(FishingFloat), "GetOwner"));
         private static readonly Action<FishingFloat, string, bool> Message = AccessTools.MethodDelegate<Action<FishingFloat, string, bool>>(AccessTools.Method(typeof(FishingFloat), "Message"));
+        private static readonly AccessTools.FieldRef<Character, bool> BlockPressed = AccessTools.FieldRefAccess<Character, bool>("m_blocking");
 
         private sealed class Line
         {
             public Fish Fish;
             public float Strain;
+            public float RunMetres;
+            public float RunSeconds;
         }
 
         private static readonly Dictionary<FishingFloat, Line> Strains = new Dictionary<FishingFloat, Line>();
@@ -74,12 +77,21 @@ namespace Rodnarok
             var lineOut = Tension.LineOut(struggling, holding, seconds, rules);
             if (lineOut > 0f)
             {
+                if (Running.Add(fish))
+                {
+                    line.RunMetres = 0f;
+                    line.RunSeconds = 0f;
+                    TellRun(ff, owner, line);
+                }
                 LineLength(ff) += lineOut;
-                Running.Add(fish);
+                line.RunMetres += lineOut;
+                line.RunSeconds += seconds;
             }
-            else
+            else if (Running.Remove(fish))
             {
-                Running.Remove(fish);
+                Log.Info("The fish stopped taking line: " + line.RunMetres.ToString("0.0", CultureInfo.InvariantCulture) + " m in "
+                    + line.RunSeconds.ToString("0.0", CultureInfo.InvariantCulture) + " s, " + (struggling ? "the hold counts again" : "it rests")
+                    + ", strain " + line.Strain.ToString("0.00", CultureInfo.InvariantCulture));
             }
         }
 
@@ -111,6 +123,21 @@ namespace Rodnarok
             if (_snapping || msg != "$msg_fishing_linebroke") return;
             Tell(ff, "the game broke it: the float got more than " + ff.m_breakDistance.ToString("0", CultureInfo.InvariantCulture)
                 + " m farther from the rod tip than the line is long, or more than " + ff.m_maxDistance.ToString("0", CultureInfo.InvariantCulture) + " m away");
+        }
+
+        /// <summary>Writes to the log why a struggling fish starts taking line: whether the block button was down, and what kept the game from counting it as a hold.</summary>
+        private static void TellRun(FishingFloat ff, Character owner, Line line)
+        {
+            var player = owner as Player;
+            var why = !BlockPressed(owner) ? "the line is eased off (block button up)"
+                : !owner.IsBlocking() ? "the block button is down but the game does not count it as blocking ("
+                    + (owner.InAttack() ? "attacking, " : "") + (owner.InDodge() ? "dodging, " : "") + (owner.InPlaceMode() ? "building, " : "")
+                    + (owner.IsEncumbered() ? "overweight, " : "") + (owner.InMinorAction() ? "in a minor action, " : "") + (owner.IsStaggering() ? "staggered, " : "")
+                    + "on " + owner.GetType().Name + ")"
+                : "the block button is down but stamina is out";
+            Log.Info("The fish takes line, " + why + ": line " + LineLength(ff).ToString("0.0", CultureInfo.InvariantCulture) + " m"
+                + ", strain " + line.Strain.ToString("0.00", CultureInfo.InvariantCulture)
+                + (player != null ? ", stamina " + player.GetStamina().ToString("0", CultureInfo.InvariantCulture) : ""));
         }
 
         /// <summary>Writes to the log why and how a line broke, so a break nobody saw coming can be traced.</summary>

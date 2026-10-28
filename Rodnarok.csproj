@@ -5,7 +5,7 @@
     <AssemblyName>Rodnarok</AssemblyName>
     <RootNamespace>Rodnarok</RootNamespace>
     <LangVersion>latest</LangVersion>
-    <Version>0.1.0</Version>
+    <Version>0.1.1</Version>
     <Authors>isimp</Authors>
     <Product>Rodnarok</Product>
     <Description>Fishing you can read: the bait decides the fish in any water, wary schools, bites and fights shown on the float and the crosshair, a line that snaps if held too long, fishing from a seat, and a trophy that calms the waves.</Description>
