@@ -24,8 +24,16 @@ namespace Rodnarok
         {
             public Fish Fish;
             public float Strain;
+
+            // The struggle under way, told in one log line when it ends.
+            public bool Struggling;
+            public int Runs;
             public float RunMetres;
             public float RunSeconds;
+            public float HeldSeconds;
+            public int NotCounted;
+            public string NotCountedWhy;
+            public int OutOfStamina;
         }
 
         private static readonly Dictionary<FishingFloat, Line> Strains = new Dictionary<FishingFloat, Line>();
@@ -68,31 +76,71 @@ namespace Rodnarok
             var struggling = fish.IsEscaping();
             var holding = owner.IsBlocking() && owner.HaveStamina();
             var seconds = Time.fixedDeltaTime;
+            if (line.Struggling && !struggling) TellStruggle(ff, line, "it rests");
+            if (struggling && !line.Struggling) StartStruggle(line);
             line.Strain = Tension.Step(line.Strain, struggling, holding, seconds, rules);
             if (Tension.Snaps(line.Strain))
             {
+                if (line.Struggling) TellStruggle(ff, line, "the line snapped");
                 Snap(ff, fish, view);
                 return;
             }
+            if (struggling && holding) line.HeldSeconds += seconds;
             var lineOut = Tension.LineOut(line.Strain, struggling, holding, seconds, rules);
             if (lineOut > 0f)
             {
-                if (Running.Add(fish))
-                {
-                    line.RunMetres = 0f;
-                    line.RunSeconds = 0f;
-                    TellRun(ff, owner, line);
-                }
+                if (Running.Add(fish)) CountRun(owner, line);
                 LineLength(ff) += lineOut;
                 line.RunMetres += lineOut;
                 line.RunSeconds += seconds;
             }
-            else if (Running.Remove(fish))
+            else
             {
-                Log.Info("The fish stopped taking line: " + line.RunMetres.ToString("0.0", CultureInfo.InvariantCulture) + " m in "
-                    + line.RunSeconds.ToString("0.0", CultureInfo.InvariantCulture) + " s, " + (struggling ? "the hold counts again" : "it rests")
-                    + ", strain " + line.Strain.ToString("0.00", CultureInfo.InvariantCulture));
+                Running.Remove(fish);
             }
+        }
+
+        private static void StartStruggle(Line line)
+        {
+            line.Struggling = true;
+            line.Runs = 0;
+            line.RunMetres = 0f;
+            line.RunSeconds = 0f;
+            line.HeldSeconds = 0f;
+            line.NotCounted = 0;
+            line.NotCountedWhy = null;
+            line.OutOfStamina = 0;
+        }
+
+        /// <summary>Counts a run of a struggling fish by why the line was not held: the block button up, down but not taken as blocking by the game, or down with stamina out.</summary>
+        private static void CountRun(Character owner, Line line)
+        {
+            line.Runs++;
+            if (!BlockPressed(owner)) return;
+            if (owner.IsBlocking())
+            {
+                line.OutOfStamina++;
+                return;
+            }
+            line.NotCounted++;
+            line.NotCountedWhy = (owner.InAttack() ? "attacking, " : "") + (owner.InDodge() ? "dodging, " : "") + (owner.InPlaceMode() ? "building, " : "")
+                + (owner.IsEncumbered() ? "overweight, " : "") + (owner.InMinorAction() ? "in a minor action, " : "") + (owner.IsStaggering() ? "staggered, " : "")
+                + "on " + owner.GetType().Name;
+        }
+
+        /// <summary>Writes to the log how a struggle went, once as it ends: the line the fish took, in how many runs, eased off and held, and any run with the block button down that did not count as a hold.</summary>
+        private static void TellStruggle(FishingFloat ff, Line line, string end)
+        {
+            line.Struggling = false;
+            var text = "A struggle ended, " + end + ": the fish took " + line.RunMetres.ToString("0.0", CultureInfo.InvariantCulture) + " m in "
+                + line.Runs.ToString(CultureInfo.InvariantCulture) + (line.Runs == 1 ? " run" : " runs")
+                + ", eased off " + line.RunSeconds.ToString("0.0", CultureInfo.InvariantCulture) + " s, held " + line.HeldSeconds.ToString("0.0", CultureInfo.InvariantCulture) + " s"
+                + ", line " + LineLength(ff).ToString("0.0", CultureInfo.InvariantCulture) + " m";
+            if (line.NotCounted > 0)
+                text += ", " + line.NotCounted.ToString(CultureInfo.InvariantCulture) + " with the block button down but not taken as blocking by the game (last " + line.NotCountedWhy + ")";
+            if (line.OutOfStamina > 0)
+                text += ", " + line.OutOfStamina.ToString(CultureInfo.InvariantCulture) + " with the block button down and stamina out";
+            Log.Info(text);
         }
 
         /// <summary>The line breaks as the game breaks one: its message, the fish let go, the float gone, the break's effect.</summary>
@@ -125,21 +173,6 @@ namespace Rodnarok
                 + " m farther from the rod tip than the line is long, or more than " + ff.m_maxDistance.ToString("0", CultureInfo.InvariantCulture) + " m away");
         }
 
-        /// <summary>Writes to the log why a struggling fish starts taking line: whether the block button was down, and what kept the game from counting it as a hold.</summary>
-        private static void TellRun(FishingFloat ff, Character owner, Line line)
-        {
-            var player = owner as Player;
-            var why = !BlockPressed(owner) ? "the line is eased off (block button up)"
-                : !owner.IsBlocking() ? "the block button is down but the game does not count it as blocking ("
-                    + (owner.InAttack() ? "attacking, " : "") + (owner.InDodge() ? "dodging, " : "") + (owner.InPlaceMode() ? "building, " : "")
-                    + (owner.IsEncumbered() ? "overweight, " : "") + (owner.InMinorAction() ? "in a minor action, " : "") + (owner.IsStaggering() ? "staggered, " : "")
-                    + "on " + owner.GetType().Name + ")"
-                : "the block button is down but stamina is out";
-            Log.Info("The fish takes line, " + why + ": line " + LineLength(ff).ToString("0.0", CultureInfo.InvariantCulture) + " m"
-                + ", strain " + line.Strain.ToString("0.00", CultureInfo.InvariantCulture)
-                + (player != null ? ", stamina " + player.GetStamina().ToString("0", CultureInfo.InvariantCulture) : ""));
-        }
-
         /// <summary>Writes to the log why and how a line broke, so a break nobody saw coming can be traced.</summary>
         private static void Tell(FishingFloat ff, string why)
         {
@@ -163,6 +196,7 @@ namespace Rodnarok
         public static void Forget(FishingFloat ff)
         {
             if (ff == null || !Strains.TryGetValue(ff, out var line)) return;
+            if (line.Struggling) TellStruggle(ff, line, "the line is gone");
             if (line.Fish != null) Running.Remove(line.Fish);
             Strains.Remove(ff);
         }
