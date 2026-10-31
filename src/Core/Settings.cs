@@ -25,6 +25,7 @@ namespace Rodnarok
         private static ConfigEntry<float> _snapSeconds;
         private static ConfigEntry<float> _easeSeconds;
         private static ConfigEntry<float> _runSpeed;
+        private static ConfigEntry<bool> _pullBySpeed;
         private static ConfigEntry<bool> _callWorldFish;
         private static ConfigEntry<bool> _wary;
         private static ConfigEntry<bool> _baitLost;
@@ -63,6 +64,7 @@ namespace Rodnarok
                     snapSeconds: _snapSeconds.Value,
                     easeSeconds: _easeSeconds.Value,
                     runSpeed: _runSpeed.Value,
+                    pullBySpeed: _pullBySpeed.Value,
                     callWorldFish: _callWorldFish.Value,
                     wary: _wary.Value,
                     baitLost: _baitLost.Value);
@@ -90,11 +92,13 @@ namespace Rodnarok
             _tension = Sync(config.Bind(Section, "Tension", rules.Tension,
                 "Whether holding the line through a struggle strains it until it snaps, shown by the crosshair ring filling. Easing off lets the strain go while the fish takes line out. Off, holding through a struggle only stalls."));
             _snapSeconds = Sync(config.Bind(Section, "SnapSeconds", rules.SnapSeconds,
-                new ConfigDescription("Seconds of holding the line through a struggle until it snaps, with Tension on.", new AcceptableValueRange<float>(0.5f, 10f))));
+                new ConfigDescription("Seconds of holding the line through a Perch's struggle until it snaps, with Tension on. With PullBySpeed on, a faster fish snaps it sooner and a slower one later.", new AcceptableValueRange<float>(0.5f, 10f))));
             _easeSeconds = Sync(config.Bind(Section, "EaseSeconds", rules.EaseSeconds,
                 new ConfigDescription("Seconds of easing off, or of the fish resting, until a line strained to snapping is unstrained, with Tension on.", new AcceptableValueRange<float>(0.1f, 10f))));
             _runSpeed = Sync(config.Bind(Section, "RunSpeed", rules.RunSpeed,
-                new ConfigDescription("Metres of line a second a struggling fish takes out while the line is eased off with no strain left on it, with Tension on; with strain still on the line it runs slower, half as fast at half strain. The line breaks past the game's 30 m as ever.", new AcceptableValueRange<float>(0f, 10f))));
+                new ConfigDescription("Metres of line a second a struggling Perch takes out while the line is eased off with no strain left on it, with Tension on; with strain still on the line it runs slower, half as fast at half strain. With PullBySpeed on, a faster fish takes more line and a slower one less. The fish swims away as fast as the line goes out. The line breaks past the game's 30 m as ever.", new AcceptableValueRange<float>(0f, 10f))));
+            _pullBySpeed = Sync(config.Bind(Section, "PullBySpeed", rules.PullBySpeed,
+                "Whether each fish pulls the line by its own swimming speed in the game, with Tension on. SnapSeconds and RunSpeed are a Perch's (speed 3); a faster fish snaps a held line sooner and takes more line eased off, by the square root of its speed against the Perch's: a Pike (5) snaps it after 0.8 s and runs 2.6 m/s, a Tuna (10) after 0.55 s and 3.7 m/s, an Anglerfish (2) after 1.2 s and 1.6 m/s. Off, every fish pulls as a Perch."));
             _callWorldFish = Sync(config.Bind(Section, "CallWorldFish", rules.CallWorldFish,
                 "Whether a fish of the world's own that takes the bait, within the float's reach and able to swim to it, is called to the float instead of a school. Off, a school comes wherever the water allows one."));
             _baitLost = Sync(config.Bind(Section, "BaitLost", rules.BaitLost,

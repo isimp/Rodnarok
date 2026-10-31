@@ -11,7 +11,7 @@ namespace Rodnarok
     /// splash about three times a second; while it rests it splashes no more than the game has it.
     /// The struggle is read from the fish's saved state, as the game reads it, so every player
     /// sees it. A struggling fish whose line is eased off heads away from the one fishing as it
-    /// takes line out.
+    /// takes line out, swimming as fast as the line goes out, and back at its own speed after.
     /// </summary>
     internal static class Thrash
     {
@@ -30,8 +30,12 @@ namespace Rodnarok
         private static readonly AccessTools.FieldRef<Fish, Rigidbody> Body = AccessTools.FieldRefAccess<Fish, Rigidbody>("m_body");
         private static readonly AccessTools.FieldRef<Fish, Vector3> Waypoint = AccessTools.FieldRefAccess<Fish, Vector3>("m_waypoint");
         private static readonly AccessTools.FieldRef<Fish, ZNetView> View = AccessTools.FieldRefAccess<Fish, ZNetView>("m_nview");
+        private static readonly AccessTools.FieldRef<Fish, bool> Fast = AccessTools.FieldRefAccess<Fish, bool>("m_fast");
 
         private static readonly Dictionary<Fish, float> NextSplash = new Dictionary<Fish, float>();
+
+        /// <summary>A running fish's own speed from before its run, and the speed the run gave it.</summary>
+        private static readonly Dictionary<Fish, (float Own, float Run)> Runs = new Dictionary<Fish, (float, float)>();
 
         /// <summary>How many splashes this game drew for struggling fish, for the self-test.</summary>
         [ForTest]
@@ -48,6 +52,7 @@ namespace Rodnarok
             // kept apart, so the decimal stays and every game, the game's own splashes included, goes on
             // reading a struggle. The game owning the fish saves the end as a decimal too.
             if (view.IsOwner() && !fish.IsEscaping() && zdo.GetFloat(ZDOVars.s_escape) > 0f) zdo.Set(ZDOVars.s_escape, 0f);
+            if (view.IsOwner()) Pace(fish);
             if (zdo.GetInt(ZDOVars.s_hooked) != 1 || zdo.GetFloat(ZDOVars.s_escape) <= 0f)
             {
                 NextSplash.Remove(fish);
@@ -80,7 +85,36 @@ namespace Rodnarok
             if (fish.transform.position.y < target) Body(fish).AddForce(Vector3.up * PushUp, ForceMode.Acceleration);
         }
 
+        /// <summary>
+        /// A fish taking line out swims as fast as the line goes out; the game doubles a fish's speed
+        /// while it is fast near a player, so that is taken out. Once the run ends it gets its own
+        /// speed back, unless something else set its speed meanwhile.
+        /// </summary>
+        private static void Pace(Fish fish)
+        {
+            var run = Lines.RunSpeedOf(fish);
+            if (run > 0f)
+            {
+                var own = Runs.TryGetValue(fish, out var was) ? was.Own : fish.m_speed;
+                var speed = Fast(fish) && fish.m_avoidSpeedScale > 0f ? run / fish.m_avoidSpeedScale : run;
+                fish.m_speed = speed;
+                Runs[fish] = (own, speed);
+                return;
+            }
+            if (!Runs.TryGetValue(fish, out var ran)) return;
+            if (Mathf.Approximately(fish.m_speed, ran.Run)) fish.m_speed = ran.Own;
+            Runs.Remove(fish);
+        }
+
+        /// <summary>The speed a fish taking line out was given, 0 for one not running, for the self-test.</summary>
+        [ForTest]
+        public static float RunSpeedForTest(Fish fish) => fish != null && Runs.TryGetValue(fish, out var ran) ? ran.Run : 0f;
+
         /// <summary>Lets go of a fish no longer there.</summary>
-        public static void Forget(Fish fish) => NextSplash.Remove(fish);
+        public static void Forget(Fish fish)
+        {
+            NextSplash.Remove(fish);
+            Runs.Remove(fish);
+        }
     }
 }

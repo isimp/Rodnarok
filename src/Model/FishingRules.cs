@@ -24,14 +24,17 @@ namespace Rodnarok
         /// <summary>Whether holding through a struggle strains the line; without, holding only stalls.</summary>
         public bool Tension { get; private set; } = true;
 
-        /// <summary>Seconds of holding through a struggle until the line snaps.</summary>
+        /// <summary>Seconds of holding through a Perch's struggle until the line snaps.</summary>
         public float SnapSeconds { get; private set; } = 1f;
 
         /// <summary>Seconds of easing off until a line strained to snapping is unstrained.</summary>
         public float EaseSeconds { get; private set; } = 1f;
 
-        /// <summary>Metres of line a second a struggling fish takes out while the line is eased off.</summary>
+        /// <summary>Metres of line a second a struggling Perch takes out while the line is eased off.</summary>
         public float RunSpeed { get; private set; } = 2f;
+
+        /// <summary>Whether each fish pulls by its own speed, the snap time and run speed being a Perch's; without, every fish pulls as a Perch.</summary>
+        public bool PullBySpeed { get; private set; } = true;
 
         /// <summary>Metres of line a second reeled in at Fishing 0.</summary>
         public float ReelSpeed { get; private set; } = 2f;
@@ -89,7 +92,8 @@ namespace Rodnarok
             float? runSpeed = null,
             bool? callWorldFish = null,
             bool? wary = null,
-            bool? baitLost = null)
+            bool? baitLost = null,
+            bool? pullBySpeed = null)
         {
             var copy = (FishingRules)MemberwiseClone();
             copy.CallWorldFish = callWorldFish ?? CallWorldFish;
@@ -99,6 +103,7 @@ namespace Rodnarok
             copy.SnapSeconds = snapSeconds ?? SnapSeconds;
             copy.EaseSeconds = easeSeconds ?? EaseSeconds;
             copy.RunSpeed = runSpeed ?? RunSpeed;
+            copy.PullBySpeed = pullBySpeed ?? PullBySpeed;
             copy.LeaveBackstop = leaveBackstop ?? LeaveBackstop;
             copy.Schools = schools ?? Schools;
             copy.Bumps = bumps ?? Bumps;

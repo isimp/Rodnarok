@@ -244,6 +244,13 @@ namespace Rodnarok
                 // character is kept on full stamina, topped up before each frame's reading so the cost
                 // the game takes within the frame is still measured as it is.
                 var skill = player.GetSkillFactor(Skills.SkillType.Fishing);
+                // The fish pulls by its own speed: its snap time and run speed are scaled from a Perch's.
+                var fishSpeed = FishBook.Current?.Speed(Utils.GetPrefabName(fish.gameObject)) ?? 0f;
+                var snapSeconds = Tension.SnapSeconds(fishSpeed, rules);
+                var runSpeed = Tension.RunSpeed(fishSpeed, rules);
+                var ownSpeed = fish.m_speed;
+                int runFrames = 0, pacedWrong = 0, restPaced = 0, restSpeedWrong = 0;
+                var pacedSeen = "";
                 var expected = rules.StallStaminaPerSecond * Mathf.Lerp(1f, rules.SkillCostShare, skill) + Mathf.Lerp(ff.m_hookedStaminaPerSec, ff.m_hookedStaminaPerSecMaxSkill, skill);
                 float struggleTime = 0f, heldTime = 0f, heldStamina = 0f, heldLine = 0f, strained = 0f;
                 float easedTime = 0f, easedLineOut = 0f, easedRule = 0f, eased = 0f, restTime = 0f, restHeld = 0f, restLine = 0f;
@@ -298,7 +305,19 @@ namespace Rodnarok
                         {
                             easedTime += Time.deltaTime;
                             easedLineOut += LineLength(ff) - line;
-                            easedRule += rules.RunSpeed * (1f - (strain + strainNow) / 2f) * Time.deltaTime;
+                            easedRule += runSpeed * (1f - (strain + strainNow) / 2f) * Time.deltaTime;
+                            if (Lines.IsRunning(fish))
+                            {
+                                // The fish swims as fast as the line goes out, the rate changing with the strain from step to step.
+                                runFrames++;
+                                var given = Thrash.RunSpeedForTest(fish);
+                                var paying = Lines.RunSpeedOf(fish);
+                                if (Mathf.Abs(given - paying) > Mathf.Max(0.05f, paying * 0.25f))
+                                {
+                                    pacedWrong++;
+                                    pacedSeen = given.ToString("0.00", CultureInfo.InvariantCulture) + " m/s given, the line " + paying.ToString("0.00", CultureInfo.InvariantCulture) + " m/s";
+                                }
+                            }
                             eased += strain - strainNow;
                         }
                         if (!RingIs(red: true, strainNow)) { ringWrong++; ringSeen = RingSeen(); }
@@ -312,6 +331,11 @@ namespace Rodnarok
                         restDepth += depth * Time.deltaTime;
                         restTime += Time.deltaTime;
                         restSplashes += Thrash.SplashesForTest - splashesAtStep;
+                        if (!Lines.IsRunning(fish) && Thrash.RunSpeedForTest(fish) <= 0f)
+                        {
+                            restPaced++;
+                            if (!Mathf.Approximately(fish.m_speed, ownSpeed)) restSpeedWrong++;
+                        }
                         if (holding)
                         {
                             restHeld += Time.deltaTime;
@@ -340,15 +364,17 @@ namespace Rodnarok
                     var rate = heldStamina / heldTime;
                     check.That(rate > expected * 0.6f && rate < expected * 1.4f, "holding through a struggle cost " + rate.ToString("0.0", CultureInfo.InvariantCulture) + " stamina a second, the stall cost with the hooked drain is " + expected.ToString("0.0", CultureInfo.InvariantCulture));
                     var strainRate = strained / heldTime;
-                    check.That(Near(strainRate, 1f / rules.SnapSeconds), "holding through a struggle strains the line to snapping in " + rules.SnapSeconds.ToString("0.0", CultureInfo.InvariantCulture) + " s, " + (strainRate * 100f).ToString("0", CultureInfo.InvariantCulture) + "% a second");
+                    check.That(Near(strainRate, 1f / snapSeconds), "holding through a struggle of a fish of speed " + fishSpeed.ToString("0.0", CultureInfo.InvariantCulture) + " strains the line to snapping in " + snapSeconds.ToString("0.00", CultureInfo.InvariantCulture) + " s, " + (strainRate * 100f).ToString("0", CultureInfo.InvariantCulture) + "% a second");
                 }
                 check.That(easedTime >= 0.5f, "the line was eased off in a struggle at least half a second, " + easedTime.ToString("0.0", CultureInfo.InvariantCulture) + " s");
                 if (easedTime > 0.2f)
                 {
                     check.That(Near(eased / easedTime, 1f / rules.EaseSeconds), "easing off lets the strain go over " + rules.EaseSeconds.ToString("0.0", CultureInfo.InvariantCulture) + " s, " + (eased / easedTime * 100f).ToString("0", CultureInfo.InvariantCulture) + "% a second");
-                    check.That(Near(easedLineOut / easedTime, easedRule / easedTime), "eased off, the struggling fish takes line out at " + rules.RunSpeed.ToString("0.0", CultureInfo.InvariantCulture) + " m/s less the strain still on the line, "
+                    check.That(Near(easedLineOut / easedTime, easedRule / easedTime), "eased off, the struggling fish takes line out at " + runSpeed.ToString("0.0", CultureInfo.InvariantCulture) + " m/s less the strain still on the line, "
                         + (easedRule / easedTime).ToString("0.0", CultureInfo.InvariantCulture) + " m/s by the strain seen, " + (easedLineOut / easedTime).ToString("0.0", CultureInfo.InvariantCulture) + " m/s");
                 }
+                check.That(runFrames > 0 && pacedWrong <= 3, "a fish taking line out swims as fast as the line goes out: " + pacedWrong.ToString(CultureInfo.InvariantCulture) + " of " + runFrames.ToString(CultureInfo.InvariantCulture) + " frames off" + (pacedWrong > 0 ? ", the last " + pacedSeen : ""));
+                check.That(restPaced > 0 && restSpeedWrong == 0, "a resting fish swims at its own speed of " + ownSpeed.ToString("0.0", CultureInfo.InvariantCulture) + " m/s again, " + restSpeedWrong.ToString(CultureInfo.InvariantCulture) + " of " + restPaced.ToString(CultureInfo.InvariantCulture) + " rest frames off");
                 // Rests near the bank are left unreeled, so the reel is measured over the time the line was held.
                 check.That(restHeld >= 0.5f && restLine / Mathf.Max(restHeld, 0.01f) > 0.5f * Mathf.Lerp(rules.ReelSpeed, rules.ReelSpeedMaxSkill, skill),
                     "holding while it rests reels it in, " + restLine.ToString("0.0", CultureInfo.InvariantCulture) + " m in " + restHeld.ToString("0.0", CultureInfo.InvariantCulture) + " s held");

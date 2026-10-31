@@ -12,9 +12,12 @@ namespace Rodnarok.Tests
     {
         private static readonly FishingRules Rules = FishingRules.Default;
 
+        /// <summary>The Perch's speed in metres a second, the speed the snap time and run speed are set for.</summary>
+        private const float Perch = 3f;
+
         private static float Hold(float strain, bool struggling, bool holding, float seconds, FishingRules rules = null)
         {
-            for (var t = 0f; t < seconds - 0.0001f; t += 0.02f) strain = Tension.Step(strain, struggling, holding, 0.02f, rules ?? Rules);
+            for (var t = 0f; t < seconds - 0.0001f; t += 0.02f) strain = Tension.Step(strain, struggling, holding, 0.02f, Perch, rules ?? Rules);
             return strain;
         }
 
@@ -59,16 +62,16 @@ namespace Rodnarok.Tests
         [Fact]
         public void WithTheArcEmptyAnEasedOffFishRunsAtFullSpeed()
         {
-            Assert.Equal(Rules.RunSpeed, Tension.LineOut(0f, struggling: true, holding: false, seconds: 1f, Rules), 3);
+            Assert.Equal(Rules.RunSpeed, Tension.LineOut(0f, struggling: true, holding: false, seconds: 1f, Perch, Rules), 3);
             Assert.Equal(2f, Rules.RunSpeed);
         }
 
         [Fact]
         public void TheMoreStrainStillOnTheLineTheSlowerAnEasedOffFishRuns()
         {
-            Assert.Equal(Rules.RunSpeed * 0.5f, Tension.LineOut(0.5f, struggling: true, holding: false, seconds: 1f, Rules), 3);
-            Assert.Equal(Rules.RunSpeed * 0.1f, Tension.LineOut(0.9f, struggling: true, holding: false, seconds: 1f, Rules), 3);
-            Assert.True(Tension.LineOut(0.9f, true, false, 1f, Rules) < Tension.LineOut(0.3f, true, false, 1f, Rules));
+            Assert.Equal(Rules.RunSpeed * 0.5f, Tension.LineOut(0.5f, struggling: true, holding: false, seconds: 1f, Perch, Rules), 3);
+            Assert.Equal(Rules.RunSpeed * 0.1f, Tension.LineOut(0.9f, struggling: true, holding: false, seconds: 1f, Perch, Rules), 3);
+            Assert.True(Tension.LineOut(0.9f, true, false, 1f, Perch, Rules) < Tension.LineOut(0.3f, true, false, 1f, Perch, Rules));
         }
 
         [Fact]
@@ -80,8 +83,8 @@ namespace Rodnarok.Tests
             for (var t = 0f; t < 3f; t += 0.02f)
             {
                 holding = strain >= 0.4f ? false : strain <= 0.2f || holding;
-                strain = Tension.Step(strain, struggling: true, holding, 0.02f, Rules);
-                tappedOut += Tension.LineOut(strain, struggling: true, holding, 0.02f, Rules);
+                strain = Tension.Step(strain, struggling: true, holding, 0.02f, Perch, Rules);
+                tappedOut += Tension.LineOut(strain, struggling: true, holding, 0.02f, Perch, Rules);
                 if (!holding) easedTime += 0.02f;
             }
             Assert.False(Tension.Snaps(strain));
@@ -92,8 +95,8 @@ namespace Rodnarok.Tests
         [Fact]
         public void HeldOrRestingTheFishTakesNoLine()
         {
-            Assert.Equal(0f, Tension.LineOut(0f, struggling: true, holding: true, seconds: 1f, Rules));
-            Assert.Equal(0f, Tension.LineOut(0f, struggling: false, holding: false, seconds: 1f, Rules));
+            Assert.Equal(0f, Tension.LineOut(0f, struggling: true, holding: true, seconds: 1f, Perch, Rules));
+            Assert.Equal(0f, Tension.LineOut(0f, struggling: false, holding: false, seconds: 1f, Perch, Rules));
         }
 
         [Fact]
@@ -101,7 +104,7 @@ namespace Rodnarok.Tests
         {
             var off = Rules.With(tension: false);
             Assert.Equal(0f, Hold(0f, struggling: true, holding: true, seconds: 10f, off));
-            Assert.Equal(0f, Tension.LineOut(0f, struggling: true, holding: false, seconds: 1f, off));
+            Assert.Equal(0f, Tension.LineOut(0f, struggling: true, holding: false, seconds: 1f, Perch, off));
         }
 
         [Theory]
@@ -110,22 +113,22 @@ namespace Rodnarok.Tests
         public void ASnapTimeOfZeroOrLessSnapsAtOnceRatherThanNever(float snap)
         {
             var rules = Rules.With(snapSeconds: snap);
-            Assert.True(Tension.Snaps(Tension.Step(0f, struggling: true, holding: true, seconds: 0.02f, rules)));
+            Assert.True(Tension.Snaps(Tension.Step(0f, struggling: true, holding: true, seconds: 0.02f, Perch, rules)));
         }
 
         [Fact]
         public void AnEaseTimeOfZeroLetsTheStrainGoAtOnce()
         {
             var rules = Rules.With(easeSeconds: 0f);
-            Assert.Equal(0f, Tension.Step(0.9f, struggling: true, holding: false, seconds: 0.02f, rules));
+            Assert.Equal(0f, Tension.Step(0.9f, struggling: true, holding: false, seconds: 0.02f, Perch, rules));
         }
 
         [Fact]
         public void TheStrainStaysBetweenNoneAndSnapped()
         {
-            Assert.Equal(0f, Tension.Step(0f, struggling: false, holding: false, seconds: 5f, Rules));
-            Assert.Equal(1f, Tension.Step(0.9f, struggling: true, holding: true, seconds: 5f, Rules));
-            Assert.Equal(0f, Tension.Step(float.NaN, struggling: false, holding: false, seconds: 0.02f, Rules));
+            Assert.Equal(0f, Tension.Step(0f, struggling: false, holding: false, seconds: 5f, Perch, Rules));
+            Assert.Equal(1f, Tension.Step(0.9f, struggling: true, holding: true, seconds: 5f, Perch, Rules));
+            Assert.Equal(0f, Tension.Step(float.NaN, struggling: false, holding: false, seconds: 0.02f, Perch, Rules));
         }
     }
 }

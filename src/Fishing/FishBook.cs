@@ -53,6 +53,13 @@ namespace Rodnarok
 
         public GameObject Prefab(string name) => name != null && _prefabs.TryGetValue(name, out var prefab) ? prefab : null;
 
+        /// <summary>How fast a fish swims as its prefab sets it, in metres a second; 0 for one unknown.</summary>
+        public float Speed(string name)
+        {
+            var fish = Prefab(name)?.GetComponent<Fish>();
+            return fish != null ? fish.m_speed : 0f;
+        }
+
         /// <summary>How many of a fish the world spawns together; unknown for one it never spawns in groups.</summary>
         public GroupSize Group(string name) =>
             name != null && _spawns.TryGetValue(name, out var entry) ? new GroupSize(entry.m_groupSizeMin, entry.m_groupSizeMax) : GroupSize.Unknown;

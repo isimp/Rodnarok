@@ -11,7 +11,8 @@ namespace Rodnarok
     /// float the line's strain follows <see cref="Tension"/>: held through a struggle it builds,
     /// and a line strained to snapping breaks as the game breaks one, with its message and effect.
     /// While a struggling fish has the line eased off it takes line out and swims away from the
-    /// rod. A new catch starts on an unstrained line.
+    /// rod as fast as the line goes out. Each fish pulls by its prefab's speed. A new catch starts
+    /// on an unstrained line.
     /// </summary>
     internal static class Lines
     {
@@ -24,6 +25,7 @@ namespace Rodnarok
         {
             public Fish Fish;
             public float Strain;
+            public float FishSpeed;
 
             // The struggle under way, told in one log line when it ends.
             public bool Struggling;
@@ -37,7 +39,7 @@ namespace Rodnarok
         }
 
         private static readonly Dictionary<FishingFloat, Line> Strains = new Dictionary<FishingFloat, Line>();
-        private static readonly HashSet<Fish> Running = new HashSet<Fish>();
+        private static readonly Dictionary<Fish, float> Running = new Dictionary<Fish, float>();
 
         /// <summary>How many lines snapped from strain in this game, for the self-test.</summary>
         [ForTest]
@@ -47,7 +49,10 @@ namespace Rodnarok
         public static float StrainOf(FishingFloat ff) => ff != null && Strains.TryGetValue(ff, out var line) ? line.Strain : 0f;
 
         /// <summary>Whether a hooked fish is taking line out, the line eased off while it struggles.</summary>
-        public static bool IsRunning(Fish fish) => fish != null && Running.Contains(fish);
+        public static bool IsRunning(Fish fish) => fish != null && Running.ContainsKey(fish);
+
+        /// <summary>How fast, in metres a second, a hooked fish taking line out goes, the line going out as fast; 0 for one not taking line.</summary>
+        public static float RunSpeedOf(Fish fish) => fish != null && Running.TryGetValue(fish, out var speed) ? speed : 0f;
 
         /// <summary>After the float's step in the game that cast it: the strain follows the fight, and an eased-off struggle takes line out.</summary>
         public static void Step(FishingFloat ff)
@@ -68,7 +73,7 @@ namespace Rodnarok
             if (!Strains.TryGetValue(ff, out var line) || line.Fish != fish)
             {
                 if (line != null && line.Fish != null) Running.Remove(line.Fish);
-                line = new Line { Fish = fish };
+                line = new Line { Fish = fish, FishSpeed = FishBook.Current?.Speed(Utils.GetPrefabName(fish.gameObject)) ?? 0f };
                 Strains[ff] = line;
             }
 
@@ -78,7 +83,7 @@ namespace Rodnarok
             var seconds = Time.fixedDeltaTime;
             if (line.Struggling && !struggling) TellStruggle(ff, line, "it rests");
             if (struggling && !line.Struggling) StartStruggle(line);
-            line.Strain = Tension.Step(line.Strain, struggling, holding, seconds, rules);
+            line.Strain = Tension.Step(line.Strain, struggling, holding, seconds, line.FishSpeed, rules);
             if (Tension.Snaps(line.Strain))
             {
                 if (line.Struggling) TellStruggle(ff, line, "the line snapped");
@@ -86,10 +91,11 @@ namespace Rodnarok
                 return;
             }
             if (struggling && holding) line.HeldSeconds += seconds;
-            var lineOut = Tension.LineOut(line.Strain, struggling, holding, seconds, rules);
+            var lineOut = Tension.LineOut(line.Strain, struggling, holding, seconds, line.FishSpeed, rules);
             if (lineOut > 0f)
             {
-                if (Running.Add(fish)) CountRun(owner, line);
+                if (!Running.ContainsKey(fish)) CountRun(owner, line);
+                Running[fish] = lineOut / seconds;
                 LineLength(ff) += lineOut;
                 line.RunMetres += lineOut;
                 line.RunSeconds += seconds;
