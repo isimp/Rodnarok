@@ -67,8 +67,8 @@ namespace Rodnarok
         private const float Track = 0.25f;
 
         /// <summary>Unity's yellow, as the game's bow ring turns.</summary>
-        private const float YellowG = 0.92f;
-        private const float YellowB = 0.016f;
+        internal const float YellowG = 0.92f;
+        internal const float YellowB = 0.016f;
 
         /// <summary>The struggle's red.</summary>
         private const float RedG = 0.25f;

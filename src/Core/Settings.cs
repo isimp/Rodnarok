@@ -31,6 +31,19 @@ namespace Rodnarok
         private static ConfigEntry<bool> _baitLost;
         private static ConfigEntry<bool> _castHints;
         private static ConfigEntry<bool> _seatedMotions;
+        private static ConfigEntry<bool> _floatGlow;
+
+        /// <summary>Whether floats glow at night in this player's game; a player's own choice.</summary>
+        public static bool FloatGlow => _floatGlow != null ? _floatGlow.Value : Rodnarok.FloatGlow.OnByDefault;
+
+        /// <summary>Sets FloatGlow as a player would, so the self-test can check the glow and put the setting back; returns what it was.</summary>
+        [ForTest]
+        public static bool FloatGlowForTest(bool on)
+        {
+            var was = FloatGlow;
+            if (_floatGlow != null) _floatGlow.Value = on;
+            return was;
+        }
 
         /// <summary>Whether seated players with a rod show the game's fishing motions on their arms; a player's own choice.</summary>
         public static bool SeatedMotions => _seatedMotions != null ? _seatedMotions.Value : SeatedPoses.OnByDefault;
@@ -110,6 +123,8 @@ namespace Rodnarok
                 "Whether each cast shows a short line at the top left saying which of the bait's fish can come to the water there, and which would need bigger or deeper water. Your own setting; the server's does not apply.");
             _seatedMotions = config.Bind("Display", "SeatedMotions", SeatedPoses.OnByDefault,
                 "Whether a seated player with a rod shows the game's casting, reeling and rod-holding motions on the arms and head while the hips and legs stay as seated, as your game sees every player. Your own setting; the server's does not apply.");
+            _floatGlow = config.Bind("Display", "FloatGlow", Rodnarok.FloatGlow.OnByDefault,
+                "Whether fishing floats glow softly at night, rising after sunset and fading before sunrise, so a float can be found in the dark. Your own float flashes white at a bite and fades back over the hook window; other players' floats glow but show no flash, since only the one fishing learns of a bite. Your own setting; the server's does not apply.");
         }
 
         private static ConfigEntry<T> Sync<T>(ConfigEntry<T> entry)

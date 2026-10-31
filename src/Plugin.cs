@@ -7,8 +7,8 @@ namespace Rodnarok
 {
     /// <summary>
     /// What BepInEx loads: it gives the log and the settings to the layers below, patches the
-    /// game's fish, registers the command and hands each frame to the schools and to the
-    /// self-test where one is installed. On a dedicated server (no graphics) it binds the
+    /// game's fish, registers the command and hands each frame to the schools, the floats' glow
+    /// and to the self-test where one is installed. On a dedicated server (no graphics) it binds the
     /// settings alone, which ServerSync then sends every player.
     /// </summary>
     [BepInPlugin(About.Guid, About.Name, About.Version)]
@@ -43,11 +43,13 @@ namespace Rodnarok
                 Lines.Clear();
                 SeatedRodPose.Forget();
                 SeatedBodies.Forget();
+                FloatGlows.Forget();
             }
             else
             {
                 CalmStands.Tick();
                 CalmWaters.Tick();
+                FloatGlows.Tick();
             }
             SelfTestHost.Tick();
         }
