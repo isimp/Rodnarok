@@ -7,8 +7,8 @@ namespace Rodnarok.Tests
     /// Each fish pulls the line by its own speed in the game: a fast one strains the line sooner and
     /// takes more line while it is eased off, a slow one later and less. The snap time and the run
     /// speed set the pull of a Perch, which fights as it always did, and every other fish is
-    /// scaled from it by the square root of its speed against the Perch's, so a Tuna is the
-    /// hardest pull and still one a player can land.
+    /// scaled from it by the fourth root of its speed against the Perch's, so a Tuna is the
+    /// hardest pull and still one a beginner can land.
     /// </summary>
     public class FishPullTests
     {
@@ -56,14 +56,14 @@ namespace Rodnarok.Tests
 
         [Theory]
         [InlineData("Fish1", 1f, 2f)]
-        [InlineData("Fish2", 0.775f, 2.582f)]
-        [InlineData("Fish3", 0.548f, 3.651f)]
-        [InlineData("Fish4_cave", 1.2247f, 1.633f)]
-        [InlineData("Fish5", 0.866f, 2.309f)]
-        [InlineData("Fish9", 1.2247f, 1.633f)]
-        [InlineData("Fish10", 0.866f, 2.309f)]
-        [InlineData("Fish11", 0.926f, 2.160f)]
-        public void EachFishPullsByTheSquareRootOfItsGameSpeedAgainstThePerchs(string fish, float snapSeconds, float runSpeed)
+        [InlineData("Fish2", 0.8801f, 2.2724f)]
+        [InlineData("Fish3", 0.7401f, 2.7024f)]
+        [InlineData("Fish4_cave", 1.1067f, 1.8072f)]
+        [InlineData("Fish5", 0.9306f, 2.1491f)]
+        [InlineData("Fish9", 1.1067f, 1.8072f)]
+        [InlineData("Fish10", 0.9306f, 2.1491f)]
+        [InlineData("Fish11", 0.9622f, 2.0786f)]
+        public void EachFishPullsByTheFourthRootOfItsGameSpeedAgainstThePerchs(string fish, float snapSeconds, float runSpeed)
         {
             var speed = GameFish.Speeds[fish];
             Assert.Equal(snapSeconds, Tension.SnapSeconds(speed, Rules), 2);

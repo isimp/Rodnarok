@@ -10,8 +10,8 @@ namespace Rodnarok
     /// eased off, slower the more strain is still on it, so easing off in short taps loses less line
     /// than letting go. Without tension, holding never strains and no line goes out.
     /// Each fish pulls by its speed in the game: the snap time and run speed are a Perch's, and a
-    /// faster fish strains the line sooner and takes more line, by the square root of its speed
-    /// against the Perch's, so the fastest still leaves a fight a player can win.
+    /// faster fish strains the line sooner and takes more line, by the fourth root of its speed
+    /// against the Perch's, so the fish differ while the fastest stays a fight a beginner can win.
     /// </summary>
     internal static class Tension
     {
@@ -20,7 +20,7 @@ namespace Rodnarok
 
         /// <summary>How much harder than a Perch a fish of this speed pulls; 1 for one of unknown speed or with the pull by speed off.</summary>
         public static float Pull(float fishSpeed, FishingRules rules) =>
-            rules.PullBySpeed && fishSpeed > 0f && !float.IsInfinity(fishSpeed) ? (float)Math.Sqrt(fishSpeed / PerchSpeed) : 1f;
+            rules.PullBySpeed && fishSpeed > 0f && !float.IsInfinity(fishSpeed) ? (float)Math.Sqrt(Math.Sqrt(fishSpeed / PerchSpeed)) : 1f;
 
         /// <summary>Seconds of holding through this fish's struggle until the line snaps.</summary>
         public static float SnapSeconds(float fishSpeed, FishingRules rules) => rules.SnapSeconds / Pull(fishSpeed, rules);
