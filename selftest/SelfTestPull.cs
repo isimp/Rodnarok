@@ -66,7 +66,7 @@ namespace Rodnarok
         {
             var player = Player.m_localPlayer;
             var spot = SelfTestArrival.DeepWaterBeside(player.transform.position, 3f);
-            check.That(spot.HasValue, "water at least 3 m deep within 6 to 20 m of the character (stand facing open water)");
+            check.Needs(spot.HasValue, "water at least 3 m deep within 6 to 20 m of the character (stand facing open water)");
             if (!spot.HasValue) yield break;
             var floatPrefab = ZNetScene.instance.GetPrefab("FishingRodFloat");
             var noBait = ObjectDB.instance.GetItemPrefab(NoBait);

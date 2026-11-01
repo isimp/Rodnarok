@@ -32,7 +32,7 @@ namespace Rodnarok
         {
             var player = Player.m_localPlayer;
             var spot = SelfTestArrival.DeepWaterBeside(player.transform.position, 3f);
-            check.That(spot.HasValue, "water at least 3 m deep within 6 to 20 m of the character (stand facing open water)");
+            check.Needs(spot.HasValue, "water at least 3 m deep within 6 to 20 m of the character (stand facing open water)");
             if (!spot.HasValue) yield break;
             var floatPrefab = ZNetScene.instance.GetPrefab("FishingRodFloat");
             var baitPrefab = ObjectDB.instance.GetItemPrefab(Bait);
@@ -40,7 +40,7 @@ namespace Rodnarok
             check.That(floatPrefab != null && baitPrefab != null && fishPrefab != null, "the float, the bait and the Perch prefabs are there");
             if (floatPrefab == null || baitPrefab == null || fishPrefab == null) yield break;
             var near = OutOfSightBeyond(spot.Value, player.transform.position);
-            check.That(near.HasValue, "a place out of sight for the Perch beyond the float, 40 m from the character or 4 m deep, reached from the float through water 3 m deep");
+            check.Needs(near.HasValue, "a place out of sight for the Perch beyond the float, 40 m from the character or 4 m deep, reached from the float through water 3 m deep");
             if (!near.HasValue) yield break;
 
             var gear = SelfTestGear.RodInHand(player);
@@ -107,7 +107,7 @@ namespace Rodnarok
         {
             var player = Player.m_localPlayer;
             var spot = SelfTestArrival.DeepWaterBeside(player.transform.position, 3f);
-            check.That(spot.HasValue, "water at least 3 m deep within 6 to 20 m of the character (stand facing open water)");
+            check.Needs(spot.HasValue, "water at least 3 m deep within 6 to 20 m of the character (stand facing open water)");
             if (!spot.HasValue) yield break;
             var floatPrefab = ZNetScene.instance.GetPrefab("FishingRodFloat");
             var baitPrefab = ObjectDB.instance.GetItemPrefab(Bait);

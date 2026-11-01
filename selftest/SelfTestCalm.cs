@@ -41,7 +41,7 @@ namespace Rodnarok
             NoteOtherMods(check);
 
             var water = SelfTestArrival.DeepWaterBeside(player.transform.position, 1.5f);
-            check.That(water.HasValue, "water within 6 to 20 m of the character");
+            check.Needs(water.HasValue, "water within 6 to 20 m of the character");
             if (!water.HasValue) yield break;
 
             var rules = PlayRules.Now;

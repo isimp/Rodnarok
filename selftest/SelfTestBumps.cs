@@ -29,7 +29,7 @@ namespace Rodnarok
         {
             var player = Player.m_localPlayer;
             var spot = SelfTestArrival.DeepWaterBeside(player.transform.position, 3f);
-            check.That(spot.HasValue, "water at least 3 m deep within 6 to 20 m of the character (stand facing open water)");
+            check.Needs(spot.HasValue, "water at least 3 m deep within 6 to 20 m of the character (stand facing open water)");
             if (!spot.HasValue) yield break;
             var floatPrefab = ZNetScene.instance.GetPrefab("FishingRodFloat");
             var baitPrefab = ObjectDB.instance.GetItemPrefab(Bait);
@@ -86,13 +86,23 @@ namespace Rodnarok
                 check.That(ff.GetCatch() == null, "reeling at the bump hooks nothing");
 
                 // The real bite follows.
+                // Watched past the 10 s it must come within, so a late bite says how late, and a missing one what the picked fish was doing.
                 var bit = false;
-                for (var waited = 0f; waited < 10f && !bit; waited += Time.deltaTime)
+                var seen = "";
+                var watched = 0f;
+                for (; watched < 20f && !bit; watched += Time.deltaTime)
                 {
                     bit = Nibbler(ff) != null && NibbleTime(ff) > bumpedAt;
+                    if (watched < 10f)
+                    {
+                        var (biter, freeIn) = Schools.BiterForTest(ff);
+                        seen = biter == null ? "no fish picked to bite"
+                            : "the picked " + Utils.GetPrefabName(biter.gameObject) + " " + Vector3.Distance(biter.transform.position, Bites.Hook(ff)).ToString("0.0", CultureInfo.InvariantCulture)
+                                + " m from the hook, " + (freeIn > 0f ? "free to bite in " + freeIn.ToString("0.0", CultureInfo.InvariantCulture) + " s" : "free to bite for " + (-freeIn).ToString("0.0", CultureInfo.InvariantCulture) + " s");
+                    }
                     yield return null;
                 }
-                check.That(bit, "the real bite follows the bumps within 10 s");
+                check.That(bit && watched <= 10f, "the real bite follows the bumps within 10 s; " + (bit ? "it came after " + watched.ToString("0.0", CultureInfo.InvariantCulture) + " s" : "none within 20 s") + ", at 10 s " + seen);
             }
             finally
             {

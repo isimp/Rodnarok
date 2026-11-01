@@ -43,7 +43,7 @@ namespace Rodnarok
         {
             var player = Player.m_localPlayer;
             var water = SelfTestArrival.DeepWaterBeside(player.transform.position, 1f);
-            check.That(water.HasValue, "water within 6 to 20 m of the character");
+            check.Needs(water.HasValue, "water within 6 to 20 m of the character");
             if (!water.HasValue) yield break;
             var chairPrefab = ZNetScene.instance.GetPrefab(ChairPrefab);
             check.That(chairPrefab != null && chairPrefab.GetComponentInChildren<Chair>() != null, "the game's wooden chair is there to sit on");
@@ -56,7 +56,7 @@ namespace Rodnarok
             var dry = SelfTestPlaces.ThrowBlockedBy(stoodAt, water.Value) == null
                 ? stoodAt
                 : SelfTestPlaces.DryLandBeside(stoodAt, spot => SelfTestPlaces.ThrowBlockedBy(spot, water.Value) == null);
-            check.That(dry.HasValue, "the character's own spot, or dry, level land within 1.5 to 4 m of it, for a chair, with a clear throw toward the water; from the own spot the throw meets "
+            check.Needs(dry.HasValue, "the character's own spot, or dry, level land within 1.5 to 4 m of it, for a chair, with a clear throw toward the water; from the own spot the throw meets "
                 + SelfTestPlaces.ThrowBlockedBy(stoodAt, water.Value));
             if (!dry.HasValue) yield break;
             var toWater = water.Value - dry.Value;

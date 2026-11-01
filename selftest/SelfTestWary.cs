@@ -27,7 +27,7 @@ namespace Rodnarok
         {
             var player = Player.m_localPlayer;
             var spot = SelfTestArrival.DeepWaterBeside(player.transform.position, 3f);
-            check.That(spot.HasValue, "water at least 3 m deep within 6 to 20 m of the character (stand facing open water)");
+            check.Needs(spot.HasValue, "water at least 3 m deep within 6 to 20 m of the character (stand facing open water)");
             if (!spot.HasValue) yield break;
             var floatPrefab = ZNetScene.instance.GetPrefab("FishingRodFloat");
             var baitPrefab = ObjectDB.instance.GetItemPrefab(Bait);
@@ -91,13 +91,21 @@ namespace Rodnarok
 
                 // A short reel with the school near only makes it flinch, and it is back once the float is still.
                 for (var waited = 0f; waited < 40f && Nearest(SelfTestArrival.SchoolOf(floatId), ff) >= 6f; waited += Time.deltaTime) yield return null;
+                var nearBefore = Nearest(SelfTestArrival.SchoolOf(floatId), ff);
+                check.That(nearBefore < 6f, "back at the float, a fish of the school comes within 6 m of it within 40 s, the nearest " + nearBefore.ToString("0.0", CultureInfo.InvariantCulture) + " m");
+                // The float's speed is measured over half seconds, so the reel runs at most two of them,
+                // well short of the 2 s that drive the school off.
+                var reelFrom = ff.transform.position;
                 SelfTestDraw.Reeling = true;
-                for (var waited = 0f; waited < 0.6f && Schools.StartledForTest < startledBefore + 2; waited += Time.deltaTime) yield return null;
+                var reeled = 0f;
+                for (; reeled < ShortReel && Schools.StartledForTest < startledBefore + 2; reeled += Time.deltaTime) yield return null;
                 SelfTestDraw.Reeling = false;
+                var reelSpeed = reeled > 0f ? Across(ff.transform.position, reelFrom) / reeled : 0f;
                 var flinched = Schools.StartledForTest == startledBefore + 2 && Schools.AwayForTest(ff);
                 var stillFrom = Time.time;
                 for (var waited = 0f; waited < Wary.StillBeforeComingBack + 5f && Schools.AwayForTest(ff); waited += Time.deltaTime) yield return null;
-                check.That(flinched, "a short reel with the school near makes it flinch; startled " + (Schools.StartledForTest - startledBefore).ToString(CultureInfo.InvariantCulture) + " times");
+                check.That(flinched, "a short reel with the school near makes it flinch; startled " + (Schools.StartledForTest - startledBefore).ToString(CultureInfo.InvariantCulture) + " times, reeled "
+                    + reeled.ToString("0.0", CultureInfo.InvariantCulture) + " s at " + reelSpeed.ToString("0.0", CultureInfo.InvariantCulture) + " m/s (more than " + Wary.FloatSpeed.ToString("0.0", CultureInfo.InvariantCulture) + " startles)");
                 check.That(!Schools.AwayForTest(ff) && Schools.LeavingForTest == leavingBefore, "after the flinch the school is back within "
                     + (Time.time - stillFrom).ToString("0.0", CultureInfo.InvariantCulture) + " s of the float lying still, and none of it left");
 
@@ -118,6 +126,9 @@ namespace Rodnarok
                 gear.PutBack();
             }
         }
+
+        /// <summary>How long the short reel runs at most, in seconds: two of the half seconds the float's speed is measured over.</summary>
+        private const float ShortReel = 1.1f;
 
         private static float Nearest(List<Fish> school, FishingFloat ff) =>
             school == null || ff == null || !school.Any(f => f != null) ? float.MaxValue : school.Where(f => f != null).Min(f => Across(f.transform.position, ff.transform.position));

@@ -72,7 +72,8 @@ namespace Rodnarok
 
         private void Finish()
         {
-            var line = "Rodnarök self-test done: " + _runner.Passed.ToString(CultureInfo.InvariantCulture) + " passed, " + _runner.Failed.ToString(CultureInfo.InvariantCulture) + " failed.";
+            var line = "Rodnarök self-test done: " + _runner.Passed.ToString(CultureInfo.InvariantCulture) + " passed, " + _runner.Failed.ToString(CultureInfo.InvariantCulture) + " failed"
+                + (_runner.Skipped > 0 ? ", " + _runner.Skipped.ToString(CultureInfo.InvariantCulture) + " skipped for the place (each says what it needs)" : "") + ".";
             Write(line);
             Log.Info(line);
             Chat.instance?.AddString(line);

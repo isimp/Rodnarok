@@ -87,7 +87,7 @@ namespace Rodnarok
         private static IEnumerable WaterCornersInOrder(ScenarioCheck check)
         {
             var tile = WaterVolume.Instances.FirstOrDefault(w => w != null && w.m_heightmap != null && Varied(NormalizedDepth(w)));
-            check.That(tile != null, "a loaded water tile with corners of different depth (stand near a shore)");
+            check.Needs(tile != null, "a loaded water tile with corners of different depth (stand near a shore)");
             if (tile == null) yield break;
             var depth = NormalizedDepth(tile);
             var centre = tile.transform.position;

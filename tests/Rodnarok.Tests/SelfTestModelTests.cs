@@ -76,6 +76,49 @@ namespace Rodnarok.Tests
         }
 
         [Fact]
+        public void AScenarioThePlaceCannotHoldIsSkippedSayingWhatItNeedsAndNotFailed()
+        {
+            var log = new List<string>();
+            var runner = new ScenarioRunner(new[]
+            {
+                new Scenario("NeedsDeepWater", check => { if (!check.Needs(false, "water 3 m deep in front of the character")) return Frames(1, () => { }); return Frames(1, () => check.That(false, "never reached")); }),
+                new Scenario("After", check => Frames(1, () => check.That(true, "ran"))),
+            }, log.Add);
+            RunOut(runner);
+            Assert.Equal(1, runner.Skipped);
+            Assert.Equal(0, runner.Failed);
+            Assert.Equal(1, runner.Passed);
+            Assert.Contains("SKIP NeedsDeepWater: needs water 3 m deep in front of the character", log);
+        }
+
+        [Fact]
+        public void ANeedTheSpotMeetsChangesNothing()
+        {
+            var log = new List<string>();
+            var runner = new ScenarioRunner(new[]
+            {
+                new Scenario("Met", check => { Assert.True(check.Needs(true, "water")); return Frames(1, () => check.That(true, "ran")); }),
+            }, log.Add);
+            RunOut(runner);
+            Assert.Equal(1, runner.Passed);
+            Assert.Contains("PASS Met", log);
+        }
+
+        [Fact]
+        public void AFailureBeforeAnUnmetNeedStillFails()
+        {
+            var log = new List<string>();
+            var runner = new ScenarioRunner(new[]
+            {
+                new Scenario("Both", check => { check.That(false, "the float sank"); check.Needs(false, "an out-of-sight spot"); return Frames(1, () => { }); }),
+            }, log.Add);
+            RunOut(runner);
+            Assert.Equal(1, runner.Failed);
+            Assert.Equal(0, runner.Skipped);
+            Assert.Contains("FAIL Both: the float sank (needs an out-of-sight spot)", log);
+        }
+
+        [Fact]
         public void AScenarioThatBreaksFailsAndTheRunGoesOn()
         {
             var log = new List<string>();

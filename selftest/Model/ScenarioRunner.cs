@@ -5,14 +5,27 @@ using System.Linq;
 
 namespace Rodnarok
 {
-    /// <summary>What a scenario checks, what failed of it, and what it notes beside its result.</summary>
+    /// <summary>What a scenario checks, what failed of it, what the place it runs in lacks for it, and what it notes beside its result.</summary>
     internal sealed class ScenarioCheck
     {
         private readonly List<string> _failures = new List<string>();
         private readonly List<string> _notes = new List<string>();
+        private readonly List<string> _needs = new List<string>();
 
         public IReadOnlyList<string> Failures => _failures;
         public IReadOnlyList<string> Notes => _notes;
+        public IReadOnlyList<string> Unmet => _needs;
+
+        /// <summary>
+        /// Whether the place the character stands in holds what the scenario needs, such as deep
+        /// water in front; when it does not, the scenario is skipped saying so rather than failed,
+        /// as nothing of the mod has been tried. The scenario stops where it is on false.
+        /// </summary>
+        public bool Needs(bool holds, string what)
+        {
+            if (!holds) _needs.Add(what);
+            return holds;
+        }
 
         /// <summary>Notes a failure, saying what was expected, unless it holds.</summary>
         public void That(bool holds, string what)
@@ -39,8 +52,8 @@ namespace Rodnarok
 
     /// <summary>
     /// Runs scenarios one after another, a frame step at a time, and writes each one's result as a
-    /// line starting PASS or FAIL. A scenario that throws fails with what it threw, and the run
-    /// goes on to the next.
+    /// line starting PASS, FAIL or SKIP, the last for a scenario the place could not hold. A
+    /// scenario that throws fails with what it threw, and the run goes on to the next.
     /// </summary>
     internal sealed class ScenarioRunner
     {
@@ -59,6 +72,7 @@ namespace Rodnarok
         public bool Running => _current != null || _waiting.Count > 0;
         public int Passed { get; private set; }
         public int Failed { get; private set; }
+        public int Skipped { get; private set; }
 
         /// <summary>The scenarios whose names hold the words, ignoring case; all of them for no words.</summary>
         public static IEnumerable<Scenario> Pick(IEnumerable<Scenario> all, string words) =>
@@ -111,15 +125,21 @@ namespace Rodnarok
             var failures = _check.Failures.ToList();
             if (broke != null) failures.Add("broke: " + broke.GetType().Name + ": " + broke.Message);
             var notes = _check.Notes.Count == 0 ? "" : " (note: " + string.Join("; ", _check.Notes) + ")";
-            if (failures.Count == 0)
+            var needs = string.Join("; ", _check.Unmet);
+            if (failures.Count > 0)
             {
-                Passed++;
-                _write("PASS " + _current.Name + notes);
+                Failed++;
+                _write("FAIL " + _current.Name + ": " + string.Join("; ", failures) + (needs.Length > 0 ? " (needs " + needs + ")" : "") + notes);
+            }
+            else if (needs.Length > 0)
+            {
+                Skipped++;
+                _write("SKIP " + _current.Name + ": needs " + needs + notes);
             }
             else
             {
-                Failed++;
-                _write("FAIL " + _current.Name + ": " + string.Join("; ", failures) + notes);
+                Passed++;
+                _write("PASS " + _current.Name + notes);
             }
             Close();
             _current = null;

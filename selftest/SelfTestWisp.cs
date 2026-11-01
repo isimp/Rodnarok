@@ -62,7 +62,7 @@ namespace Rodnarok
         {
             var player = Player.m_localPlayer;
             var spot = SelfTestArrival.DeepWaterBeside(player.transform.position, 3f);
-            check.That(spot.HasValue, "water at least 3 m deep within 6 to 20 m of the character (stand facing open water)");
+            check.Needs(spot.HasValue, "water at least 3 m deep within 6 to 20 m of the character (stand facing open water)");
             if (!spot.HasValue) yield break;
             var floatPrefab = ZNetScene.instance.GetPrefab("FishingRodFloat");
             var noBait = ObjectDB.instance.GetItemPrefab(NoBait);
@@ -96,8 +96,13 @@ namespace Rodnarok
                 var field = ball.GetComponentInChildren<Demister>();
                 check.That(field != null && field.m_forceField != null, "the wisp carries the game's mist clearing");
                 if (field == null || field.m_forceField == null) yield break;
-                var ownRange = field.m_forceField.endRange;
+                // The clearing's own width is the game's prefab's: a float of an earlier scenario may still have the wisp out.
+                var prefabField = wisplight.m_ballPrefab != null ? wisplight.m_ballPrefab.GetComponentInChildren<ParticleSystemForceField>(true) : null;
+                var ownRange = prefabField != null ? prefabField.endRange : field.m_forceField.endRange;
                 var flicker = ball.GetComponentInChildren<Light>();
+                var homeIn = 0f;
+                for (; homeIn < 10f && FloatWisps.TaskForTest != WispTask.Home; homeIn += Time.deltaTime) yield return null;
+                check.That(FloatWisps.TaskForTest == WispTask.Home, "before the cast the wisp is with the character, " + FloatWisps.TaskForTest + " after " + F(homeIn) + " s");
                 for (var waited = 0f; waited < 2f; waited += Time.deltaTime) yield return null;
                 Vector3 Home() => player.transform.position + player.transform.TransformVector(wisplight.m_offset);
                 var ownLight = flicker != null ? flicker.intensity : 0f;

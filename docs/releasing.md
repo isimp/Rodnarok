@@ -66,7 +66,7 @@ python3 tools/publish.py dist/hexium/Rodnarok-0.1.0.zip --check-only   # validat
 
 ## Before a release
 
-Run the whole test suite locally (`dotnet test tests/Rodnarok.Tests`) and the in-game self-test (`/rodnarok selftest`) on the installed game. Both should pass.
+Run the whole test suite locally (`dotnet test tests/Rodnarok.Tests`) and the in-game self-test (`/rodnarok selftest`) on the installed game. Both should pass; a scenario skipped for the place is run again where the place holds what it says it needs.
 
 ## After a game update
 

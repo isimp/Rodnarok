@@ -146,6 +146,11 @@ namespace Rodnarok
         /// <summary>The farthest out beyond the float a school may start, in metres.</summary>
         private const float FarthestStart = 60f;
 
+        /// <summary>The fish of a float's school picked to take the bait, null for none, and how long until it may, for the self-test.</summary>
+        [ForTest]
+        public static (Fish Fish, float FreeIn) BiterForTest(FishingFloat ff) =>
+            ff != null && Casts.TryGetValue(ff, out var cast) && cast.Biter >= 0 && cast.Biter < cast.Fish.Count ? (cast.Fish[cast.Biter], cast.BiterFreeAt - Time.time) : (null, 0f);
+
         /// <summary>The fish of the world's own called to a float this game cast, for the self-test; null for none.</summary>
         [ForTest]
         public static Fish CalledFishForTest(FishingFloat ff) => ff != null && Casts.TryGetValue(ff, out var cast) ? cast.Called : null;

@@ -22,6 +22,13 @@ namespace Rodnarok
     {
         private const string Bait = "FishingBait";
 
+        /// <summary>
+        /// How far from its middle the school's fish keep on average on the way in, at the least, in
+        /// metres. Spread up to 4 m apart and wandering up to 6 m round their home they keep about 2 m;
+        /// a school swimming in as one tight ball keeps under 1 m.
+        /// </summary>
+        private const float LooseSpread = 1.5f;
+
         private static readonly AccessTools.FieldRef<FishingFloat, float> NibbleTime = AccessTools.FieldRefAccess<FishingFloat, float>("m_nibbleTime");
         private static readonly AccessTools.FieldRef<FishingFloat, Fish> Nibbler = AccessTools.FieldRefAccess<FishingFloat, Fish>("m_nibbler");
 
@@ -80,7 +87,7 @@ namespace Rodnarok
         {
             var player = Player.m_localPlayer;
             var spot = DeepWaterBeside(player.transform.position, 3f);
-            check.That(spot.HasValue, "water at least 3 m deep within 6 to 20 m of the character (stand facing open water)");
+            check.Needs(spot.HasValue, "water at least 3 m deep within 6 to 20 m of the character (stand facing open water)");
             if (!spot.HasValue) yield break;
 
             var wildBefore = WildFish().ToList();
@@ -172,7 +179,7 @@ namespace Rodnarok
                 }
                 check.That(halfNearAfter >= 0f, "half the school reached the float within " + (swim + 30f).ToString("0", CultureInfo.InvariantCulture) + " s");
                 check.That(halfNearAfter < 0f || halfNearAfter >= swim * 0.6f, "the school swims in rather than rushing, half of it at the float after " + halfNearAfter.ToString("0.0", CultureInfo.InvariantCulture) + " s of a " + swim.ToString("0", CultureInfo.InvariantCulture) + " s swim"); 
-                check.That(school.Count < 2 || spreads.Count > 0 && spreads.Average() >= 2f, "the school is loose on its way in, its fish on average " + (spreads.Count > 0 ? spreads.Average() : 0f).ToString("0.0", CultureInfo.InvariantCulture) + " m from its middle");
+                check.That(school.Count < 2 || spreads.Count > 0 && spreads.Average() >= LooseSpread, "the school is loose on its way in, its fish on average " + (spreads.Count > 0 ? spreads.Average() : 0f).ToString("0.0", CultureInfo.InvariantCulture) + " m from its middle");
                 check.That(!nibbledEarly, "no fish of the school took the bait before the school was in");
                 SelfTestPictures.Take("arrival-in");
                 var nibbled = false;
@@ -209,7 +216,7 @@ namespace Rodnarok
                     var carried = Carried(player, name);
                     // Dry land beside the character, where a fish could only have flopped ashore.
                     var dry = SelfTestPlaces.DryLandBeside(player.transform.position);
-                    check.That(dry.HasValue, "dry land beside the character to put a fish on");
+                    check.Needs(dry.HasValue, "dry land beside the character to put a fish on");
                     var shore = (dry ?? player.transform.position) + Vector3.up * 0.3f;
                     stray.transform.position = shore;
                     var body = stray.GetComponent<Rigidbody>();
