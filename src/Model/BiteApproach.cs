@@ -6,7 +6,7 @@ namespace Rodnarok
     /// How fast a fish going for the bait swims as it closes on the hook. The game steers a fish at
     /// its own speed and turning rate, so a fast fish circles wider than the reach it must bite
     /// from; within <see cref="From"/> of the hook it swims no faster than lets it turn inside half
-    /// that reach.
+    /// its distance to the hook, and at the hook inside half that reach.
     /// </summary>
     internal static class BiteApproach
     {
@@ -18,7 +18,7 @@ namespace Rodnarok
         {
             if (metresToHook > From || turnDegrees <= 0f) return own;
             var turning = turnDegrees * (float)Math.PI / 180f;
-            return Math.Min(own, turning * reach / 2f);
+            return Math.Min(own, turning * Math.Max(metresToHook, reach) / 2f);
         }
     }
 }

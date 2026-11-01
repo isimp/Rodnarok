@@ -28,6 +28,8 @@ namespace Rodnarok
         private static readonly AccessTools.FieldRef<FishingFloat, Fish> Nibbler = AccessTools.FieldRefAccess<FishingFloat, Fish>("m_nibbler");
         private static readonly System.Reflection.MethodInfo TestBate = AccessTools.Method(typeof(Fish), "TestBate");
 
+        private static string F(float value) => value.ToString("0.0", CultureInfo.InvariantCulture);
+
         public static IEnumerable<Scenario> All()
         {
             yield return new Scenario("PlainBaitBringsTheFishThatLiveWhereTheFloatLands", Brings);
@@ -87,9 +89,15 @@ namespace Rodnarok
                 }
                 check.That(bit, "a Trollfish of the school bites the plain bait within 90 s");
                 var trollfish = school.FirstOrDefault(f => f != null);
+                var firstId = floatId;
                 ZNetScene.instance.Destroy(ff.gameObject);
                 ff = null;
                 foreach (var frame in SelfTestArrival.UntilNoSchoolLeaves()) yield return frame;
+                // Every fish of the first school gone, as a new school waits for the last to leave.
+                var stayed = 0f;
+                for (; stayed < 60f && SelfTestArrival.SchoolOf(firstId).Any(f => f != null); stayed += Time.deltaTime) yield return null;
+                check.That(!SelfTestArrival.SchoolOf(firstId).Any(f => f != null), "the first school, float " + firstId.ID.ToString(CultureInfo.InvariantCulture) + ", is gone within 60 s of its float, "
+                    + F(stayed) + " s; left: " + Schools.LeavingDescribedForTest());
 
                 // The server's setting off: plain bait brings its own fish only, and a Trollfish turns away from it.
                 PlayRules.ForTest = PlayRules.Now.With(biomeFishOnBait: false);

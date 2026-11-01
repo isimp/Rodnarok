@@ -301,13 +301,15 @@ namespace Rodnarok
             line.enabled = false;
             Add(line.gameObject, life, delay, (p, q) =>
             {
-                var r = 0.05f + radius * q;
+                // Thin against its size from the start, so a young ring is a ring and not a disc.
+                var r = radius * (0.25f + 0.75f * q);
+                line.widthMultiplier = Mathf.Min(width, r * 0.12f);
                 for (var i = 0; i < RingPoints; i++)
                 {
                     var a = i * Mathf.PI * 2f / RingPoints;
                     line.SetPosition(i, new Vector3(Mathf.Cos(a) * r, 0f, Mathf.Sin(a) * r));
                 }
-                var c = Tint(Color.white, 0.75f * strength * (1f - q));
+                var c = Tint(Color.white, 0.6f * strength * Mathf.Min(1f, q * 6f) * (1f - q));
                 line.startColor = c;
                 line.endColor = c;
                 line.enabled = true;

@@ -36,6 +36,7 @@ namespace Rodnarok
         private static readonly KeyValuePair<int, int> ComingKey = ZDO.GetHashZDOID("Rodnarok.coming");
 
         private static readonly AccessTools.FieldRef<FishingFloat, Fish> NibblerOf = AccessTools.FieldRefAccess<FishingFloat, Fish>("m_nibbler");
+        private static readonly AccessTools.FieldRef<Fish, FishingFloat> FailedBait = AccessTools.FieldRefAccess<Fish, FishingFloat>("m_failedBait");
 
         /// <summary>What this game last wrote as each fish's float it is coming to, so it is written only when it changes.</summary>
         private static readonly Dictionary<Fish, ZDOID> Coming = new Dictionary<Fish, ZDOID>();
@@ -159,7 +160,7 @@ namespace Rodnarok
             if (fish == null) return "a fish gone from the world";
             var view = fish.GetComponent<ZNetView>();
             var p = fish.transform.position;
-            return Utils.GetPrefabName(fish.gameObject) + " leaving " + (Time.time - pair.Value).ToString("0", System.Globalization.CultureInfo.InvariantCulture) + " s, "
+            return Utils.GetPrefabName(fish.gameObject) + " of float " + FloatOf(fish).ID.ToString(System.Globalization.CultureInfo.InvariantCulture) + " leaving " + (Time.time - pair.Value).ToString("0", System.Globalization.CultureInfo.InvariantCulture) + " s, "
                 + NearestPlayer(p).ToString("0", System.Globalization.CultureInfo.InvariantCulture) + " m from the nearest player, "
                 + (ZoneSystem.instance.m_waterLevel - p.y).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " m under, owned here " + (view != null && view.IsValid() && view.IsOwner());
         }));
@@ -350,6 +351,8 @@ namespace Rodnarok
             }
             if (fish == null || !cast.Fish.Contains(fish)) return false;
             cast.Learned.Add(fish);
+            // The game's own mark of a bait a fish failed at, so it nibbles that float no more while it lingers by it.
+            FailedBait(fish) = ff;
             cast.Biter = -1;
             cast.BiterFreeAt = float.MaxValue;
             cast.BumpsAt.Clear();
