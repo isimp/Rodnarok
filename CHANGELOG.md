@@ -6,6 +6,8 @@ Each fish pulls the line by its own swimming speed in the game. A Perch fights a
 
 At night floats glow softly so you can find yours in the dark, and yours flashes white when a fish bites, fading back as the hook window runs out. Other players see your float glow but not the flash. The new setting `FloatGlow`, your own, turns it off.
 
+A seated cast goes where you aim instead of straight ahead. Sitting on the ground you turn toward your aim while drawing; on a chair or a bench the cast follows your aim up to 60 degrees to either side of the seat.
+
 ## 0.1.1
 
 A struggling fish takes line slower while the line still holds strain: short taps on the block button that keep the ring partly filled lose less line than letting go. Each struggle writes one log line: the line the fish took, eased off and held time, and any hold the game did not count.

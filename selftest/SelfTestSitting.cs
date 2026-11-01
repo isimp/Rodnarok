@@ -10,13 +10,25 @@ namespace Rodnarok
     /// <summary>
     /// Fishing while sitting, as a player does it: on a chair, then sitting on the ground, the
     /// character holding a rod draws a cast, casts and reels in, and stays seated through all of
-    /// it. Needs only a character beside water: the rod and a chair are brought for the run, and
+    /// it. The seat faces away from the water, the chair by less than its reach to the side and
+    /// the ground by a quarter turn, and the cast must still go where the character looks: across
+    /// the chair's front, or with the body turning toward the aim on the ground. Needs only a
+    /// character beside water: the rod and a chair are brought for the run, and
     /// afterwards the character stands where it stood with its gear as before, the chair and the
     /// float taken away. Pictures of the seated draw and cast are taken for looking at.
     /// </summary>
     internal static class SelfTestSitting
     {
         private const string ChairPrefab = "piece_chair02";
+
+        /// <summary>How far the chair faces away from the water, in degrees: inside the chair's reach to the side.</summary>
+        private const float ChairAway = 40f;
+
+        /// <summary>How far the character sitting on the ground faces away from the water, in degrees.</summary>
+        private const float GroundAway = 90f;
+
+        /// <summary>How far a cast may land from where the character aimed, in degrees: the rod's own spread of 5 and the float's drift.</summary>
+        private const float CastSpread = 10f;
 
         private static readonly AccessTools.FieldRef<FishingFloat, float> LineLength = AccessTools.FieldRefAccess<FishingFloat, float>("m_lineLength");
         private static readonly AccessTools.FieldRef<Character, Animator> AnimatorOf = AccessTools.FieldRefAccess<Character, Animator>("m_animator");
@@ -62,10 +74,11 @@ namespace Rodnarok
                 for (var waited = 0f; waited < 1f; waited += Time.deltaTime) yield return null;
 
                 // On a chair on dry land, sat on as a player sits on one: walked up to, then used.
-                chair = Object.Instantiate(chairPrefab, dry.Value, facing);
+                var chairFacing = facing * Quaternion.Euler(0f, -ChairAway, 0f);
+                chair = Object.Instantiate(chairPrefab, dry.Value, chairFacing);
                 yield return null;
                 var seat = chair.GetComponentInChildren<Chair>();
-                MoveTo(player, dry.Value + facing * Vector3.back * 0.6f);
+                MoveTo(player, dry.Value + chairFacing * Vector3.back * 0.6f);
                 yield return null;
                 var used = seat.Interact(player, false, false);
                 for (var waited = 0f; waited < SitDown; waited += Time.deltaTime) yield return null;
@@ -74,7 +87,7 @@ namespace Rodnarok
                 yield return null;
                 if (player.IsAttached())
                 {
-                    foreach (var step in CastAndReel(check, player, water.Value, "chair", () => player.IsAttached(), () => Seated(player, standing), () => Heads(player, standing))) yield return step;
+                    foreach (var step in CastAndReel(check, player, water.Value, "chair", ChairAway, () => player.IsAttached(), () => Seated(player, standing), () => Heads(player, standing))) yield return step;
                 }
                 player.AttachStop();
                 ZNetScene.instance.Destroy(chair);
@@ -83,6 +96,8 @@ namespace Rodnarok
 
                 // On dry ground where the chair stood, with the sit emote.
                 MoveTo(player, dry.Value);
+                var groundFacing = facing * Quaternion.Euler(0f, -GroundAway, 0f);
+                Face(player, groundFacing);
                 yield return null;
                 var sat = player.StartEmote("sit", oneshot: false);
                 for (var waited = 0f; waited < SitDown; waited += Time.deltaTime) yield return null;
@@ -91,7 +106,7 @@ namespace Rodnarok
                 yield return null;
                 if (SeatedFishing.SitsOnTheGround(player))
                 {
-                    foreach (var step in CastAndReel(check, player, water.Value, "ground", () => SeatedFishing.SitsOnTheGround(player), () => Seated(player, standing), () => Heads(player, standing))) yield return step;
+                    foreach (var step in CastAndReel(check, player, water.Value, "ground", GroundAway, () => SeatedFishing.SitsOnTheGround(player), () => Seated(player, standing), () => Heads(player, standing))) yield return step;
                 }
             }
             finally
@@ -114,8 +129,8 @@ namespace Rodnarok
             check.That(gear.AsBefore(), "the character's gear and what it knows are as before the run: " + gear.Difference());
         }
 
-        /// <summary>Draws a cast toward the water, casts, and reels in, checking the character stays seated throughout.</summary>
-        private static IEnumerable<object> CastAndReel(ScenarioCheck check, Player player, Vector3 water, string seat, System.Func<bool> seated, System.Func<bool> posed, System.Func<string> heads)
+        /// <summary>Draws a cast toward the water, casts, and reels in, checking the character stays seated throughout and the cast goes where it aims.</summary>
+        private static IEnumerable<object> CastAndReel(ScenarioCheck check, Player player, Vector3 water, string seat, float away, System.Func<bool> seated, System.Func<bool> posed, System.Func<string> heads)
         {
             foreach (var ff in OwnFloats()) ZNetScene.instance.Destroy(ff.gameObject);
             var look = water + Vector3.up * 3f - player.GetEyePoint();
@@ -142,7 +157,10 @@ namespace Rodnarok
                 yield return null;
             }
             SelfTestDraw.Drawing = false;
+            var bodyOff = Off(player.transform.forward, water - player.transform.position);
             check.That(drew, "sitting on the " + seat + ", the rod draws");
+            if (seat == "ground")
+                check.That(bodyOff < CastSpread, "drawing on the ground, the body turns toward the aim, " + F(away) + " degrees round: " + F(bodyOff) + " degrees short at the end of the draw");
             check.That(stayed, "the character stayed seated on the " + seat + " while drawing");
             check.That(lowered, "drawing on the " + seat + ", the character's head stays lowered as seated; at the end " + heads());
             check.That(windUpShown, "drawing on the " + seat + ", the arms show the throw's wind-up");
@@ -177,6 +195,12 @@ namespace Rodnarok
                 : "a float showed after " + shownAt.ToString("0.0", CultureInfo.InvariantCulture) + " s, owned here " + ownedShown
                     + (goneAt < 0f ? "" : ", gone after " + goneAt.ToString("0.0", CultureInfo.InvariantCulture) + " s while " + goneWhile);
             check.That(cast != null, "sitting on the " + seat + ", the rod casts; " + told + "; the throw meets " + (SelfTestPlaces.ThrowBlockedBy(player.transform.position, water) ?? "nothing"));
+            if (cast != null)
+            {
+                var castOff = Off(cast.transform.position - player.transform.position, water - player.transform.position);
+                check.That(castOff < CastSpread, "sitting on the " + seat + " facing " + F(away) + " degrees away from the water, the cast goes where the character aims: "
+                    + F(castOff) + " degrees from the aim, at most " + F(CastSpread));
+            }
             check.That(seated(), "the character is still seated on the " + seat + " after the cast");
             for (var waited = 0f; waited < 1.5f; waited += Time.deltaTime)
             {
@@ -349,6 +373,25 @@ namespace Rodnarok
 
         private static string Heads(Player player, float standing) =>
             HeadHeight(player).ToString("0.00", CultureInfo.InvariantCulture) + " m up, standing " + standing.ToString("0.00", CultureInfo.InvariantCulture) + " m";
+
+        /// <summary>How far apart two ways are across the ground, in degrees.</summary>
+        private static float Off(Vector3 a, Vector3 b)
+        {
+            a.y = 0f;
+            b.y = 0f;
+            return Vector3.Angle(a, b);
+        }
+
+        private static string F(float value) => value.ToString("0", CultureInfo.InvariantCulture);
+
+        /// <summary>Turns the character to face a way, looking that way too.</summary>
+        private static void Face(Player player, Quaternion facing)
+        {
+            player.transform.rotation = facing;
+            var body = player.GetComponent<Rigidbody>();
+            if (body != null) body.rotation = facing;
+            player.SetLookDir(facing * Vector3.forward);
+        }
 
         /// <summary>Stands the character at a place, as if it had walked there.</summary>
         private static void MoveTo(Player player, Vector3 place)

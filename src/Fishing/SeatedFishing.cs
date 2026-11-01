@@ -33,6 +33,69 @@ namespace Rodnarok
         /// <summary>Whether this step's controls keep a seated player with a rod seated: no moving, jumping or crouching.</summary>
         public static bool StaysSeated(Player player, Vector3 movedir, bool jump, bool crouch) =>
             movedir == Vector3.zero && !jump && !crouch && SeatedWithRod(player);
+
+        /// <summary>
+        /// How far round from the way a seated player's body faces their cast goes, as <see cref="SeatedAim"/>
+        /// has it; none for a player not seated with a rod. Asked as the player really sits, not as the
+        /// game is shown them for a moment.
+        /// </summary>
+        public static Quaternion ThrowTurn(Player player)
+        {
+            var passing = Passing;
+            Passing = null;
+            try
+            {
+                if (!SeatedWithRod(player)) return Quaternion.identity;
+                var body = player.transform.rotation.eulerAngles.y;
+                var cast = SeatedAim.ThrowYaw(body, player.GetLookYaw().eulerAngles.y, onChair: player.IsAttached());
+                return Quaternion.Euler(0f, cast - body, 0f);
+            }
+            finally
+            {
+                Passing = passing;
+            }
+        }
+    }
+
+    /// <summary>
+    /// A seated player's cast goes where they aim, as <see cref="SeatedAim"/> has it. The game throws
+    /// the rod's cast along the body's facing, which a seat holds still; the cast and where it
+    /// leaves the rod are turned round the character to the aim.
+    /// </summary>
+    [HarmonyPatch(typeof(Attack), "GetProjectileSpawnPoint")]
+    internal static class SeatedThrow
+    {
+        private static readonly AccessTools.FieldRef<Attack, Humanoid> CharacterOf = AccessTools.FieldRefAccess<Attack, Humanoid>("m_character");
+
+        private static void Postfix(Attack __instance, ref Vector3 spawnPoint, ref Vector3 aimDir)
+        {
+            if (!(CharacterOf(__instance) is Player player)) return;
+            var turn = SeatedFishing.ThrowTurn(player);
+            if (turn == Quaternion.identity) return;
+            var pivot = player.transform.position;
+            spawnPoint = pivot + turn * (spawnPoint - pivot);
+            aimDir = turn * aimDir;
+        }
+    }
+
+    /// <summary>
+    /// Sitting on the ground, drawing a cast turns the body toward the aim at the game's own turning
+    /// speed, as drawing does for a standing player; a chair holds its sitter's facing.
+    /// </summary>
+    [HarmonyPatch(typeof(Player), "FixedUpdate")]
+    internal static class SeatedTurn
+    {
+        private static readonly AccessTools.FieldRef<Character, float> TurnSpeed = AccessTools.FieldRefAccess<Character, float>("m_turnSpeed");
+        private static readonly AccessTools.FieldRef<Character, Rigidbody> Body = AccessTools.FieldRefAccess<Character, Rigidbody>("m_body");
+
+        private static void Postfix(Player __instance)
+        {
+            if (__instance != Player.m_localPlayer || !__instance.IsDrawingBow() || !SeatedFishing.SitsOnTheGround(__instance) || !SeatedFishing.SeatedWithRod(__instance)) return;
+            var turned = Quaternion.RotateTowards(__instance.transform.rotation, __instance.GetLookYaw(), TurnSpeed(__instance) * Time.fixedDeltaTime);
+            __instance.transform.rotation = turned;
+            var body = Body(__instance);
+            if (body != null) body.rotation = turned;
+        }
     }
 
     /// <summary>A seated player with a rod who holds still is not stood up by casting or reeling.</summary>

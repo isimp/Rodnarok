@@ -14,7 +14,7 @@ A school of the bait's fish sets off from out of sight beyond the float as it la
 
 A fish bites only when it is really at the float, the float is pulled under with a splash, and the crosshair ring closes over the time you have to hook it by holding the line. In the fight the fish thrashes at the surface while it struggles and calms when it rests, and the ring turns red or yellow to show which. Hold the line while it rests to reel it in. Miss a bite and the fish nibbles at your bait, and each miss is likelier to take it; a fish that missed won't bite again, and once the whole school has, it swims off. Then reel in and cast again. Holding through a struggle gains nothing and strains the line, and the ring fills as it does: ease off before it closes or the line snaps, and the fish takes some line back while you do, less the more strain the line still holds, so short taps keep it closer than letting go. Each fish pulls by how fast it swims in the game: a Pike or a Tuna strains the line sooner and takes more line, an Anglerfish less.
 
-You can cast and reel while sitting on a chair, a bench or a boat's bench. A *Serpent trophy* put up on an *Item stand* calms the waves around it once you tap the use key on that stand; tap it again, or take the trophy off, to let the waters be.
+You can cast and reel while sitting on a chair, a bench or a boat's bench, or on the ground, and the cast goes where you aim: on the ground you turn toward it, on a seat it reaches 60 degrees to either side. A *Serpent trophy* put up on an *Item stand* calms the waves around it once you tap the use key on that stand; tap it again, or take the trophy off, to let the waters be.
 
 ## Multiplayer
 
