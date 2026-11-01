@@ -44,12 +44,14 @@ namespace Rodnarok
                 SeatedRodPose.Forget();
                 SeatedBodies.Forget();
                 FloatWisps.Forget();
+                ArrivalSigns.Forget();
             }
             else
             {
                 CalmStands.Tick();
                 CalmWaters.Tick();
                 FloatWisps.Tick();
+                ArrivalSigns.Tick();
             }
             SelfTestHost.Tick();
         }

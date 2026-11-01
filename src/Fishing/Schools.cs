@@ -28,6 +28,18 @@ namespace Rodnarok
         /// <summary>The saved key holding the id of the float a fish was drawn to.</summary>
         private static readonly KeyValuePair<int, int> FloatKey = ZDO.GetHashZDOID("Rodnarok.float");
 
+        /// <summary>
+        /// The key holding the id of the float a fish is coming to, a school's fish or one of the
+        /// world's own called, from when it sets off until a fish bites; none otherwise. Every game
+        /// reads it to show the fish's sign (<see cref="ArrivalSigns"/>).
+        /// </summary>
+        private static readonly KeyValuePair<int, int> ComingKey = ZDO.GetHashZDOID("Rodnarok.coming");
+
+        private static readonly AccessTools.FieldRef<FishingFloat, Fish> NibblerOf = AccessTools.FieldRefAccess<FishingFloat, Fish>("m_nibbler");
+
+        /// <summary>What this game last wrote as each fish's float it is coming to, so it is written only when it changes.</summary>
+        private static readonly Dictionary<Fish, ZDOID> Coming = new Dictionary<Fish, ZDOID>();
+
         /// <summary>How near the float, across the ground, a fish counts as there.</summary>
         private const float Near = 6f;
 
@@ -191,6 +203,45 @@ namespace Rodnarok
             return zdo == null ? ZDOID.None : zdo.GetZDOID(FloatKey);
         }
 
+        /// <summary>The float a fish is coming to, as the game steering it marked it; none for a fish coming to none.</summary>
+        public static ZDOID ComingTo(Fish fish)
+        {
+            var zdo = fish != null ? fish.GetComponent<ZNetView>()?.GetZDO() : null;
+            return zdo == null ? ZDOID.None : zdo.GetZDOID(ComingKey);
+        }
+
+        /// <summary>Marks the float a fish this game steers is coming to, none for none, writing it only when it changes.</summary>
+        private static void MarkComing(Fish fish, ZDOID to)
+        {
+            if (fish == null) return;
+            if (Coming.TryGetValue(fish, out var was) ? was == to : to.IsNone()) return;
+            var view = fish.GetComponent<ZNetView>();
+            if (view == null || !view.IsValid() || !view.IsOwner()) return;
+            view.GetZDO().Set(ComingKey, to);
+            if (to.IsNone()) Coming.Remove(fish);
+            else Coming[fish] = to;
+        }
+
+        /// <summary>Marks a fish this game steers as coming to a float, none for none, for the self-test's pictures of each fish's sign.</summary>
+        [ForTest]
+        public static void MarkComingForTest(Fish fish, ZDOID to) => MarkComing(fish, to);
+
+        /// <summary>A school's fish, or the fish called, are coming to the float from when they set off until a fish bites.</summary>
+        private static void MarkCast(Cast cast)
+        {
+            var coming = cast.Came && !cast.Hooked && !cast.Spooked && cast.Float != null && NibblerOf(cast.Float) == null ? cast.Id : ZDOID.None;
+            if (cast.Called is object) MarkComing(cast.Called, coming);
+            foreach (var fish in cast.Fish) MarkComing(fish, coming);
+        }
+
+        /// <summary>A called fish is the game's again, coming to no float.</summary>
+        private static void Uncall(Fish fish)
+        {
+            if (fish is null) return;
+            CalledBy.Remove(fish);
+            MarkComing(fish, ZDOID.None);
+        }
+
         /// <summary>The float one of the schools' fish may go for now: its own, while it is the one let to and the float waits in the water; none otherwise.</summary>
         public static FishingFloat FloatFor(Fish fish)
         {
@@ -205,7 +256,7 @@ namespace Rodnarok
         public static void Hooked(Fish fish, FishingFloat ff)
         {
             // A called fish, once on the line or let go, is the game's again.
-            CalledBy.Remove(fish);
+            Uncall(fish);
             if (ff == null || !CastOf.TryGetValue(fish, out var cast) || cast.Hooked) return;
             cast.Hooked = true;
             var hooked = cast.Fish.IndexOf(fish);
@@ -232,7 +283,7 @@ namespace Rodnarok
         public static void BaitTaken(FishingFloat ff)
         {
             if (ff == null || !Casts.TryGetValue(ff, out var cast) || cast.Hooked) return;
-            if (cast.Called is object) CalledBy.Remove(cast.Called);
+            if (cast.Called is object) Uncall(cast.Called);
             cast.Spooked = true;
             cast.BumpsAt.Clear();
             foreach (var fish in cast.Fish.ToList())
@@ -252,7 +303,7 @@ namespace Rodnarok
             if (ff == null || !Casts.TryGetValue(ff, out var cast) || cast.Hooked) return false;
             if (cast.Called is object && cast.Called == fish)
             {
-                CalledBy.Remove(fish);
+                Uncall(fish);
                 cast.Spooked = true;
                 return true;
             }
@@ -342,7 +393,7 @@ namespace Rodnarok
                     continue;
                 }
                 Casts.Remove(pair.Key);
-                if (pair.Value.Called is object) CalledBy.Remove(pair.Value.Called);
+                if (pair.Value.Called is object) Uncall(pair.Value.Called);
                 foreach (var fish in pair.Value.Fish) Leave(fish, pair.Value.LastPlace);
             }
         }
@@ -354,12 +405,13 @@ namespace Rodnarok
                 if (Time.time >= cast.DueAt) Come(cast);
                 return;
             }
+            MarkCast(cast);
             if (cast.Called is object)
             {
                 // A called fish gone from the world before it bit: what comes is decided again.
                 if (cast.Called == null && !cast.Hooked)
                 {
-                    CalledBy.Remove(cast.Called);
+                    Uncall(cast.Called);
                     cast.Called = null;
                     cast.Came = false;
                     cast.DueAt = Time.time + 1f;
@@ -879,6 +931,9 @@ namespace Rodnarok
             var item = fish.GetComponent<ItemDrop>();
             if (view == null || !view.IsOwner() || fish.IsOutOfWater() || Jumping(fish)) return;
             if (item != null && item.m_itemData.m_quality > fish.m_jumpMaxLevel) return;
+            // Only a fish whose sign leaps does, and as the game's own fish, mostly at dawn and dusk.
+            if (!ArrivalSign.Leaps(ArrivalSign.Of(Utils.GetPrefabName(fish.gameObject)))) return;
+            if (EnvMan.instance == null || Random.value >= ArrivalSign.DawnDusk(EnvMan.instance.GetDayFraction())) return;
             if (!DeepAhead(fish, home.y)) return;
             Jump(fish);
             LeaptAt[fish] = Time.time;
@@ -912,6 +967,7 @@ namespace Rodnarok
         /// </summary>
         private static void Flee(Fish fish, Vector3 from, float dive = 0f)
         {
+            MarkComing(fish, ZDOID.None);
             var view = fish.GetComponent<ZNetView>();
             if (view == null || !view.IsValid() || !view.IsOwner()) return;
             var away = Flat(fish.transform.position - from);
@@ -1162,6 +1218,7 @@ namespace Rodnarok
             LeaptAt.Clear();
             Trail.Clear();
             CalledBy.Clear();
+            Coming.Clear();
         }
 
         private static Vector3 Flat(Vector3 v)
