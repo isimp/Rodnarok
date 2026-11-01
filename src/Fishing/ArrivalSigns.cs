@@ -261,7 +261,8 @@ namespace Rodnarok
                     var up = Mathf.Sin(Time.time * 1.7f + 1f) > -0.2f;
                     var fin = go.transform.Find("Fin");
                     fin.gameObject.SetActive(up);
-                    fin.GetComponent<MeshRenderer>().material.color = Tint(new Color(0.12f, 0.16f, 0.2f), 0.9f, false);
+                    // Dark against the day's water, by night a moonlit edge, so it shows on dark water too.
+                    fin.GetComponent<MeshRenderer>().material.color = Tint(Color.Lerp(new Color(0.12f, 0.16f, 0.2f), new Color(0.5f, 0.6f, 0.7f), _darkness), 0.9f, false);
                     SetWake(go.transform.Find("Wake"), at - heading * 0.15f, at - heading * 1.6f, up ? 0.6f * strength : 0f);
                     break;
             }
