@@ -103,7 +103,7 @@ namespace Rodnarok
                     yield return null;
                 }
                 kinds = school == null || school.Count == 0
-                    ? "none within 30 s, " + Schools.LeavingForTest.ToString(CultureInfo.InvariantCulture) + " fish still leaving, " + (Schools.TooLittleWaterForTest - tooLittle).ToString(CultureInfo.InvariantCulture) + " casts found too little water"
+                    ? "none within 30 s, " + Schools.LeavingForTest.ToString(CultureInfo.InvariantCulture) + " fish still leaving (" + Schools.LeavingDescribedForTest() + "), " + (Schools.TooLittleWaterForTest - tooLittle).ToString(CultureInfo.InvariantCulture) + " casts found too little water"
                     : string.Join(", ", school.Where(f => f != null).Select(f => Utils.GetPrefabName(f.gameObject)).Distinct());
                 check.That(school != null && school.Count > 0 && school.All(f => f != null && Utils.GetPrefabName(f.gameObject) == Pike),
                     "with BiomeFishOnBait off the same cast brings a school of Pike: " + kinds);

@@ -40,6 +40,9 @@ namespace Rodnarok
         /// <summary>What this game last wrote as each fish's float it is coming to, so it is written only when it changes.</summary>
         private static readonly Dictionary<Fish, ZDOID> Coming = new Dictionary<Fish, ZDOID>();
 
+        /// <summary>The speed each fish going for the bait had before it slowed to meet the hook (<see cref="BiteApproach"/>).</summary>
+        private static readonly Dictionary<Fish, float> SlowedFrom = new Dictionary<Fish, float>();
+
         /// <summary>How near the float, across the ground, a fish counts as there.</summary>
         private const float Near = 6f;
 
@@ -148,6 +151,19 @@ namespace Rodnarok
         [ForTest]
         public static int LeavingForTest => GoneSince.Count;
 
+        /// <summary>Each leaving fish: what it is, how long it has left, how far the nearest player is, how deep it swims and whether this game owns it, for the self-test.</summary>
+        [ForTest]
+        public static string LeavingDescribedForTest() => string.Join("; ", GoneSince.Select(pair =>
+        {
+            var fish = pair.Key;
+            if (fish == null) return "a fish gone from the world";
+            var view = fish.GetComponent<ZNetView>();
+            var p = fish.transform.position;
+            return Utils.GetPrefabName(fish.gameObject) + " leaving " + (Time.time - pair.Value).ToString("0", System.Globalization.CultureInfo.InvariantCulture) + " s, "
+                + NearestPlayer(p).ToString("0", System.Globalization.CultureInfo.InvariantCulture) + " m from the nearest player, "
+                + (ZoneSystem.instance.m_waterLevel - p.y).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture) + " m under, owned here " + (view != null && view.IsValid() && view.IsOwner());
+        }));
+
         /// <summary>How long the school of a float this game cast takes to swim in, for the self-test; below zero for none.</summary>
         [ForTest]
         public static float SwimSecondsForTest(FishingFloat ff) => ff != null && Casts.TryGetValue(ff, out var cast) && cast.Fish.Count > 0 ? cast.SwimSeconds : -1f;
@@ -240,6 +256,30 @@ namespace Rodnarok
             if (fish is null) return;
             CalledBy.Remove(fish);
             MarkComing(fish, ZDOID.None);
+            Unslow(fish);
+        }
+
+        /// <summary>A fish going for the bait swims no faster near the hook than lets it turn to meet it.</summary>
+        private static void Approach(Fish fish, FishingFloat ff)
+        {
+            if (fish == null || ff == null) return;
+            var own = SlowedFrom.TryGetValue(fish, out var was) ? was : fish.m_speed;
+            var speed = BiteApproach.Speed(own, fish.m_turnRate, Bites.Reach, Vector3.Distance(fish.transform.position, Bites.Hook(ff)));
+            if (speed >= own)
+            {
+                Unslow(fish);
+                return;
+            }
+            SlowedFrom[fish] = own;
+            fish.m_speed = speed;
+        }
+
+        /// <summary>A fish slowed to meet the hook swims at its speed again.</summary>
+        private static void Unslow(Fish fish)
+        {
+            if (fish is null || !SlowedFrom.TryGetValue(fish, out var own)) return;
+            SlowedFrom.Remove(fish);
+            if (fish != null) fish.m_speed = own;
         }
 
         /// <summary>The float one of the schools' fish may go for now: its own, while it is the one let to and the float waits in the water; none otherwise.</summary>
@@ -255,6 +295,7 @@ namespace Rodnarok
         /// <summary>A fish was hooked or let go by a float; a school whose fish is hooked scatters.</summary>
         public static void Hooked(Fish fish, FishingFloat ff)
         {
+            Unslow(fish);
             // A called fish, once on the line or let go, is the game's again.
             Uncall(fish);
             if (ff == null || !CastOf.TryGetValue(fish, out var cast) || cast.Hooked) return;
@@ -408,6 +449,7 @@ namespace Rodnarok
             MarkCast(cast);
             if (cast.Called is object)
             {
+                if (cast.Called != null && !cast.Hooked) Approach(cast.Called, cast.Float);
                 // A called fish gone from the world before it bit: what comes is decided again.
                 if (cast.Called == null && !cast.Hooked)
                 {
@@ -432,6 +474,13 @@ namespace Rodnarok
             {
                 cast.BumpsAt.RemoveAt(0);
                 Bites.Bump(cast.Float);
+            }
+            // The fish let go for the bait slows near the hook; every other keeps its speed.
+            var approaching = !cast.Hooked && cast.Biter >= 0 && cast.Biter < cast.Fish.Count && Time.time >= cast.BiterFreeAt ? cast.Fish[cast.Biter] : null;
+            foreach (var fish in cast.Fish)
+            {
+                if (fish == approaching) Approach(fish, cast.Float);
+                else Unslow(fish);
             }
             if (cast.Hooked || cast.Fish.Count == 0 || cast.BiterFreeAt < float.MaxValue) return;
             var near = cast.Fish.Count(f => Across(f.transform.position, cast.Float.transform.position) < Near);
@@ -971,6 +1020,7 @@ namespace Rodnarok
         private static void Flee(Fish fish, Vector3 from, float dive = 0f)
         {
             MarkComing(fish, ZDOID.None);
+            Unslow(fish);
             var view = fish.GetComponent<ZNetView>();
             if (view == null || !view.IsValid() || !view.IsOwner()) return;
             var away = Flat(fish.transform.position - from);
@@ -1222,6 +1272,7 @@ namespace Rodnarok
             Trail.Clear();
             CalledBy.Clear();
             Coming.Clear();
+            SlowedFrom.Clear();
         }
 
         private static Vector3 Flat(Vector3 v)

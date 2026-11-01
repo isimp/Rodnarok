@@ -140,29 +140,29 @@ namespace Rodnarok
             switch (coming.Kind)
             {
                 case ArrivalSignKind.Rings:
-                    Ring(Jitter(at, 0.8f), 0.7f, 1.3f, strength, 0f);
+                    Ring(Jitter(at, 0.8f), 1.1f, 1.3f, strength, 0f);
                     break;
                 case ArrivalSignKind.Flicker:
-                    for (var i = 0; i < 5; i++) Ring(Jitter(at, 1.3f), 0.28f, 0.7f, strength, Random.Range(0f, 0.15f));
+                    for (var i = 0; i < 5; i++) Ring(Jitter(at, 1.4f), 0.45f, 0.7f, strength, Random.Range(0f, 0.15f));
                     break;
                 case ArrivalSignKind.Swirl:
                     var by2 = Vector3.MoveTowards(new Vector3(floatAt.x, at.y, floatAt.z), at, 0.6f);
-                    Ring(by2, 1.1f, 1.6f, 1f, 0f, 0.06f);
-                    Ring(by2, 0.55f, 1.6f, 1f, 0.1f, 0.05f);
-                    Blob(by2, new Vector3(0.9f, 0.35f, 1f), new Color(0.05f, 0.1f, 0.15f), 0.45f, 1.6f, true);
+                    Ring(by2, 1.4f, 1.6f, 1f, 0f, 0.1f);
+                    Ring(by2, 0.7f, 1.6f, 1f, 0.1f, 0.08f);
+                    Blob(by2, new Vector3(1.3f, 0.5f, 1f), new Color(0.05f, 0.1f, 0.15f), 0.5f, 1.6f, true);
                     break;
                 case ArrivalSignKind.Bloop:
                     var bloop = Jitter(at, 0.5f);
-                    Dot(bloop, 0.16f, 0.35f, 0.05f, strength, 0f, Color.white);
-                    Ring(bloop, 0.55f, 0.8f, strength, 0.33f);
+                    Dot(bloop, 0.3f, 0.35f, 0.05f, strength, 0f, Color.white);
+                    Ring(bloop, 0.85f, 0.8f, strength, 0.33f);
                     break;
                 case ArrivalSignKind.Fizz:
-                    for (var i = 0; i < 4; i++) Dot(Jitter(at, 0.7f), 0.05f, Random.Range(0.5f, 0.9f), 0.12f, strength, 0f, Color.white);
+                    for (var i = 0; i < 5; i++) Dot(Jitter(at, 0.8f), 0.1f, Random.Range(0.5f, 0.9f), 0.15f, strength, 0f, Color.white);
                     break;
                 case ArrivalSignKind.Dome:
                     var dome = Jitter(at, 0.4f);
-                    Arc(dome, 0.35f, 1.5f, strength);
-                    Ring(dome, 0.8f, 0.7f, strength, 1.5f);
+                    Arc(dome, 0.55f, 1.5f, strength);
+                    Ring(dome, 1.1f, 0.7f, strength, 1.5f);
                     break;
                 case ArrivalSignKind.Steam:
                     Puff(Jitter(at, 0.6f), strength);
@@ -172,8 +172,8 @@ namespace Rodnarok
                     {
                         var spot = Jitter(at, 1.1f);
                         var delay = Random.Range(0f, 0.25f);
-                        Splash(spot, Random.Range(0.18f, 0.35f), Random.Range(0.45f, 0.75f), strength, delay);
-                        Ring(spot, 0.3f, 0.6f, strength * 0.7f, delay);
+                        Splash(spot, Random.Range(0.3f, 0.55f), Random.Range(0.45f, 0.75f), strength, delay);
+                        Ring(spot, 0.45f, 0.6f, strength * 0.7f, delay);
                     }
                     break;
                 case ArrivalSignKind.Zigzag:
@@ -182,9 +182,9 @@ namespace Rodnarok
                     for (var i = 0; i < 6; i++)
                     {
                         var turn = dir + (i % 2 == 0 ? 0.9f : -0.9f);
-                        glint += new Vector3(Mathf.Cos(turn), 0f, Mathf.Sin(turn)) * 0.3f;
-                        Dot(glint, 0.07f, 0.35f, 0f, strength, i * 0.05f, new Color(0.9f, 0.96f, 1f));
-                        Ring(glint, 0.15f, 0.35f, strength * 0.7f, i * 0.05f);
+                        glint += new Vector3(Mathf.Cos(turn), 0f, Mathf.Sin(turn)) * 0.45f;
+                        Dot(glint, 0.13f, 0.4f, 0f, strength, i * 0.05f, new Color(0.9f, 0.96f, 1f));
+                        Ring(glint, 0.25f, 0.4f, strength * 0.7f, i * 0.05f);
                     }
                     break;
             }
@@ -201,7 +201,7 @@ namespace Rodnarok
                     blob.sprite = DotSprite();
                     blob.transform.SetParent(go.transform, false);
                     blob.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-                    blob.transform.localScale = new Vector3(1.8f, 0.7f, 1f);
+                    blob.transform.localScale = new Vector3(2.6f, 1f, 1f);
                     Wake(go, "WakeLeft");
                     Wake(go, "WakeRight");
                     break;
@@ -221,6 +221,7 @@ namespace Rodnarok
                     var fin = new GameObject("Fin");
                     fin.transform.SetParent(go.transform, false);
                     fin.AddComponent<MeshFilter>().sharedMesh = FinMesh();
+                    fin.transform.localScale = Vector3.one * 1.6f;
                     fin.AddComponent<MeshRenderer>().sharedMaterial = SignMaterial();
                     Wake(go, "Wake");
                     break;
@@ -272,7 +273,7 @@ namespace Rodnarok
             line.transform.SetParent(parent.transform, false);
             line.useWorldSpace = true;
             line.positionCount = 2;
-            line.widthMultiplier = 0.04f;
+            line.widthMultiplier = 0.07f;
             line.sharedMaterial = SignMaterial();
         }
 
@@ -288,7 +289,7 @@ namespace Rodnarok
 
         // Parts of signs.
 
-        private static void Ring(Vector3 at, float radius, float life, float strength, float delay, float width = 0.035f)
+        private static void Ring(Vector3 at, float radius, float life, float strength, float delay, float width = 0.07f)
         {
             var line = new GameObject("RodnarokSignRing").AddComponent<LineRenderer>();
             line.transform.position = at;
@@ -336,9 +337,9 @@ namespace Rodnarok
             Add(puff.gameObject, 1.8f, 0f, (p, q) =>
             {
                 puff.transform.position = at + new Vector3(0.1f * q, 1.2f * q, 0f);
-                puff.transform.localScale = Vector3.one * (0.3f + 0.7f * q);
+                puff.transform.localScale = Vector3.one * (0.5f + 1.2f * q);
                 Face(puff.transform);
-                puff.color = Tint(new Color(0.92f, 0.92f, 0.92f), 0.45f * strength * (1f - q));
+                puff.color = Tint(new Color(0.92f, 0.92f, 0.92f), 0.65f * strength * (1f - q));
             });
         }
 
@@ -347,7 +348,7 @@ namespace Rodnarok
             var line = new GameObject("RodnarokSignSplash").AddComponent<LineRenderer>();
             line.useWorldSpace = true;
             line.positionCount = 2;
-            line.widthMultiplier = 0.035f;
+            line.widthMultiplier = 0.07f;
             line.sharedMaterial = SignMaterial();
             line.enabled = false;
             var lean = new Vector3(Random.Range(-0.05f, 0.05f), 0f, Random.Range(-0.05f, 0.05f));
@@ -368,7 +369,7 @@ namespace Rodnarok
             var line = new GameObject("RodnarokSignDome").AddComponent<LineRenderer>();
             line.useWorldSpace = true;
             line.positionCount = RingPoints / 2 + 1;
-            line.widthMultiplier = 0.035f;
+            line.widthMultiplier = 0.07f;
             line.sharedMaterial = SignMaterial();
             Add(line.gameObject, life, 0f, (p, q) =>
             {

@@ -10,6 +10,8 @@ Plain *Fishing Bait* also brings the fish that live where the float lands: in th
 
 Each fish tells itself on its way to your float by a sign of its own on the water, more often as it nears: a *Perch* small rings, a *Giant herring* a flicker of tiny rings, a *Pike* one swirl by the float, a *Trollfish* a heavy bulge, a *Grouper* big bubbles, a *Coral cod* a fizz, a *Pufferfish* swelling domes, an *Anglerfish* a lure glowing under the water, a *Magmafish* steam, a *Tuna* a boil of splashes, a *Northern salmon* a fin and a *Tetra* a zigzag of glints. Every player at the water sees them. Fish no longer all leap on their way in: only a *Tuna* or a *Northern salmon* does, and mostly at dawn and dusk, as the game's own fish leap.
 
+A fast fish such as a *Pike* or a *Tuna* now slows as it closes on the bait, so it meets the hook and bites instead of circling it.
+
 A seated cast goes where you aim instead of straight ahead. Sitting on the ground you turn toward your aim while drawing; on a chair or a bench the cast follows your aim up to 60 degrees to either side of the seat.
 
 ## 0.1.1

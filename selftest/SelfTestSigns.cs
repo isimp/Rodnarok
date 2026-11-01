@@ -43,6 +43,8 @@ namespace Rodnarok
         /// <summary>How far short of the float, toward the character, each fish of the pictures is put, in metres: near enough for the Pike's swirl.</summary>
         private const float PictureShort = 5f;
 
+        private static bool Travels(ArrivalSignKind kind) => kind == ArrivalSignKind.Bulge || kind == ArrivalSignKind.Glow || kind == ArrivalSignKind.Fin;
+
         /// <summary>The character looks down at a place a little to its side, so the third-person camera shows it past the character.</summary>
         private static void Aim(Player player, Vector3 at)
         {
@@ -157,13 +159,16 @@ namespace Rodnarok
                     var expected = ArrivalSign.Of(prefab);
                     var shownBy = 0;
                     var kindSeen = ArrivalSignKind.Rings;
-                    for (var waited = 0f; waited < 3f; waited += Time.deltaTime)
+                    // The picture is taken just after a showing, a travelling sign a second after it starts.
+                    var shownAt = -1f;
+                    for (var waited = 0f; waited < 4f; waited += Time.deltaTime)
                     {
                         Aim(player, at + Vector3.up * 1.5f);
                         var seen = ArrivalSigns.ForTest(floatId);
                         kindSeen = seen.Kind;
+                        if (seen.Shown > shownBy && shownAt < 0f && waited > 1f) shownAt = waited;
                         shownBy = seen.Shown;
-                        if (waited > 2.2f && shownBy > 0) break;
+                        if (shownAt >= 0f && waited >= shownAt + (Travels(expected) ? 1f : 0.35f)) break;
                         yield return null;
                     }
                     if (kindSeen != expected || shownBy == 0) wrong.Add(name + " showed " + kindSeen + " " + shownBy + " times, " + expected + " wanted");
