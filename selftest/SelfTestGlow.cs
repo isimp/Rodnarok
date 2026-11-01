@@ -9,11 +9,12 @@ namespace Rodnarok
     /// <summary>
     /// A float glows at night and flashes at a bite, as a player meets it: a float lands in deep
     /// water beside the character, carrying no fish's bait so nothing comes to it. At full night
-    /// it must carry a soft yellow light just above it; a bite must flash it white and brighter,
-    /// fading back to the glow over the hook window; hooking the fish must end the flash at once;
-    /// by day the light must be out, and with the player's FloatGlow setting off there must be no
-    /// light at all. The night is set for the checks; when it is really night in game, pictures
-    /// of the waiting glow and the flash are taken as well. The setting, the character's view, the
+    /// it must carry a soft yellow light and a yellow bead just above it; a bite must flash them
+    /// white, the light brighter and the bead larger, fading back to the glow over the hook window;
+    /// hooking the fish must end the flash at once; by day both must be out, and with the player's
+    /// FloatGlow setting off there must be neither. Full night is set for the checks; when it is
+    /// really night in game, pictures of the waiting glow and the flash are taken as well, at full
+    /// night, the character looking at the float a little to its side so it does not hide it. The setting, the character's view, the
     /// float, the fish and the rod are put back after.
     /// </summary>
     internal static class SelfTestGlow
@@ -41,11 +42,18 @@ namespace Rodnarok
 
         private static bool Yellow(Light light) => light != null && Mathf.Abs(light.color.g - RingDraw.YellowG) < 0.03f && light.color.b < 0.1f;
 
-        /// <summary>The character looks just above the float, as a player watching it would.</summary>
+        private static string Seen(SpriteRenderer bead) =>
+            bead == null ? "no bead" : (bead.enabled ? "shown" : "hidden") + ", colour " + F(bead.color.r) + "/" + F(bead.color.g) + "/" + F(bead.color.b) + "/" + F(bead.color.a)
+                + ", width " + F(bead.transform.lossyScale.x) + " m";
+
+        /// <summary>How far, in degrees, the character looks beside the float, so the character's own body leaves it in sight.</summary>
+        private const float AimBeside = 10f;
+
+        /// <summary>The character looks at the float a little to its side, so the third-person camera shows it past the character.</summary>
         private static void Aim(Player player, FishingFloat ff)
         {
             if (ff == null) return;
-            var dir = ff.transform.position + Vector3.up * 1.2f - player.m_eye.position;
+            var dir = Quaternion.Euler(0f, AimBeside, 0f) * (ff.transform.position - player.m_eye.position);
             if (dir.sqrMagnitude < 0.01f) return;
             player.SetLookDir(dir);
             LookPitch(player) = -Mathf.Asin(Mathf.Clamp(dir.normalized.y, -1f, 1f)) * Mathf.Rad2Deg;
@@ -99,18 +107,21 @@ namespace Rodnarok
                     + F(Vector3.Distance(light.transform.position, ff.transform.position)) + " m from it");
                 check.That(Yellow(light) && Mathf.Abs(light.intensity - FloatGlow.GlowIntensity) < 0.01f && Mathf.Abs(light.range - FloatGlow.GlowRange) < 0.01f,
                     "waiting, the float glows soft yellow at intensity " + F(FloatGlow.GlowIntensity) + " over " + F(FloatGlow.GlowRange) + " m: " + Seen(light));
+                var bead = FloatGlows.BeadForTest(ff);
+                check.That(bead != null && bead.enabled && Mathf.Abs(bead.color.g - RingDraw.YellowG) < 0.03f && bead.color.b < 0.1f && bead.color.a > 0.99f
+                    && Mathf.Abs(bead.transform.lossyScale.x - FloatGlow.BeadSize) < 0.01f, "waiting, a yellow bead " + F(FloatGlow.BeadSize) + " m wide shows on the float: " + Seen(bead));
+                if (bead == null) yield break;
                 var night = EnvMan.IsNight();
                 if (night)
                 {
-                    FloatGlows.DarknessForTest = null;
-                    for (var waited = 0f; waited < 0.5f; waited += Time.deltaTime)
+                    for (var waited = 0f; waited < 1f; waited += Time.deltaTime)
                     {
                         Aim(player, ff);
                         yield return null;
                     }
                     var trouble = SelfTestPictures.Take("glow-waiting");
                     check.That(trouble == null, "a picture of the waiting glow is taken: " + trouble);
-                    FloatGlows.DarknessForTest = 1f;
+                    check.Note("glow pictures at full night; the game's own darkness now is " + F(FloatGlow.Darkness(EnvMan.instance.GetDayFraction())));
                 }
 
                 // A bite: a white, brighter flash that fades back over the hook window.
@@ -123,6 +134,7 @@ namespace Rodnarok
                 yield return null;
                 check.That(light.enabled && light.color.b > 0.8f && light.intensity > FloatGlow.GlowIntensity * 2f && light.range > FloatGlow.GlowRange,
                     "right after a bite the float flashes white and brighter: " + Seen(light));
+                check.That(bead.enabled && bead.color.b > 0.8f && bead.transform.lossyScale.x > FloatGlow.BeadSize * 1.5f, "right after a bite the bead is white and larger: " + Seen(bead));
                 if (night)
                 {
                     Aim(player, ff);
@@ -134,6 +146,7 @@ namespace Rodnarok
                 check.That(light.intensity < flash && light.intensity > FloatGlow.GlowIntensity, "half the hook window on, the flash has faded part way: " + Seen(light));
                 for (var waited = 0f; waited < window / 2f + 0.2f; waited += Time.deltaTime) yield return null;
                 check.That(Yellow(light) && Mathf.Abs(light.intensity - FloatGlow.GlowIntensity) < 0.01f, "once the hook window is out the float glows soft yellow again: " + Seen(light));
+                check.That(Mathf.Abs(bead.transform.lossyScale.x - FloatGlow.BeadSize) < 0.01f && bead.color.b < 0.1f, "and the bead is its yellow size again: " + Seen(bead));
 
                 // Hooking ends the flash at once, though the game's half second is stretched on the hook.
                 Nibbler(ff) = fish;
@@ -149,7 +162,7 @@ namespace Rodnarok
                 // By day the light is out.
                 FloatGlows.DarknessForTest = 0f;
                 yield return null;
-                check.That(!light.enabled, "by day the float's light is out: " + Seen(light));
+                check.That(!light.enabled && !bead.enabled, "by day the float's light and bead are out: " + Seen(light) + "; " + Seen(bead));
 
                 // With the player's setting off no float carries a light.
                 FloatGlows.DarknessForTest = 1f;
@@ -157,7 +170,7 @@ namespace Rodnarok
                 // Unity takes a destroyed light away at the end of the frame.
                 yield return null;
                 yield return null;
-                check.That(FloatGlows.LightForTest(ff) == null && light == null, "with FloatGlow off the float carries no light");
+                check.That(FloatGlows.LightForTest(ff) == null && light == null && bead == null, "with FloatGlow off the float carries no light and no bead");
                 if (!night) check.Note("no pictures of the glow: it is day in game; run the self-test at night to see it");
             }
             finally

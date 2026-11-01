@@ -2,14 +2,16 @@ using System;
 
 namespace Rodnarok
 {
-    /// <summary>How the float's light shows: whether it is lit, how bright and how far it reaches, and its colour.</summary>
+    /// <summary>How the float's glow shows: whether it is lit, its light's brightness and reach, its bead's size and opacity, and its colour.</summary>
     internal readonly struct GlowLook
     {
-        public GlowLook(bool on, float intensity, float range, float r, float g, float b)
+        public GlowLook(bool on, float intensity, float range, float size, float alpha, float r, float g, float b)
         {
             On = on;
             Intensity = intensity;
             Range = range;
+            Size = size;
+            Alpha = alpha;
             R = r;
             G = g;
             B = b;
@@ -21,6 +23,12 @@ namespace Rodnarok
         /// <summary>How far the light reaches, in metres.</summary>
         public float Range { get; }
 
+        /// <summary>How wide the bead on the float is, in metres.</summary>
+        public float Size { get; }
+
+        /// <summary>How opaque the bead is, from 0 to 1.</summary>
+        public float Alpha { get; }
+
         public float R { get; }
         public float G { get; }
         public float B { get; }
@@ -28,10 +36,12 @@ namespace Rodnarok
 
     /// <summary>
     /// The float's glow at night, so it can be found and its bite seen in the dark. It is a soft
-    /// light in the ring's resting yellow, as strong as the game's night light is in the sky: none
-    /// by day, rising after sunset to full at midnight and falling again before sunrise. A bite
-    /// flashes it white and brighter, fading back to the glow over the hook window as the ring
-    /// drains. Through the fight it stays the soft glow; the ring shows struggle and rest.
+    /// light in the ring's resting yellow with a bead of the same colour on the float, drawn
+    /// without the scene's light so it shows from far off, both as strong as the game's night
+    /// light is in the sky: none by day, rising after sunset to full at midnight and falling again
+    /// before sunrise. A bite flashes them white, the light brighter and the bead larger, fading
+    /// back to the glow over the hook window as the ring drains. Through the fight it stays the
+    /// soft glow; the ring shows struggle and rest.
     /// </summary>
     internal static class FloatGlow
     {
@@ -45,6 +55,10 @@ namespace Rodnarok
         /// <summary>The flash's brightness and reach, in metres, the moment a fish bites.</summary>
         public const float FlashIntensity = 3f;
         public const float FlashRange = 5f;
+
+        /// <summary>The bead's width, in metres, while waiting and the moment a fish bites.</summary>
+        public const float BeadSize = 0.35f;
+        public const float BeadFlashSize = 0.7f;
 
         /// <summary>How dark it is by the time of day, from 0 by day to 1 at midnight: the weight the game gives its night light.</summary>
         public static float Darkness(float dayFraction)
@@ -62,6 +76,8 @@ namespace Rodnarok
             return new GlowLook(true,
                 Lerp(GlowIntensity, FlashIntensity, flash) * darkness,
                 Lerp(GlowRange, FlashRange, flash),
+                Lerp(BeadSize, BeadFlashSize, flash),
+                darkness,
                 1f,
                 Lerp(RingDraw.YellowG, 1f, flash),
                 Lerp(RingDraw.YellowB, 1f, flash));

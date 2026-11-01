@@ -107,6 +107,33 @@ namespace Rodnarok.Tests
         }
 
         [Fact]
+        public void AtNightAGlowingBeadOnTheFloatShowsFromFarOff()
+        {
+            var glow = FloatGlow.Look(1f, NoBite, Window);
+            Assert.Equal(FloatGlow.BeadSize, glow.Size, 3);
+            Assert.Equal(1f, glow.Alpha, 3);
+            Assert.False(FloatGlow.Look(0f, NoBite, Window).On);
+        }
+
+        [Fact]
+        public void ABiteSwellsTheBeadAndItShrinksBackOverTheHookWindow()
+        {
+            Assert.Equal(FloatGlow.BeadFlashSize, FloatGlow.Look(1f, 0f, Window).Size, 3);
+            Assert.True(FloatGlow.BeadFlashSize > FloatGlow.BeadSize * 1.5f);
+            Assert.Equal((FloatGlow.BeadFlashSize + FloatGlow.BeadSize) / 2f, FloatGlow.Look(1f, Window / 2f, Window).Size, 3);
+            Assert.Equal(FloatGlow.BeadSize, FloatGlow.Look(1f, Window, Window).Size, 3);
+        }
+
+        [Fact]
+        public void TheBeadFadesInWithTheNightAndKeepsItsSize()
+        {
+            var dusk = FloatGlow.Darkness(0.8f);
+            var look = FloatGlow.Look(dusk, NoBite, Window);
+            Assert.Equal(dusk, look.Alpha, 3);
+            Assert.Equal(FloatGlow.BeadSize, look.Size, 3);
+        }
+
+        [Fact]
         public void TheGlowIsOnUnlessAPlayerTurnsItOff()
         {
             Assert.True(FloatGlow.OnByDefault);
