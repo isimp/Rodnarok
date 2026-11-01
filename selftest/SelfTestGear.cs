@@ -96,12 +96,53 @@ namespace Rodnarok
             return gear;
         }
 
+        private static readonly AccessTools.FieldRef<Humanoid, ItemDrop.ItemData> Utility = AccessTools.FieldRefAccess<Humanoid, ItemDrop.ItemData>("m_utilityItem");
+        private ItemDrop.ItemData _utility;
+        private ItemDrop.ItemData _addedWorn;
+        private bool _wore;
+
+        /// <summary>Puts an item on in the utility slot, one of the character's own if it carries one, else one added for the run; null with what stood in the way.</summary>
+        public ItemDrop.ItemData Wear(string prefab)
+        {
+            var inventory = _player.GetInventory();
+            if (!_wore)
+            {
+                _wore = true;
+                _utility = Utility(_player);
+            }
+            var item = inventory.GetAllItems().Find(i => i.m_dropPrefab != null && i.m_dropPrefab.name == prefab);
+            if (item == null)
+            {
+                if (!inventory.HaveEmptySlot())
+                {
+                    Trouble = "no free inventory slot for a " + prefab;
+                    return null;
+                }
+                item = inventory.AddItem(prefab, 1, 1, 0, 0L, "", false);
+                _addedWorn = item;
+                if (item == null)
+                {
+                    Trouble = "a " + prefab + " could not be added";
+                    return null;
+                }
+            }
+            if (!_player.IsItemEquiped(item)) _player.EquipItem(item, triggerEquipEffects: false);
+            return _player.IsItemEquiped(item) ? item : null;
+        }
+
         /// <summary>Puts hands, put-away items, selected bait, inventory and knowledge back as they were; once.</summary>
         public void PutBack()
         {
             if (_putBack) return;
             _putBack = true;
             var inventory = _player.GetInventory();
+            if (_wore)
+            {
+                var worn = Utility(_player);
+                if (worn != null && worn != _utility) _player.UnequipItem(worn, triggerEquipEffects: false);
+                if (_utility != null && inventory.ContainsItem(_utility) && !_player.IsItemEquiped(_utility)) _player.EquipItem(_utility, triggerEquipEffects: false);
+                if (_addedWorn != null && inventory.ContainsItem(_addedWorn)) inventory.RemoveItem(_addedWorn);
+            }
             if (Rod != null && _player.IsItemEquiped(Rod) && Rod != _right && Rod != _left) _player.UnequipItem(Rod, triggerEquipEffects: false);
             if (_right != null && inventory.ContainsItem(_right) && !_player.IsItemEquiped(_right)) _player.EquipItem(_right, triggerEquipEffects: false);
             if (_left != null && inventory.ContainsItem(_left) && !_player.IsItemEquiped(_left)) _player.EquipItem(_left, triggerEquipEffects: false);
@@ -138,6 +179,7 @@ namespace Rodnarok
             if (_player.LeftItem != _left) differs.Add("left hand");
             if (HiddenRight(_player) != _hiddenRight || HiddenLeft(_player) != _hiddenLeft) differs.Add("put-away items");
             if (Ammo(_player) != _ammo) differs.Add("selected bait or ammunition");
+            if (_wore && Utility(_player) != _utility) differs.Add("utility item");
             var now = _player.GetInventory().GetAllItems();
             if (now.Count != _items.Count || _items.Any(e => !now.Contains(e.Item) || e.Item.m_stack != e.Stack))
             {

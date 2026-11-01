@@ -101,7 +101,7 @@ namespace Rodnarok
         }
 
         /// <summary>The float this game cast, if one is out.</summary>
-        private static FishingFloat OwnFloat()
+        internal static FishingFloat OwnFloat()
         {
             foreach (var ff in FishingFloat.GetAllInstances())
             {

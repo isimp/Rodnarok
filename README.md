@@ -22,7 +22,7 @@ Install Rodnarök on every player and on a dedicated server. The server's settin
 
 ## Settings
 
-All settings are in `BepInEx/config/isimp.Rodnarok.cfg`, and `/rodnarok` in the chat tells where. `CastHints`, your own setting and off at first, makes each cast say at the top left which of the bait's fish can come to the water there and which would need bigger or deeper water. Seated players with a rod show the cast, the pull and the rod held out on their arms while they stay seated; `SeatedMotions`, also your own, turns that off. At night floats glow softly so you can find yours in the dark, and yours flashes white when a fish bites; `FloatGlow`, your own as well, turns that off.
+All settings are in `BepInEx/config/isimp.Rodnarok.cfg`, and `/rodnarok` in the chat tells where. `CastHints`, your own setting and off at first, makes each cast say at the top left which of the bait's fish can come to the water there and which would need bigger or deeper water. Seated players with a rod show the cast, the pull and the rod held out on their arms while they stay seated; `SeatedMotions`, also your own, turns that off. Wearing a *Wisplight*, its wisp guards your float: it drifts round the float searching while you wait, dives in close and flares when a fish bites, follows the fight and comes back to you after, while your mist clearing stays with you and the wisp clears a small pocket round the float; `FloatWisp`, your own as well, turns that off.
 
 ## Other mods
 

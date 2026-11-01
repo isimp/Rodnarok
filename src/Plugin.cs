@@ -43,13 +43,13 @@ namespace Rodnarok
                 Lines.Clear();
                 SeatedRodPose.Forget();
                 SeatedBodies.Forget();
-                FloatGlows.Forget();
+                FloatWisps.Forget();
             }
             else
             {
                 CalmStands.Tick();
                 CalmWaters.Tick();
-                FloatGlows.Tick();
+                FloatWisps.Tick();
             }
             SelfTestHost.Tick();
         }
