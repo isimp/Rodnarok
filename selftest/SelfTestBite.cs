@@ -250,6 +250,7 @@ namespace Rodnarok
                 var runSpeed = Tension.RunSpeed(fishSpeed, rules);
                 var ownSpeed = fish.m_speed;
                 int runFrames = 0, pacedWrong = 0, restPaced = 0, restSpeedWrong = 0;
+                var runningBefore = false;
                 var pacedSeen = "";
                 var expected = rules.StallStaminaPerSecond * Mathf.Lerp(1f, rules.SkillCostShare, skill) + Mathf.Lerp(ff.m_hookedStaminaPerSec, ff.m_hookedStaminaPerSecMaxSkill, skill);
                 float struggleTime = 0f, heldTime = 0f, heldStamina = 0f, heldLine = 0f, strained = 0f;
@@ -280,6 +281,11 @@ namespace Rodnarok
                     Aim(player, ff);
                     yield return null;
                     if (ff == null || ff.GetCatch() != fish) break;
+                    // The fish takes its pace in its own step after the float's starts the run, so a
+                    // run's first frame is left out of the pace check.
+                    var runningNow = Lines.IsRunning(fish);
+                    var settled = runningNow && runningBefore;
+                    runningBefore = runningNow;
                     var strainNow = Lines.StrainOf(ff);
                     var depth = WaterLevel(fish) - fish.transform.position.y;
                     var splashesAtStep = splashesThen;
@@ -306,7 +312,7 @@ namespace Rodnarok
                             easedTime += Time.deltaTime;
                             easedLineOut += LineLength(ff) - line;
                             easedRule += runSpeed * (1f - (strain + strainNow) / 2f) * Time.deltaTime;
-                            if (Lines.IsRunning(fish))
+                            if (settled)
                             {
                                 // The fish swims as fast as the line goes out, the rate changing with the strain from step to step.
                                 runFrames++;

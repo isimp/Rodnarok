@@ -139,11 +139,25 @@ namespace Rodnarok
             if (HiddenRight(_player) != _hiddenRight || HiddenLeft(_player) != _hiddenLeft) differs.Add("put-away items");
             if (Ammo(_player) != _ammo) differs.Add("selected bait or ammunition");
             var now = _player.GetInventory().GetAllItems();
-            if (now.Count != _items.Count || _items.Any(e => !now.Contains(e.Item) || e.Item.m_stack != e.Stack)) differs.Add("inventory");
+            if (now.Count != _items.Count || _items.Any(e => !now.Contains(e.Item) || e.Item.m_stack != e.Stack))
+            {
+                // Named item by item, so a failure says what came, went or changed.
+                var changes = new List<string>();
+                foreach (var (item, stack) in _items)
+                {
+                    if (!now.Contains(item)) changes.Add(Named(item) + " gone");
+                    else if (item.m_stack != stack) changes.Add(Named(item) + " " + stack + " -> " + item.m_stack);
+                }
+                foreach (var item in now)
+                    if (!_items.Any(e => e.Item == item)) changes.Add(Named(item) + " x" + item.m_stack + " new");
+                differs.Add("inventory (" + string.Join(", ", changes) + ")");
+            }
             if (!KnownMaterial(_player).SetEquals(_knownMaterial)) differs.Add("known items");
             if (!KnownRecipes(_player).SetEquals(_knownRecipes)) differs.Add("known recipes");
             return string.Join(", ", differs);
         }
+
+        private static string Named(ItemDrop.ItemData item) => item.m_dropPrefab != null ? item.m_dropPrefab.name : item.m_shared.m_name;
 
         private static string BaitName() => ObjectDB.instance.GetItemPrefab(BaitPrefab)?.GetComponent<ItemDrop>()?.m_itemData.m_shared.m_name ?? "$item_fishingbait";
 

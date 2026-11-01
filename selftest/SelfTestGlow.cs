@@ -154,6 +154,8 @@ namespace Rodnarok
                 // With the player's setting off no float carries a light.
                 FloatGlows.DarknessForTest = 1f;
                 Settings.FloatGlowForTest(false);
+                // Unity takes a destroyed light away at the end of the frame.
+                yield return null;
                 yield return null;
                 check.That(FloatGlows.LightForTest(ff) == null && light == null, "with FloatGlow off the float carries no light");
                 if (!night) check.Note("no pictures of the glow: it is day in game; run the self-test at night to see it");

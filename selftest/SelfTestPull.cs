@@ -118,6 +118,7 @@ namespace Rodnarok
                     var lineFrom = LineLength(ff);
                     float heldTime = 0f, strained = 0f, easedTime = 0f, easedLineOut = 0f, easedRule = 0f, spent = 0f, fought = 0f;
                     int struggles = 0, runFrames = 0, pacedWrong = 0;
+                    var runningBefore = false;
                     var pacedSeen = "";
                     var holding = true;
                     var wasStruggling = false;
@@ -142,6 +143,11 @@ namespace Rodnarok
                         yield return null;
                         if (ff == null || ff.GetCatch() != fish) break;
                         spent += stamina - player.GetStamina();
+                        // The fish takes its pace in its own step after the float's starts the run, so a
+                        // run's first frame is left out of the pace check.
+                        var runningNow = Lines.IsRunning(fish);
+                        var settled = runningNow && runningBefore;
+                        runningBefore = runningNow;
                         if (!struggled || !fish.IsEscaping()) continue;
                         var strainNow = Lines.StrainOf(ff);
                         if (holding)
@@ -153,7 +159,7 @@ namespace Rodnarok
                         easedTime += Time.deltaTime;
                         easedLineOut += LineLength(ff) - line;
                         easedRule += runSpeed * (1f - (strain + strainNow) / 2f) * Time.deltaTime;
-                        if (!Lines.IsRunning(fish)) continue;
+                        if (!settled) continue;
                         runFrames++;
                         var given = Thrash.RunSpeedForTest(fish);
                         var paying = Lines.RunSpeedOf(fish);
