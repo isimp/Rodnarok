@@ -460,6 +460,7 @@ namespace Rodnarok
             if (!Rules.Wary || cast.Hooked || cast.Spooked || cast.Fish.Count == 0) return false;
             var at = cast.Float.transform.position;
             var now = Time.time;
+            var seenBefore = cast.FloatSeenAt >= 0f ? cast.FloatSeen : at;
             if (cast.FloatSeenAt < 0f || now - cast.FloatSeenAt >= 0.5f)
             {
                 cast.FloatSpeed = cast.FloatSeenAt < 0f ? 0f : Across(at, cast.FloatSeen) / (now - cast.FloatSeenAt);
@@ -467,7 +468,9 @@ namespace Rodnarok
                 cast.FloatSeenAt = now;
             }
             var heard = HeardAt(at) ?? HeardAt(Centre(cast.Fish));
-            var near = cast.Fish.Any(f => Across(f.transform.position, at) < Near);
+            // Near where the float was as its speed was measured or where it is: reeled fast away from
+            // a school, the float leaves it behind within the half second its speed is measured over.
+            var near = cast.Fish.Any(f => Across(f.transform.position, at) < Near || Across(f.transform.position, seenBefore) < Near);
             var fast = Wary.FloatStartles(cast.FloatSpeed, near);
             // Reeling on after the school flinched aside still drags the float through it.
             var dragging = Wary.Dragging(cast.FloatSpeed, near, cast.Away);

@@ -114,7 +114,9 @@ namespace Rodnarok
             var home = player.transform.position + player.transform.TransformVector(wisplight.m_offset);
             Move(wisplight, ball, guard, home, seconds);
             Shine(guard, 1f);
-            if (Vector3.Distance(ball.transform.position, home) > FloatWisp.HandBack) return;
+            // The game's own place drifts round the noiseless one by its noise; within the leash less
+            // that drift the game never drags the wisp in its first step.
+            if (Vector3.Distance(ball.transform.position, home) > FloatWisp.HandBackWithin(wisplight.m_maxDistance, wisplight.m_noiseDistance)) return;
             BallVelocity(wisplight) = new Vector3(guard.Motion.VX, guard.Motion.VY, guard.Motion.VZ);
             Guards.Remove(wisplight);
             view.GetZDO().Set(GuardsFor, ZDOID.None);

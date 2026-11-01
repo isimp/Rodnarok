@@ -155,6 +155,15 @@ namespace Rodnarok.Tests
             Assert.Equal(6f, FloatWisp.HandBack);
         }
 
+        /// <summary>The game's place drifts 1.5 m round the noiseless one, so the wisp is handed back within 4.5 m and never dragged.</summary>
+        [Fact]
+        public void TheWispIsHandedBackWithinTheLeashLessTheGamesDrift()
+        {
+            Assert.Equal(4.5f, FloatWisp.HandBackWithin(6f, 1.5f), 3);
+            Assert.True(FloatWisp.HandBackWithin(6f, 1.5f) + 1.5f <= 6f);
+            Assert.Equal(0.5f, FloatWisp.HandBackWithin(1f, 3f), 3);
+        }
+
         [Fact]
         public void TheWispsPocketRoundTheFloatIsAsWideAsTheGamesClearingWhereWispsGather()
         {

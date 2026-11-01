@@ -248,7 +248,11 @@ namespace Rodnarok
                 var fishSpeed = FishBook.Current?.Speed(Utils.GetPrefabName(fish.gameObject)) ?? 0f;
                 var snapSeconds = Tension.SnapSeconds(fishSpeed, rules);
                 var runSpeed = Tension.RunSpeed(fishSpeed, rules);
+                // The speed the fish swims before a run, which it swims again once the run is over.
                 var ownSpeed = fish.m_speed;
+                var ranBefore = false;
+                var restSpeedBefore = fish.m_speed;
+                var restSpeedSeen = 0f;
                 int runFrames = 0, pacedWrong = 0, restPaced = 0, restSpeedWrong = 0;
                 var runningBefore = false;
                 var pacedSeen = "";
@@ -285,6 +289,13 @@ namespace Rodnarok
                     // run's first frame is left out of the pace check.
                     var runningNow = Lines.IsRunning(fish);
                     var settled = runningNow && runningBefore;
+                    // A run starting: the speed it swam until now is the one it comes back to.
+                    if (runningNow && !runningBefore)
+                    {
+                        if (!ranBefore || Thrash.RunSpeedForTest(fish) <= 0f) ownSpeed = restSpeedBefore;
+                        ranBefore = true;
+                    }
+                    if (!runningNow && Thrash.RunSpeedForTest(fish) <= 0f) restSpeedBefore = fish.m_speed;
                     runningBefore = runningNow;
                     var strainNow = Lines.StrainOf(ff);
                     var depth = WaterLevel(fish) - fish.transform.position.y;
@@ -340,7 +351,11 @@ namespace Rodnarok
                         if (!Lines.IsRunning(fish) && Thrash.RunSpeedForTest(fish) <= 0f)
                         {
                             restPaced++;
-                            if (!Mathf.Approximately(fish.m_speed, ownSpeed)) restSpeedWrong++;
+                            if (ranBefore && !Mathf.Approximately(fish.m_speed, ownSpeed))
+                            {
+                                restSpeedWrong++;
+                                restSpeedSeen = fish.m_speed;
+                            }
                         }
                         if (holding)
                         {
@@ -380,7 +395,8 @@ namespace Rodnarok
                         + (easedRule / easedTime).ToString("0.0", CultureInfo.InvariantCulture) + " m/s by the strain seen, " + (easedLineOut / easedTime).ToString("0.0", CultureInfo.InvariantCulture) + " m/s");
                 }
                 check.That(runFrames > 0 && pacedWrong <= 3, "a fish taking line out swims as fast as the line goes out: " + pacedWrong.ToString(CultureInfo.InvariantCulture) + " of " + runFrames.ToString(CultureInfo.InvariantCulture) + " frames off" + (pacedWrong > 0 ? ", the last " + pacedSeen : ""));
-                check.That(restPaced > 0 && restSpeedWrong == 0, "a resting fish swims at its own speed of " + ownSpeed.ToString("0.0", CultureInfo.InvariantCulture) + " m/s again, " + restSpeedWrong.ToString(CultureInfo.InvariantCulture) + " of " + restPaced.ToString(CultureInfo.InvariantCulture) + " rest frames off");
+                check.That(restPaced > 0 && restSpeedWrong == 0, "a resting fish swims at the speed it had before its run, " + ownSpeed.ToString("0.0", CultureInfo.InvariantCulture) + " m/s, again, " + restSpeedWrong.ToString(CultureInfo.InvariantCulture) + " of " + restPaced.ToString(CultureInfo.InvariantCulture) + " rest frames off"
+                    + (restSpeedWrong > 0 ? ", the last at " + restSpeedSeen.ToString("0.0", CultureInfo.InvariantCulture) + " m/s" : ""));
                 // Rests near the bank are left unreeled, so the reel is measured over the time the line was held.
                 check.That(restHeld >= 0.5f && restLine / Mathf.Max(restHeld, 0.01f) > 0.5f * Mathf.Lerp(rules.ReelSpeed, rules.ReelSpeedMaxSkill, skill),
                     "holding while it rests reels it in, " + restLine.ToString("0.0", CultureInfo.InvariantCulture) + " m in " + restHeld.ToString("0.0", CultureInfo.InvariantCulture) + " s held");

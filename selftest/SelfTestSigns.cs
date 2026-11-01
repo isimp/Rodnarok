@@ -13,8 +13,10 @@ namespace Rodnarok
     /// float for every game; the float must show the Perch's rings on the way in, more often as the
     /// school nears, and once a fish bites the marks must be gone and no more signs show. Then one
     /// fish of each of the game's fish is put a few metres from a float and marked as coming: each
-    /// must show its own sign, and a picture of each is taken, the character looking at it. The
-    /// rules, the rod, the floats and the fish are put back after.
+    /// must show its own sign, and a picture of each is taken, 5 m short of the float toward the
+    /// character, the character looking down at it. A Wisplight's wisp stays with the character
+    /// meanwhile, so it does not sit in the pictures. The rules, the setting, the rod, the floats
+    /// and the fish are put back after.
     /// </summary>
     internal static class SelfTestSigns
     {
@@ -38,6 +40,18 @@ namespace Rodnarok
 
         private static string F(float value) => value.ToString("0.0", CultureInfo.InvariantCulture);
 
+        /// <summary>How far short of the float, toward the character, each fish of the pictures is put, in metres: near enough for the Pike's swirl.</summary>
+        private const float PictureShort = 5f;
+
+        /// <summary>The character looks down at a place a little to its side, so the third-person camera shows it past the character.</summary>
+        private static void Aim(Player player, Vector3 at)
+        {
+            var dir = Quaternion.Euler(0f, 10f, 0f) * (at - player.m_eye.position);
+            if (dir.sqrMagnitude < 0.01f) return;
+            player.SetLookDir(dir);
+            LookPitch(player) = -Mathf.Asin(Mathf.Clamp(dir.normalized.y, -1f, 1f)) * Mathf.Rad2Deg;
+        }
+
         private static IEnumerable Shows(ScenarioCheck check)
         {
             var player = Player.m_localPlayer;
@@ -52,6 +66,7 @@ namespace Rodnarok
             var gear = SelfTestGear.RodInHand(player);
             var yaw = LookYaw(player);
             var pitch = LookPitch(player);
+            var wispWas = Settings.FloatWispForTest(false);
             FishingFloat ff = null;
             var placed = new List<GameObject>();
             try
@@ -83,10 +98,12 @@ namespace Rodnarok
                 var showsFar = new List<float>();
                 var showsNear = new List<float>();
                 var lastShown = 0;
+                var kindWhileComing = ArrivalSignKind.Rings;
                 var bit = false;
                 for (var waited = 0f; waited < 90f && !bit; waited += Time.deltaTime)
                 {
                     var (kind, shown, nearness) = ArrivalSigns.ForTest(floatId);
+                    if (shown > 0) kindWhileComing = kind;
                     if (shown > lastShown)
                     {
                         (nearness < 0.4f ? showsFar : nearness > 0.7f ? showsNear : new List<float>()).Add(Time.time);
@@ -95,8 +112,7 @@ namespace Rodnarok
                     bit = Nibbler(ff) != null && NibbleTime(ff) > 0f;
                     yield return null;
                 }
-                var (signKind, signShown, _) = ArrivalSigns.ForTest(floatId);
-                check.That(signKind == ArrivalSignKind.Rings && signShown >= 3, "the Perch coming shows its rings on the way in: " + signKind + ", " + signShown + " times");
+                check.That(kindWhileComing == ArrivalSignKind.Rings && lastShown >= 3, "the Perch coming shows its rings on the way in: " + kindWhileComing + ", " + lastShown + " times");
                 var farEvery = showsFar.Count > 1 ? (showsFar.Last() - showsFar.First()) / (showsFar.Count - 1) : -1f;
                 var nearEvery = showsNear.Count > 1 ? (showsNear.Last() - showsNear.First()) / (showsNear.Count - 1) : -1f;
                 if (farEvery > 0f && nearEvery > 0f)
@@ -132,7 +148,7 @@ namespace Rodnarok
                         wrong.Add(prefab + " not in the game");
                         continue;
                     }
-                    var at = spot.Value + away * 6f + Vector3.down * 1.5f;
+                    var at = spot.Value - away * PictureShort + Vector3.down * 1.5f;
                     var go = Object.Instantiate(fishPrefab, at, Quaternion.LookRotation(-away));
                     placed.Add(go);
                     var fish = go.GetComponent<Fish>();
@@ -143,7 +159,7 @@ namespace Rodnarok
                     var kindSeen = ArrivalSignKind.Rings;
                     for (var waited = 0f; waited < 3f; waited += Time.deltaTime)
                     {
-                        player.SetLookDir(Quaternion.Euler(0f, 10f, 0f) * (at - player.m_eye.position));
+                        Aim(player, at + Vector3.up * 1.5f);
                         var seen = ArrivalSigns.ForTest(floatId);
                         kindSeen = seen.Kind;
                         shownBy = seen.Shown;
@@ -166,6 +182,7 @@ namespace Rodnarok
             {
                 Schools.RollForTest = null;
                 PlayRules.ForTest = null;
+                Settings.FloatWispForTest(wispWas);
                 if (ff != null) ZNetScene.instance.Destroy(ff.gameObject);
                 foreach (var go in placed)
                     if (go != null) ZNetScene.instance.Destroy(go);

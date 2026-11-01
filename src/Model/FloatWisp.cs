@@ -66,6 +66,13 @@ namespace Rodnarok
         /// </summary>
         public const float HandBack = 6f;
 
+        /// <summary>
+        /// How near its noiseless place over the player the wisp is handed back, in metres: the
+        /// Wisplight's leash less how far the game's place drifts round it, so the game's first step
+        /// never drags the wisp to its leash.
+        /// </summary>
+        public static float HandBackWithin(float leash, float drift) => Math.Max(0.5f, leash - drift);
+
         /// <summary>How wide the wisp's own clearing round the float is, in metres: the game's clearing where wisps gather.</summary>
         public const float PocketRange = 6f;
 

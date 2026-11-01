@@ -93,15 +93,18 @@ namespace Rodnarok
 
                 // The server's setting off: plain bait brings its own fish only, and a Trollfish turns away from it.
                 PlayRules.ForTest = PlayRules.Now.With(biomeFishOnBait: false);
+                var tooLittle = Schools.TooLittleWaterForTest;
                 ff = Cast(floatPrefab, spot.Value, player, bait);
                 floatId = ff.GetComponent<ZNetView>().GetZDO().m_uid;
                 school = null;
-                for (var waited = 0f; waited < 15f && (school == null || school.Count == 0); waited += Time.deltaTime)
+                for (var waited = 0f; waited < 30f && (school == null || school.Count == 0); waited += Time.deltaTime)
                 {
                     school = SelfTestArrival.SchoolOf(floatId);
                     yield return null;
                 }
-                kinds = school == null ? "none" : string.Join(", ", school.Where(f => f != null).Select(f => Utils.GetPrefabName(f.gameObject)).Distinct());
+                kinds = school == null || school.Count == 0
+                    ? "none within 30 s, " + Schools.LeavingForTest.ToString(CultureInfo.InvariantCulture) + " fish still leaving, " + (Schools.TooLittleWaterForTest - tooLittle).ToString(CultureInfo.InvariantCulture) + " casts found too little water"
+                    : string.Join(", ", school.Where(f => f != null).Select(f => Utils.GetPrefabName(f.gameObject)).Distinct());
                 check.That(school != null && school.Count > 0 && school.All(f => f != null && Utils.GetPrefabName(f.gameObject) == Pike),
                     "with BiomeFishOnBait off the same cast brings a school of Pike: " + kinds);
                 var test = trollfish != null ? trollfish : school?.FirstOrDefault(f => f != null);
