@@ -7,7 +7,7 @@ namespace Rodnarok
     /// <summary>
     /// A fishing rod and bait put in the character's hands for a scenario, and everything as it was
     /// put back afterwards: both hands, the items put away with the hide key, the selected bait,
-    /// every stack of the inventory, and the items and recipes the character knows. A rod the
+    /// every stack of the inventory, every item worn or held, and the items and recipes the character knows. A rod the
     /// character carries is used, otherwise one is added; bait is added for the run and the
     /// character's own bait count set back after, so a cast never spends the character's bait.
     /// The game shows a character that newly learns an item a notice, which it shows once whatever
@@ -35,6 +35,7 @@ namespace Rodnarok
         private readonly int _bait;
         private readonly HashSet<string> _knownMaterial;
         private readonly HashSet<string> _knownRecipes;
+        private readonly List<ItemDrop.ItemData> _equipped;
         private ItemDrop.ItemData _addedRod;
         private bool _putBack;
 
@@ -50,6 +51,7 @@ namespace Rodnarok
             _bait = BaitCount(player);
             _knownMaterial = new HashSet<string>(KnownMaterial(player));
             _knownRecipes = new HashSet<string>(KnownRecipes(player));
+            _equipped = player.GetInventory().GetEquippedItems().ToList();
         }
 
         /// <summary>The rod now in hand, or null with what stood in the way.</summary>
@@ -99,6 +101,7 @@ namespace Rodnarok
         private static readonly AccessTools.FieldRef<Humanoid, ItemDrop.ItemData> Utility = AccessTools.FieldRefAccess<Humanoid, ItemDrop.ItemData>("m_utilityItem");
         private ItemDrop.ItemData _utility;
         private ItemDrop.ItemData _addedWorn;
+        private ItemDrop.ItemData _lentWorn;
         private bool _wore;
 
         /// <summary>Puts an item on in the utility slot, one of the character's own if it carries one, else one added for the run; null with what stood in the way.</summary>
@@ -126,7 +129,11 @@ namespace Rodnarok
                     return null;
                 }
             }
-            if (!_player.IsItemEquiped(item)) _player.EquipItem(item, triggerEquipEffects: false);
+            if (!_player.IsItemEquiped(item))
+            {
+                _lentWorn = item;
+                _player.EquipItem(item, triggerEquipEffects: false);
+            }
             return _player.IsItemEquiped(item) ? item : null;
         }
 
@@ -138,6 +145,8 @@ namespace Rodnarok
             var inventory = _player.GetInventory();
             if (_wore)
             {
+                // Taken off by itself, as a mod giving more utility slots may wear it in a slot of its own.
+                if (_lentWorn != null && _player.IsItemEquiped(_lentWorn)) _player.UnequipItem(_lentWorn, triggerEquipEffects: false);
                 var worn = Utility(_player);
                 if (worn != null && worn != _utility) _player.UnequipItem(worn, triggerEquipEffects: false);
                 if (_utility != null && inventory.ContainsItem(_utility) && !_player.IsItemEquiped(_utility)) _player.EquipItem(_utility, triggerEquipEffects: false);
@@ -180,6 +189,11 @@ namespace Rodnarok
             if (HiddenRight(_player) != _hiddenRight || HiddenLeft(_player) != _hiddenLeft) differs.Add("put-away items");
             if (Ammo(_player) != _ammo) differs.Add("selected bait or ammunition");
             if (_wore && Utility(_player) != _utility) differs.Add("utility item");
+            var equippedNow = _player.GetInventory().GetEquippedItems();
+            var came = equippedNow.Where(i => !_equipped.Contains(i)).Select(Named).ToList();
+            var went = _equipped.Where(i => !equippedNow.Contains(i)).Select(Named).ToList();
+            if (came.Count > 0 || went.Count > 0)
+                differs.Add("worn or held (" + string.Join(", ", came.Select(n => n + " put on").Concat(went.Select(n => n + " taken off"))) + ")");
             var now = _player.GetInventory().GetAllItems();
             if (now.Count != _items.Count || _items.Any(e => !now.Contains(e.Item) || e.Item.m_stack != e.Stack))
             {

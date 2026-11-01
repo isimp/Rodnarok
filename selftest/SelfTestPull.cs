@@ -43,6 +43,9 @@ namespace Rodnarok
         /// <summary>How long a fight may take, in seconds.</summary>
         private const float FightSeconds = 120f;
 
+        /// <summary>How long a run goes before its pace is checked, in seconds: a few physics steps.</summary>
+        private const float RunSettles = 0.1f;
+
         private static readonly AccessTools.FieldRef<FishingFloat, float> NibbleTime = AccessTools.FieldRefAccess<FishingFloat, float>("m_nibbleTime");
         private static readonly AccessTools.FieldRef<FishingFloat, Fish> Nibbler = AccessTools.FieldRefAccess<FishingFloat, Fish>("m_nibbler");
         private static readonly AccessTools.FieldRef<FishingFloat, float> LineLength = AccessTools.FieldRefAccess<FishingFloat, float>("m_lineLength");
@@ -118,7 +121,7 @@ namespace Rodnarok
                     var lineFrom = LineLength(ff);
                     float heldTime = 0f, strained = 0f, easedTime = 0f, easedLineOut = 0f, easedRule = 0f, spent = 0f, fought = 0f;
                     int struggles = 0, runFrames = 0, pacedWrong = 0;
-                    var runningBefore = false;
+                    var runningFor = 0f;
                     var pacedSeen = "";
                     var holding = true;
                     var wasStruggling = false;
@@ -143,11 +146,11 @@ namespace Rodnarok
                         yield return null;
                         if (ff == null || ff.GetCatch() != fish) break;
                         spent += stamina - player.GetStamina();
-                        // The fish takes its pace in its own step after the float's starts the run, so a
-                        // run's first frame is left out of the pace check.
-                        var runningNow = Lines.IsRunning(fish);
-                        var settled = runningNow && runningBefore;
-                        runningBefore = runningNow;
+                        // The fish takes its pace in its own physics step after the float's starts the run,
+                        // and a frame may hold no step at all, so a run's first tenth of a second is left out
+                        // of the pace check.
+                        runningFor = Lines.IsRunning(fish) ? runningFor + Time.deltaTime : 0f;
+                        var settled = runningFor >= RunSettles;
                         if (!struggled || !fish.IsEscaping()) continue;
                         var strainNow = Lines.StrainOf(ff);
                         if (holding)
@@ -166,7 +169,7 @@ namespace Rodnarok
                         if (Mathf.Abs(given - paying) > Mathf.Max(0.05f, paying * 0.25f))
                         {
                             pacedWrong++;
-                            pacedSeen = F(given) + " m/s given, the line " + F(paying) + " m/s";
+                            pacedSeen = F(given) + " m/s given, the line " + F(paying) + " m/s, " + F(runningFor) + " s into the run";
                         }
                     }
                     SelfTestHold.Holding = false;
