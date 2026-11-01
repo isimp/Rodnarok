@@ -146,6 +146,10 @@ namespace Rodnarok
         /// <summary>The farthest out beyond the float a school may start, in metres.</summary>
         private const float FarthestStart = 60f;
 
+        /// <summary>The roll among a bait's fish the self-test sets in place of a random one; null for a random one.</summary>
+        [ForTest]
+        public static float? RollForTest { get; set; }
+
         /// <summary>The fish of a float's school picked to take the bait, null for none, and how long until it may, for the self-test.</summary>
         [ForTest]
         public static (Fish Fish, float FreeIn) BiterForTest(FishingFloat ff) =>
@@ -613,8 +617,10 @@ namespace Rodnarok
                 starts[candidate] = fits ? place : null;
                 return fits;
             }
-            var roll = Random.value;
-            var kind = book.Baits.Choose(bait, roll, Fits) ?? book.Baits.Choose(bait, roll);
+            var roll = RollForTest ?? Random.value;
+            var biome = FishBook.BiomeAt(home);
+            var local = Rules.BiomeFishOnBait;
+            var kind = book.Baits.Choose(bait, roll, Fits, biome, local) ?? book.Baits.Choose(bait, roll, null, biome, local);
             var prefab = book.Prefab(kind);
             if (prefab == null)
             {
@@ -622,9 +628,9 @@ namespace Rodnarok
                 return;
             }
             var template = prefab.GetComponent<Fish>();
-            var worldFish = Callable(cast.Float, bait);
+            var worldFish = Callable(cast.Float, bait, book, biome, local);
             var start = starts.TryGetValue(kind, out var found) ? found : null;
-            Hint(cast, book, bait, starts, worldFish);
+            Hint(cast, book, book.Baits.FishFor(bait, biome, local), starts, worldFish);
             var water = Arrival.WaterAllowsSchool(start.HasValue, start.HasValue);
             switch (Arrival.Choose(worldFish != null, water, GoneSince.Count == 0, Rules))
             {
@@ -729,13 +735,13 @@ namespace Rodnarok
         /// With cast hints on, the cast says once which of the bait's fish the water here fits, which
         /// would need bigger or deeper water, or which fish of the world's own is called.
         /// </summary>
-        private static void Hint(Cast cast, FishBook book, string bait, Dictionary<string, StartPlace?> starts, Fish called)
+        private static void Hint(Cast cast, FishBook book, IReadOnlyList<string> baitsFish, Dictionary<string, StartPlace?> starts, Fish called)
         {
             if (cast.Hinted || !Settings.CastHints || Player.m_localPlayer == null) return;
             cast.Hinted = true;
             var here = new List<string>();
             var better = new List<string>();
-            foreach (var kind in book.Baits.FishFor(bait))
+            foreach (var kind in baitsFish)
             {
                 var name = ShownName(book.Prefab(kind)?.GetComponent<Fish>());
                 if (name == null) continue;
@@ -767,7 +773,7 @@ namespace Rodnarok
         /// float's reach, and can swim to the float through water deep enough for it all the way;
         /// null for none. A fish another game steers is left to it.
         /// </summary>
-        private static Fish Callable(FishingFloat ff, string bait)
+        private static Fish Callable(FishingFloat ff, string bait, FishBook book, int biome, bool local)
         {
             var at = ff.transform.position;
             var surface = ZoneSystem.instance.m_waterLevel;
@@ -778,7 +784,7 @@ namespace Rodnarok
                 if (fish == null || IsOurs(fish) || IsCalled(fish) || !FloatOf(fish).IsNone() || fish.IsHooked() || fish.IsOutOfWater()) continue;
                 var view = fish.GetComponent<ZNetView>();
                 if (view == null || !view.IsValid() || !view.IsOwner()) continue;
-                if (!fish.m_baits.Any(b => b.m_bait != null && b.m_bait.name == bait)) continue;
+                if (!book.Baits.Takes(Utils.GetPrefabName(fish.gameObject), bait, biome, local)) continue;
                 var distance = Vector3.Distance(fish.transform.position, at);
                 if (distance > ff.m_range || distance >= bestDistance) continue;
                 var across = Across(fish.transform.position, at);

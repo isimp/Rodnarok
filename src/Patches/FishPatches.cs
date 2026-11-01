@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using HarmonyLib;
 
 namespace Rodnarok
@@ -44,6 +45,26 @@ namespace Rodnarok
         {
             if (SchoolHearsNoNoise.Moving == null) return true;
             __result = null;
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// With BiomeFishOnBait on, a fish takes the plain Fishing Bait where the world spawns it, at the
+    /// chance its own bait has. The game's own test knows only the baits a fish's prefab lists, so a
+    /// Trollfish would swim up to plain bait in the Black Forest and turn away.
+    /// </summary>
+    [HarmonyPatch(typeof(Fish), "TestBate")]
+    internal static class BiomeFishTakePlainBait
+    {
+        private static bool Prefix(Fish __instance, FishingFloat ff, ref bool __result)
+        {
+            if (!PlayRules.Now.BiomeFishOnBait || ff == null || ff.GetBait() != BaitTable.PlainBait) return true;
+            if (__instance.m_baits.Any(b => b?.m_bait != null && b.m_bait.name == BaitTable.PlainBait)) return true;
+            var book = FishBook.Current;
+            if (book == null || !book.Baits.Takes(Utils.GetPrefabName(__instance.gameObject), BaitTable.PlainBait, FishBook.BiomeAt(ff.transform.position), true)) return true;
+            var own = __instance.m_baits.FirstOrDefault(b => b?.m_bait != null);
+            __result = own != null && UnityEngine.Random.value < own.m_chance;
             return false;
         }
     }

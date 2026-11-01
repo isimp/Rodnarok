@@ -1,6 +1,6 @@
 # Rodnarök
 
-Rodnarök makes fishing in Valheim something you can read and enjoy. The bait on your hook decides which fish comes, in any water deep enough, so every fish of the game can be caught at your own dock: the bait recipes and their trophies are what opens the later fish, not a trip to their biome.
+Rodnarök makes fishing in Valheim something you can read and enjoy. The bait on your hook decides which fish comes, in any water deep enough, so every fish of the game can be caught at your own dock: the bait recipes and their trophies are what opens the later fish, not a trip to their biome. Plain *Fishing Bait* also brings the fish that live where the float lands, so in the Black Forest it brings a *Trollfish* as often as a *Perch* or a *Pike*, and at sea a *Tuna*, a *Coral cod* or a *Pufferfish*; the server setting `BiomeFishOnBait` turns that off.
 
 ![The crosshair ring through a fight: white as it drains after the bite, red filling as a held struggle strains the line, red emptying as the line is eased off, yellow while the resting fish is reeled in](https://raw.githubusercontent.com/isimp/Rodnarok/main/docs/images/fight.webp)
 

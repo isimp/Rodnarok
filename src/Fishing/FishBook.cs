@@ -6,9 +6,9 @@ namespace Rodnarok
 {
     /// <summary>
     /// What the running game says about its fish: which bait brings which fish (from the baits each
-    /// fish prefab takes), and how the world spawns each (its group size, levels and level-up
-    /// chance, from the spawn lists every zone uses). Read once per world, so fish another mod
-    /// adds come in too.
+    /// fish prefab takes), and how and where the world spawns each (its group size, levels,
+    /// level-up chance and biomes, from the spawn lists every zone uses). Read once per world, so
+    /// fish another mod adds come in too.
     /// </summary>
     internal sealed class FishBook
     {
@@ -22,16 +22,37 @@ namespace Rodnarok
         {
             var fish = ZNetScene.instance.m_prefabs.Where(p => p != null && p.GetComponent<Fish>() != null).ToList();
             foreach (var prefab in fish) _prefabs[prefab.name] = prefab;
-            Baits = new BaitTable(fish.Select(p => new FishKind(p.name,
-                p.GetComponent<Fish>().m_baits.Where(b => b?.m_bait != null).Select(b => b.m_bait.name).ToList())));
 
+            // Every biome a fish's enabled spawns name, for the plain bait that brings a biome's fish.
+            var biomes = new Dictionary<string, int>(System.StringComparer.Ordinal);
             var spawner = ZoneSystem.instance?.m_zoneCtrlPrefab?.GetComponent<SpawnSystem>();
-            if (spawner == null) return;
-            foreach (var entry in spawner.m_spawnLists.Where(l => l != null).SelectMany(l => l.m_spawners))
+            if (spawner != null)
             {
-                if (entry?.m_prefab == null || !entry.m_enabled || entry.m_prefab.GetComponent<Fish>() == null) continue;
-                if (!_spawns.ContainsKey(entry.m_prefab.name)) _spawns[entry.m_prefab.name] = entry;
+                foreach (var entry in spawner.m_spawnLists.Where(l => l != null).SelectMany(l => l.m_spawners))
+                {
+                    if (entry?.m_prefab == null || !entry.m_enabled || entry.m_prefab.GetComponent<Fish>() == null) continue;
+                    if (!_spawns.ContainsKey(entry.m_prefab.name)) _spawns[entry.m_prefab.name] = entry;
+                    biomes.TryGetValue(entry.m_prefab.name, out var known);
+                    biomes[entry.m_prefab.name] = known | (int)entry.m_biome;
+                }
             }
+            Baits = new BaitTable(fish.Select(p => new FishKind(p.name,
+                p.GetComponent<Fish>().m_baits.Where(b => b?.m_bait != null).Select(b => b.m_bait.name).ToList(),
+                biomes.TryGetValue(p.name, out var lives) ? lives : 0)));
+        }
+
+        /// <summary>A biome the self-test sets in place of every place's own; null for each place's own.</summary>
+        [ForTest]
+        public static int? BiomeForTest { get; set; }
+
+        /// <summary>The biome at a place as the world's spawns judge it: the biome of the ground under it, as the game's flag.</summary>
+        public static int BiomeAt(Vector3 place)
+        {
+            if (BiomeForTest.HasValue) return BiomeForTest.Value;
+            if (ZoneSystem.instance == null) return 0;
+            var point = place;
+            ZoneSystem.instance.GetGroundData(ref point, out _, out var biome, out _, out _);
+            return (int)biome;
         }
 
         /// <summary>The book of the world being played; null outside a world.</summary>

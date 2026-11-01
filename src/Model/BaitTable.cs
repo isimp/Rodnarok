@@ -4,35 +4,43 @@ using System.Linq;
 
 namespace Rodnarok
 {
-    /// <summary>One kind of fish as the game makes it: its prefab and the baits it takes.</summary>
+    /// <summary>One kind of fish as the game makes it: its prefab, the baits it takes, and the biomes the world spawns it in, as the game's biome flags.</summary>
     internal sealed class FishKind
     {
-        public FishKind(string prefab, IReadOnlyList<string> baits)
+        public FishKind(string prefab, IReadOnlyList<string> baits, int biomes = 0)
         {
             Prefab = prefab;
             Baits = baits ?? Array.Empty<string>();
+            Biomes = biomes;
         }
 
         public string Prefab { get; }
         public IReadOnlyList<string> Baits { get; }
+        public int Biomes { get; }
     }
 
     /// <summary>
     /// Which fish each bait brings, built from the baits the game's own fish take. A bait brings
-    /// its fish in any water: where a fish lives in the world plays no part. A bait several fish
-    /// take brings each of them in equal share.
+    /// its fish in any water. A bait several fish take brings each of them in equal share. With
+    /// the fish's biomes counted (<c>local</c>), the game's plain <see cref="PlainBait"/> also
+    /// brings the fish the world spawns in the biome the float lands in.
     /// </summary>
     internal sealed class BaitTable
     {
+        /// <summary>The game's plain Fishing Bait, the one every biome's bait is made from.</summary>
+        public const string PlainBait = "FishingBait";
+
         private static readonly IReadOnlyList<string> NoFish = Array.Empty<string>();
 
         private readonly Dictionary<string, List<string>> _fish = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+        private readonly List<FishKind> _kinds = new List<FishKind>();
 
         /// <summary>Fish in the order given; each bait's fish keep that order.</summary>
         public BaitTable(IEnumerable<FishKind> fish)
         {
             foreach (var kind in fish ?? Enumerable.Empty<FishKind>())
             {
+                _kinds.Add(kind);
                 foreach (var bait in kind.Baits.Where(b => !string.IsNullOrEmpty(b)).Distinct(StringComparer.Ordinal))
                 {
                     if (!_fish.TryGetValue(bait, out var list)) _fish[bait] = list = new List<string>();
@@ -49,6 +57,31 @@ namespace Rodnarok
         public IReadOnlyList<string> FishFor(string bait) =>
             bait != null && _fish.TryGetValue(bait, out var list) ? list : NoFish;
 
+        /// <summary>
+        /// The fish a bait brings to a float in a biome (the game's biome flags): its own fish, and
+        /// with <paramref name="local"/> for plain bait also the fish the world spawns there, in the
+        /// order the fish were given.
+        /// </summary>
+        public IReadOnlyList<string> FishFor(string bait, int biome, bool local)
+        {
+            if (!local || bait != PlainBait || biome == 0) return FishFor(bait);
+            return _kinds.Where(k => Takes(k, bait, biome, true)).Select(k => k.Prefab).Distinct(StringComparer.Ordinal).ToList();
+        }
+
+        /// <summary>Whether a fish takes a bait at a float in a biome, as <see cref="FishFor(string, int, bool)"/> has it; false for a fish not known.</summary>
+        public bool Takes(string prefab, string bait, int biome, bool local)
+        {
+            var kind = _kinds.FirstOrDefault(k => k.Prefab == prefab);
+            return kind != null && Takes(kind, bait, biome, local);
+        }
+
+        private static bool Takes(FishKind kind, string bait, int biome, bool local) =>
+            kind.Baits.Contains(bait, StringComparer.Ordinal) || local && bait == PlainBait && (kind.Biomes & biome) != 0;
+
+        /// <summary>The fish that comes to a bait at a float in a biome for a roll from 0 to 1 among those that fit, each taking an equal share; null for none.</summary>
+        public string Choose(string bait, double roll, Func<string, bool> fits, int biome, bool local) =>
+            Pick(FishFor(bait, biome, local), roll, fits);
+
         /// <summary>The fish that comes to a bait for a roll from 0 to 1, each of its fish taking an equal share of the rolls; null for what no fish takes.</summary>
         public string Choose(string bait, double roll) => Choose(bait, roll, null);
 
@@ -56,9 +89,11 @@ namespace Rodnarok
         /// The fish that comes to a bait for a roll from 0 to 1 among those of its fish that fit, such
         /// as the water at a float; each fitting fish takes an equal share of the rolls; null for none.
         /// </summary>
-        public string Choose(string bait, double roll, Func<string, bool> fits)
+        public string Choose(string bait, double roll, Func<string, bool> fits) => Pick(FishFor(bait), roll, fits);
+
+        private static string Pick(IReadOnlyList<string> all, double roll, Func<string, bool> fits)
         {
-            IReadOnlyList<string> fish = fits == null ? FishFor(bait) : FishFor(bait).Where(fits).ToList();
+            IReadOnlyList<string> fish = fits == null ? all : all.Where(fits).ToList();
             if (fish.Count == 0) return null;
             var index = (int)Math.Floor(Math.Max(0.0, roll) * fish.Count);
             return fish[Math.Min(index, fish.Count - 1)];

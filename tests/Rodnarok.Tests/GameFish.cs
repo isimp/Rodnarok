@@ -3,25 +3,29 @@ using System.Collections.Generic;
 namespace Rodnarok.Tests
 {
     /// <summary>
-    /// The fish of Valheim 1.0.20 and the bait each takes, as the game's prefabs set them. The
-    /// in-game self-test checks the installed game still agrees.
+    /// The fish of Valheim 1.0.21, the bait each takes and the biomes the world's spawn lists spawn
+    /// it in, as the game's prefabs set them. The Tetra spawns only in the Mountain caves' own
+    /// spawners, in no biome of the world. The in-game self-test checks the installed game still agrees.
     /// </summary>
     internal static class GameFish
     {
+        /// <summary>The game's biome flags (<c>Heightmap.Biome</c>).</summary>
+        public const int Meadows = 1, Swamp = 2, Mountain = 4, BlackForest = 8, Plains = 16, AshLands = 32, DeepNorth = 64, Ocean = 256, Mistlands = 512;
+
         public static readonly IReadOnlyList<FishKind> All = new[]
         {
-            new FishKind("Fish1", new[] { "FishingBait" }),
-            new FishKind("Fish2", new[] { "FishingBait" }),
-            new FishKind("Fish3", new[] { "FishingBaitOcean" }),
-            new FishKind("Fish4_cave", new[] { "FishingBaitCave" }),
-            new FishKind("Fish5", new[] { "FishingBaitForest" }),
-            new FishKind("Fish6", new[] { "FishingBaitSwamp" }),
-            new FishKind("Fish7", new[] { "FishingBaitPlains" }),
-            new FishKind("Fish8", new[] { "FishingBaitOcean" }),
-            new FishKind("Fish9", new[] { "FishingBaitMistlands" }),
-            new FishKind("Fish10", new[] { "FishingBaitDeepNorth" }),
-            new FishKind("Fish11", new[] { "FishingBaitAshlands" }),
-            new FishKind("Fish12", new[] { "FishingBaitMistlands" }),
+            new FishKind("Fish1", new[] { "FishingBait" }, Meadows | BlackForest | Plains),
+            new FishKind("Fish2", new[] { "FishingBait" }, Meadows | BlackForest | Plains),
+            new FishKind("Fish3", new[] { "FishingBaitOcean" }, Ocean),
+            new FishKind("Fish4_cave", new[] { "FishingBaitCave" }, 0),
+            new FishKind("Fish5", new[] { "FishingBaitForest" }, BlackForest),
+            new FishKind("Fish6", new[] { "FishingBaitSwamp" }, Swamp),
+            new FishKind("Fish7", new[] { "FishingBaitPlains" }, Plains),
+            new FishKind("Fish8", new[] { "FishingBaitOcean" }, Ocean),
+            new FishKind("Fish9", new[] { "FishingBaitMistlands" }, Mistlands),
+            new FishKind("Fish10", new[] { "FishingBaitDeepNorth" }, DeepNorth),
+            new FishKind("Fish11", new[] { "FishingBaitAshlands" }, AshLands),
+            new FishKind("Fish12", new[] { "FishingBaitMistlands" }, Ocean | Mistlands),
         };
 
         /// <summary>The speed of the game's slowest fish, the Anglerfish and the Tetra, in metres a second.</summary>

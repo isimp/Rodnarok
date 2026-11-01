@@ -36,6 +36,9 @@ namespace Rodnarok
         /// <summary>Whether each fish pulls by its own speed, the snap time and run speed being a Perch's; without, every fish pulls as a Perch.</summary>
         public bool PullBySpeed { get; private set; } = true;
 
+        /// <summary>Whether the game's plain Fishing Bait also brings the fish the world spawns where the float lands.</summary>
+        public bool BiomeFishOnBait { get; private set; } = true;
+
         /// <summary>Metres of line a second reeled in at Fishing 0.</summary>
         public float ReelSpeed { get; private set; } = 2f;
 
@@ -93,7 +96,8 @@ namespace Rodnarok
             bool? callWorldFish = null,
             bool? wary = null,
             bool? baitLost = null,
-            bool? pullBySpeed = null)
+            bool? pullBySpeed = null,
+            bool? biomeFishOnBait = null)
         {
             var copy = (FishingRules)MemberwiseClone();
             copy.CallWorldFish = callWorldFish ?? CallWorldFish;
@@ -104,6 +108,7 @@ namespace Rodnarok
             copy.EaseSeconds = easeSeconds ?? EaseSeconds;
             copy.RunSpeed = runSpeed ?? RunSpeed;
             copy.PullBySpeed = pullBySpeed ?? PullBySpeed;
+            copy.BiomeFishOnBait = biomeFishOnBait ?? BiomeFishOnBait;
             copy.LeaveBackstop = leaveBackstop ?? LeaveBackstop;
             copy.Schools = schools ?? Schools;
             copy.Bumps = bumps ?? Bumps;

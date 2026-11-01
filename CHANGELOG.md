@@ -6,6 +6,8 @@ Each fish pulls the line by its own swimming speed in the game. A Perch fights a
 
 Wearing a *Wisplight*, its wisp guards your float. While the float waits it drifts round it, searching, and now and then dips low over the water; when a fish bites it dives in close and flares; through the fight it follows the float, and once the float is gone it comes back to you. Your mist clearing stays with you while the wisp is out, and the wisp clears a small pocket round the float. Other players see the wisp move but not the flare. The new setting `FloatWisp`, your own, turns it off.
 
+Plain *Fishing Bait* also brings the fish that live where the float lands: in the Black Forest a *Trollfish* as often as a *Perch* or a *Pike*, in the Swamp a *Giant herring*, at sea a *Tuna*, a *Coral cod* or a *Pufferfish*, and so on. A biome's own bait still brings only its fish, anywhere, and the *Tetra* keeps to its *Cold Fishing Bait*. The new server setting `BiomeFishOnBait` turns it off.
+
 A seated cast goes where you aim instead of straight ahead. Sitting on the ground you turn toward your aim while drawing; on a chair or a bench the cast follows your aim up to 60 degrees to either side of the seat.
 
 ## 0.1.1
