@@ -259,6 +259,28 @@ namespace Rodnarok
             return zdo == null ? ZDOID.None : zdo.GetZDOID(ComingKey);
         }
 
+        /// <summary>The keys holding where a fish last fled from and when, in the server's time, for every game to show it darting off.</summary>
+        private static readonly int FledFromKey = "Rodnarok.fledFrom".GetStableHashCode();
+        private static readonly int FledAtKey = "Rodnarok.fledAt".GetStableHashCode();
+
+        /// <summary>Whether a fish fled just now (<see cref="ScatterBurst.Fresh"/>), from where, and when as the server's clock ticks.</summary>
+        public static bool FledJustNow(Fish fish, out Vector3 from, out long fledAt)
+        {
+            from = Vector3.zero;
+            fledAt = 0L;
+            var zdo = fish != null ? fish.GetComponent<ZNetView>()?.GetZDO() : null;
+            if (zdo == null || ZNet.instance == null) return false;
+            var at = zdo.GetLong(FledAtKey, 0L);
+            fledAt = at;
+            if (at == 0L) return false;
+            from = zdo.GetVec3(FledFromKey, Vector3.zero);
+            return ScatterBurst.Fresh((float)((ZNet.instance.GetTime().Ticks - at) / (double)TimeSpan.TicksPerSecond));
+        }
+
+        /// <summary>Marks a fish this game steers as going for the bait of a float, none for none, for the self-test.</summary>
+        [ForTest]
+        public static void MarkGoingForTest(Fish fish, ZDOID to) => MarkGoing(fish, to);
+
         /// <summary>The float a fish is going for the bait of, as the game steering it marked it; none for a fish going for none.</summary>
         public static ZDOID GoingFor(Fish fish)
         {
@@ -1098,6 +1120,9 @@ namespace Rodnarok
             Unslow(fish);
             var view = fish.GetComponent<ZNetView>();
             if (view == null || !view.IsValid() || !view.IsOwner()) return;
+            // Every game reads what the fish fled from, and when, to show it darting off (ArrivalSigns).
+            view.GetZDO().Set(FledFromKey, from);
+            if (ZNet.instance != null) view.GetZDO().Set(FledAtKey, ZNet.instance.GetTime().Ticks);
             var away = Flat(fish.transform.position - from);
             var deep = Vector3.zero;
             var diving = dive > 0f && OpenWaterAway(fish, away, dive + 0.5f, out deep);

@@ -18,9 +18,13 @@ namespace Rodnarok
     /// path, no further apart than the school can swim; at the float the signs go quiet, slow and by
     /// the float; and the fish marked for every game as going for the bait must be the one that
     /// bites. A Trollfish, Anglerfish and salmon are pictured swimming across the view, their sign
-    /// facing that way, and the Trollfish's bulge must fade at the float, leaving a slow ring there. A Wisplight's wisp stays with the character
-    /// meanwhile, so it does not sit in the pictures. The rules, the setting, the rod, the floats
-    /// and the fish are put back after.
+    /// facing that way, and the Trollfish's bulge must fade at the float, leaving a slow ring there.
+    /// The float must tremble toward the Perch going for the bait in its last 1.5 m; hooked, the
+    /// rest of the school must dart off and the float's look stand upright again; the signs must
+    /// use their parts again rather than make new ones; a two-star Perch must show its hint coming
+    /// and its size going for the bait, pictured; and the crest must be lit by the game's light.
+    /// A Wisplight's wisp stays with the character meanwhile, so it does not sit in the pictures.
+    /// The rules, the setting, the rod, the floats and the fish are put back after.
     /// </summary>
     internal static class SelfTestSigns
     {
@@ -30,6 +34,8 @@ namespace Rodnarok
         private static readonly AccessTools.FieldRef<FishingFloat, Fish> Nibbler = AccessTools.FieldRefAccess<FishingFloat, Fish>("m_nibbler");
         private static readonly AccessTools.FieldRef<Player, float> LookPitch = AccessTools.FieldRefAccess<Player, float>("m_lookPitch");
         private static readonly AccessTools.FieldRef<Character, Quaternion> LookYaw = AccessTools.FieldRefAccess<Character, Quaternion>("m_lookYaw");
+        private static readonly System.Reflection.MethodInfo TryToHook = AccessTools.Method(typeof(FishingFloat), "TryToHook");
+        private static readonly System.Reflection.MethodInfo SetCatch = AccessTools.Method(typeof(FishingFloat), "SetCatch");
 
         private static readonly (string Prefab, string Name)[] GameFish =
         {
@@ -110,6 +116,13 @@ namespace Rodnarok
                 var bit = false;
                 var quietSeen = false;
                 Fish going = null;
+                Fish bitBy = null;
+                var madeBefore = ArrivalSigns.PartsMadeForTest();
+                var tiltMost = 0f;
+                var tiltToward = 0f;
+                var lookParts = 0;
+                var lookBefore = new List<(Transform T, Quaternion Rot, Vector3 Pos)>();
+                foreach (Transform child in ff.transform) lookBefore.Add((child, child.localRotation, child.localPosition));
                 for (var waited = 0f; waited < 90f && !bit; waited += Time.deltaTime)
                 {
                     var (kind, shown, nearness) = ArrivalSigns.ForTest(floatId);
@@ -129,7 +142,24 @@ namespace Rodnarok
                         }
                         lastShown = shown;
                     }
+                    // The float trembles toward the fish going for the bait as it closes the last 1.5 m.
+                    if (going != null)
+                    {
+                        var offset = going.transform.position - ff.transform.position;
+                        if (new Vector2(offset.x, offset.z).magnitude < FloatTremble.From)
+                        {
+                            var tremble = ArrivalSigns.TrembleForTest(floatId);
+                            lookParts = Mathf.Max(lookParts, tremble.Parts);
+                            if (tremble.Degrees > tiltMost)
+                            {
+                                tiltMost = tremble.Degrees;
+                                var (ax, az) = FloatTremble.Axis(offset.x, offset.z);
+                                tiltToward = Vector3.Dot(tremble.Axis, new Vector3(ax, 0f, az));
+                            }
+                        }
+                    }
                     bit = Nibbler(ff) != null && NibbleTime(ff) > 0f;
+                    if (bit) bitBy = Nibbler(ff);
                     yield return null;
                 }
                 check.That(kindWhileComing == ArrivalSignKind.Rings && lastShown >= 3, "the Perch coming shows its rings on the way in: " + kindWhileComing + ", " + lastShown + " times");
@@ -140,6 +170,8 @@ namespace Rodnarok
                 else
                     check.Note("the school was not seen both far off and near, so how often the rings came was not compared");
                 check.That(bit, "a Perch bit within 90 s");
+                var made = ArrivalSigns.PartsMadeForTest() - madeBefore;
+                check.That(made <= 8 || made * 2 <= lastShown, "the signs use their parts again: " + made + " parts made for " + lastShown + " showings");
 
                 // The signs walk one path: one showing after another no further apart than the school can swim between them.
                 var jumps = new List<string>();
@@ -161,6 +193,29 @@ namespace Rodnarok
                 else check.Note("the school was quiet at the float too briefly for a quiet showing");
                 // The fish going for the bait is marked for every game, and it is the one that bites.
                 check.That(going != null && going == Nibbler(ff), "the fish marked as going for the bait is the one that bit" + (going == null ? ": none was marked" : ""));
+                check.That(lookParts > 0 && tiltMost >= 3f && tiltToward > 0.8f, "the float trembled toward the fish closing in: up to " + F(tiltMost) + " degrees, toward it " + F(tiltToward) + ", " + lookParts + " parts of its look tilting");
+
+                // Hooked, the rest of the school darts off, and the float's look stands upright again.
+                if (bitBy != null)
+                {
+                    var dartsBefore = ArrivalSigns.DartsForTest();
+                    var others = school.Count(f => f != null && f != bitBy);
+                    Nibbler(ff) = bitBy;
+                    NibbleTime(ff) = Time.time - 0.6f;
+                    TryToHook.Invoke(ff, null);
+                    var hooked = ff.GetCatch();
+                    check.That(hooked == bitBy, "reeling just after the bite hooks the Perch");
+                    for (var waited = 0f; waited < 1.5f; waited += Time.deltaTime) yield return null;
+                    var darted = ArrivalSigns.DartsForTest() - dartsBefore;
+                    if (hooked != null) check.That(darted >= others, "the rest of the school darted off when the Perch was hooked: " + darted + " darts for " + others + " fish");
+                    var tilted = lookBefore.Where(l => l.T != null && (Quaternion.Angle(l.T.localRotation, l.Rot) > 0.5f || Vector3.Distance(l.T.localPosition, l.Pos) > 0.005f)).Select(l => l.T.name).ToList();
+                    check.That(tilted.Count == 0, "after the bite the float's look stands as before" + (tilted.Count == 0 ? "" : ": still tilted " + string.Join(", ", tilted)));
+                    if (hooked != null)
+                    {
+                        SetCatch.Invoke(ff, new object[] { null });
+                        hooked.OnHooked(null);
+                    }
+                }
                 for (var waited = 0f; waited < 1f; waited += Time.deltaTime) yield return null;
                 check.That(school.Where(f => f != null).All(f => Schools.ComingTo(f).IsNone()), "after the bite no fish of the school is marked as coming any more");
                 var afterBite = ArrivalSigns.ForTest(floatId).Shown;
@@ -216,6 +271,28 @@ namespace Rodnarok
                         yield return null;
                     }
                     if (kindSeen != expected || shownBy == 0) wrong.Add(name + " showed " + kindSeen + " " + shownBy + " times, " + expected + " wanted");
+                    if (expected == ArrivalSignKind.Rings)
+                    {
+                        // A starred fish: a hint while it only comes, clearly bigger once it goes for the bait.
+                        var zdo = go.GetComponent<ZNetView>().GetZDO();
+                        zdo.Set(ZDOVars.s_quality, 3);
+                        for (var waited = 0f; waited < 0.2f; waited += Time.deltaTime) yield return null;
+                        var hint = ArrivalSigns.StarsForTest(floatId);
+                        Schools.MarkGoingForTest(fish, floatId);
+                        for (var waited = 0f; waited < 0.2f; waited += Time.deltaTime) yield return null;
+                        var goingStars = ArrivalSigns.StarsForTest(floatId);
+                        for (var waited = 0f; waited < 2.5f; waited += Time.deltaTime)
+                        {
+                            Aim(player, at + Vector3.up * 1.5f);
+                            yield return null;
+                        }
+                        var starredPicture = SelfTestPictures.Take("sign-" + name + "-two-stars-going");
+                        if (starredPicture != null) wrong.Add("no picture of the starred " + name + ": " + starredPicture);
+                        Schools.MarkGoingForTest(fish, ZDOID.None);
+                        zdo.Set(ZDOVars.s_quality, 1);
+                        if (Mathf.Abs(hint.Size - SignStars.Size(3, false, 1)) > 0.001f || Mathf.Abs(goingStars.Size - SignStars.Size(3, true, 3)) > 0.001f)
+                            wrong.Add("a two-star " + name + " showed " + F(hint.Size) + "x coming and " + F(goingStars.Size) + "x going for the bait, " + F(SignStars.Size(3, false, 1)) + "x and " + F(SignStars.Size(3, true, 3)) + "x wanted");
+                    }
                     var trouble = SelfTestPictures.Take("sign-" + name);
                     if (trouble != null) wrong.Add("no picture of the " + name + ": " + trouble);
                     if (swims)

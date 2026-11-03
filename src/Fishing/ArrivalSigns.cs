@@ -24,7 +24,8 @@ namespace Rodnarok
         /// <summary>A part of a sign on the water, living a while.</summary>
         private sealed class Piece
         {
-            public GameObject Go;
+            public Part Part;
+            public GameObject Go => Part?.Go;
             public float Age;
             public float Life;
             public float Delay;
@@ -45,6 +46,12 @@ namespace Rodnarok
             public readonly List<Fish> Fish = new List<Fish>();
             public readonly List<Spot> Places = new List<Spot>();
             public readonly Vector3[] Wake = new Vector3[WakePoints];
+            public float Size = 1f;
+            public float Bold = 1f;
+            public float Phase;
+            public float Tilt;
+            public Vector3 Axis;
+            public List<(Transform T, Vector3 Pos, Quaternion Rot)> Look;
         }
 
         private const int WakePoints = (int)(SignPath.WakeSeconds / SignPath.TrailStep) + 2;
@@ -53,6 +60,15 @@ namespace Rodnarok
         private static readonly List<Piece> Pieces = new List<Piece>();
         private static readonly List<ZDOID> Gone = new List<ZDOID>();
         private static readonly HashSet<ZDOID> Seen = new HashSet<ZDOID>();
+
+        /// <summary>How long after it last came to a float a fish is still watched for a flee to dart off from, in seconds.</summary>
+        private const float WatchAfter = 10f;
+
+        /// <summary>Each fish that came to a float lately, with when it last did, and the flee each last darted for.</summary>
+        private static readonly Dictionary<Fish, float> Lately = new Dictionary<Fish, float>();
+        private static readonly Dictionary<Fish, long> DartedAt = new Dictionary<Fish, long>();
+        private static readonly List<Fish> Dropped = new List<Fish>();
+
         private static Material _material;
         private static Sprite _dot;
         private static Mesh _fin;
@@ -66,6 +82,10 @@ namespace Rodnarok
         private static float _fogDensity;
         private static float _fogStart;
         private static float _fogEnd;
+
+        /// <summary>How much bigger and bolder the sign being drawn shows for the stars of its fish (<see cref="SignStars"/>).</summary>
+        private static float _size = 1f;
+        private static float _bold = 1f;
 
         /// <summary>The light the signs are drawn in now, for the self-test: the crest and trough colours, the game's light they come from, and its fog.</summary>
         [ForTest]
@@ -117,6 +137,33 @@ namespace Rodnarok
                 Seen.Add(to);
             }
 
+            // A fish that came to a float lately and fled just now, from a hooked school or a fright, darts off, once a flee.
+            // The game takes its coming mark at the nibble, before the hook scatters the rest, so this watches it a while longer.
+            _size = 1f;
+            _bold = 1f;
+            foreach (var coming in Floats.Values)
+                foreach (var fish in coming.Fish)
+                    Lately[fish] = Time.time;
+            Dropped.Clear();
+            foreach (var pair in Lately)
+            {
+                var fish = pair.Key;
+                if (fish == null || Time.time - pair.Value > WatchAfter)
+                {
+                    Dropped.Add(fish);
+                    continue;
+                }
+                if (!Schools.FledJustNow(fish, out var from, out var fledAt)) continue;
+                if (DartedAt.TryGetValue(fish, out var was) && was == fledAt) continue;
+                DartedAt[fish] = fledAt;
+                Dart(fish.transform.position, from);
+            }
+            foreach (var fish in Dropped)
+            {
+                Lately.Remove(fish);
+                DartedAt.Remove(fish);
+            }
+
             Gone.Clear();
             foreach (var pair in Floats)
             {
@@ -126,7 +173,7 @@ namespace Rodnarok
                     Gone.Add(pair.Key);
                     continue;
                 }
-                Step(pair.Value, floatObject.transform.position, pair.Key);
+                Step(pair.Value, floatObject, pair.Key);
             }
             foreach (var id in Gone) End(id);
             Age(Time.deltaTime);
@@ -137,8 +184,9 @@ namespace Rodnarok
         /// for the bait when one is marked; a travelling sign rides the path, and showings come on
         /// it, or by the float while the school mills about there.
         /// </summary>
-        private static void Step(Coming coming, Vector3 at, ZDOID floatId)
+        private static void Step(Coming coming, GameObject floatObject, ZDOID floatId)
         {
+            var at = floatObject.transform.position;
             var nearest = float.MaxValue;
             Fish going = null;
             coming.Places.Clear();
@@ -150,6 +198,15 @@ namespace Rodnarok
                 if (going == null && Schools.GoingFor(fish) == floatId) going = fish;
             }
             if (coming.Places.Count == 0) return;
+            // A starred fish tells itself: a little bolder for a school holding one, by its own stars once it goes for the bait.
+            var best = 1;
+            foreach (var fish in coming.Fish) best = Math.Max(best, Quality(fish));
+            var goingQuality = going != null ? Quality(going) : 1;
+            coming.Size = SignStars.Size(best, going != null, goingQuality);
+            coming.Bold = SignStars.Boldness(best, going != null, goingQuality);
+            _size = coming.Size;
+            _bold = coming.Bold;
+            Tremble(coming, going, floatObject);
             var nearness = ArrivalSign.Nearness(nearest);
             coming.Nearness = nearness;
             var target = going != null ? new Spot(going.transform.position.x, going.transform.position.y, going.transform.position.z) : SignPath.Centre(coming.Places);
@@ -181,7 +238,7 @@ namespace Rodnarok
                 : Jitter(new Vector3(show.X, show.Y, show.Z), 0.15f);
             coming.ShownAt = showAt;
             // A travelling sign, faded at the float, leaves a slow ring there that the school is in.
-            if (lasts) Ring(new Vector3(showAt.x, Surface(showAt) + 0.02f, showAt.z), 1.1f, 1.6f, ArrivalSign.Strength(nearness) * 0.8f, 0f);
+            if (lasts) Ring(new Vector3(showAt.x, Surface(showAt) + 0.02f, showAt.z), 1.1f, 1.6f, Mathf.Min(1f, ArrivalSign.Strength(nearness) * _bold) * 0.8f, 0f);
             else Show(coming, showAt, at, nearness, Surface(showAt));
             coming.Shown++;
             coming.NextAt = Time.time + (path.Quiet ? SignPath.QuietEvery
@@ -196,7 +253,7 @@ namespace Rodnarok
         /// <summary>One showing of a sign at a place by the school, toward the float.</summary>
         private static void Show(Coming coming, Vector3 by, Vector3 floatAt, float nearness, float surface)
         {
-            var strength = ArrivalSign.Strength(nearness);
+            var strength = Mathf.Min(1f, ArrivalSign.Strength(nearness) * _bold);
             var at = new Vector3(by.x, surface + 0.02f, by.z);
             switch (coming.Kind)
             {
@@ -262,12 +319,10 @@ namespace Rodnarok
                     blob.sprite = DotSprite();
                     blob.transform.SetParent(go.transform, false);
                     blob.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-                    blob.transform.localScale = new Vector3(2.6f, 1f, 1f);
                     var rim = new GameObject("Rim").AddComponent<SpriteRenderer>();
                     rim.sprite = DotSprite();
                     rim.transform.SetParent(go.transform, false);
                     rim.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-                    rim.transform.localScale = new Vector3(1.8f, 0.45f, 1f);
                     rim.sortingOrder = 1;
                     Wake(go, "WakeLeftTrough");
                     Wake(go, "WakeRightTrough");
@@ -307,7 +362,7 @@ namespace Rodnarok
             var go = coming.Lasting;
             var path = coming.Path;
             var showing = path.Showing;
-            var strength = ArrivalSign.Strength(nearness) * showing;
+            var strength = Mathf.Min(1f, ArrivalSign.Strength(nearness) * _bold) * showing;
             var moving = SignPath.Moving(path.Speed);
             var heading = new Vector3(path.HeadX, 0f, path.HeadZ);
             var at = new Vector3(pathAt.x, surface + 0.03f, pathAt.z);
@@ -318,8 +373,10 @@ namespace Rodnarok
                 case ArrivalSignKind.Bulge:
                     // A dark hump pushing the water up, its rim lit on the side facing the light.
                     var blob = go.transform.Find("Bulge").GetComponent<SpriteRenderer>();
+                    blob.transform.localScale = new Vector3(2.6f, 1f, 1f) * _size;
                     blob.color = Dark(at, 0.55f * strength * (0.4f + 0.6f * moving));
                     var rim = go.transform.Find("Rim");
+                    rim.localScale = new Vector3(1.8f, 0.45f, 1f) * _size;
                     rim.position = at + Flat(_toSun) * 0.15f + Vector3.up * 0.005f;
                     rim.GetComponent<SpriteRenderer>().color = Lit(at, 0.5f * strength * (0.4f + 0.6f * moving));
                     SetWake(go.transform.Find("WakeLeftTrough"), coming, surface + 0.025f, -1f, 0.45f * strength * moving, dark: true);
@@ -332,16 +389,17 @@ namespace Rodnarok
                     var light = go.GetComponentInChildren<Light>();
                     light.transform.position = at + Vector3.down * 0.6f;
                     light.intensity = (0.6f + 1.4f * nearness) * pulse;
-                    light.range = 2f + 2f * nearness;
+                    light.range = (2f + 2f * nearness) * _size;
                     var halo = go.transform.Find("Halo").GetComponent<SpriteRenderer>();
                     halo.color = new Color(0.82f, 1f, 0.67f, (0.15f + 0.4f * nearness) * pulse * (1f - FogAt(at)));
-                    halo.transform.localScale = Vector3.one * (0.8f + 0.8f * nearness);
+                    halo.transform.localScale = Vector3.one * (0.8f + 0.8f * nearness) * _size;
                     break;
                 case ArrivalSignKind.Fin:
                     // Breaking the surface now and then, as a fin does.
                     var up = Mathf.Sin(Time.time * 1.7f + 1f) > -0.2f && showing > 0.02f;
                     var fin = go.transform.Find("Fin");
                     fin.gameObject.SetActive(up);
+                    fin.localScale = Vector3.one * 1.6f * _size;
                     // Dark against the day's water, by night edged in the night's own light, so it shows on dark water too.
                     var finColour = Color.Lerp(new Color(0.12f, 0.16f, 0.2f), _crest * 0.75f, _darkness);
                     fin.GetComponent<MeshRenderer>().material.color = Fogged(at, new Color(finColour.r, finColour.g, finColour.b, 0.9f * showing));
@@ -386,7 +444,7 @@ namespace Rodnarok
                     dz = coming.Path.HeadZ;
                     length = 1f;
                 }
-                var off = side * (SignPath.WakeSide(trail[i].Age) + (dark ? 0.09f : 0f));
+                var off = side * (SignPath.WakeSide(trail[i].Age) * _size + (dark ? 0.09f : 0f));
                 coming.Wake[i] = new Vector3(point.X - dz / length * off, y, point.Z + dx / length * off);
             }
             line.positionCount = n;
@@ -397,30 +455,119 @@ namespace Rodnarok
             line.endColor = new Color(colour.r, colour.g, colour.b, 0f);
         }
 
-        // Parts of signs.
+        // Parts of signs, kept and used again (PartPool) rather than made and thrown away with every showing.
 
-        private static void Ring(Vector3 at, float radius, float life, float strength, float delay, float width = 0.07f)
+        /// <summary>One kept part of a sign: a line, a ring with its trough, or a spot.</summary>
+        private sealed class Part
         {
-            var line = new GameObject("RodnarokSignRing").AddComponent<LineRenderer>();
-            line.transform.position = at;
+            public GameObject Go;
+            public LineRenderer Line;
+            public LineRenderer Trough;
+            public SpriteRenderer Sprite;
+            public Gradient Gradient;
+            public GradientColorKey[] Colours;
+            public GradientAlphaKey[] Alphas;
+            public PartPool<Part> Pool;
+        }
+
+        private const int PartsKept = 64;
+        private static readonly AnimationCurve Even = AnimationCurve.Constant(0f, 1f, 1f);
+        private static PartPool<Part> _rings;
+        private static PartPool<Part> _lines;
+        private static PartPool<Part> _spots;
+
+        /// <summary>How many parts of signs this game has made, for the self-test.</summary>
+        [ForTest]
+        public static int PartsMadeForTest() => (_rings?.Made ?? 0) + (_lines?.Made ?? 0) + (_spots?.Made ?? 0);
+
+        private static PartPool<Part> NewPool(Func<Part> make) =>
+            new PartPool<Part>(make, p => { if (p.Go != null) p.Go.SetActive(false); }, p => { if (p.Go != null) Object.Destroy(p.Go); }, PartsKept);
+
+        /// <summary>A kept part from a pool, or a new one; one whose object the game took away on a world change is dropped.</summary>
+        private static Part Take(ref PartPool<Part> pool, Func<Part> make)
+        {
+            if (pool == null) pool = NewPool(make);
+            var part = pool.Take();
+            while (part.Go == null) part = pool.Take();
+            part.Pool = pool;
+            part.Go.SetActive(true);
+            return part;
+        }
+
+        private static LineRenderer NewLine(GameObject go)
+        {
+            var line = go.AddComponent<LineRenderer>();
+            line.sharedMaterial = SignMaterial();
+            line.enabled = false;
+            return line;
+        }
+
+        private static Part MakeRing()
+        {
+            var go = new GameObject("RodnarokSignRing");
+            var line = NewLine(go);
             line.useWorldSpace = false;
             line.loop = true;
             line.positionCount = RingPoints;
-            line.widthMultiplier = width;
-            line.sharedMaterial = SignMaterial();
-            line.enabled = false;
-            var trough = new GameObject("Trough").AddComponent<LineRenderer>();
-            trough.transform.SetParent(line.transform, false);
+            var trough = NewLine(new GameObject("Trough"));
+            trough.transform.SetParent(go.transform, false);
             trough.transform.localPosition = Vector3.down * 0.005f;
             trough.useWorldSpace = false;
             trough.loop = true;
             trough.positionCount = RingPoints;
-            trough.sharedMaterial = SignMaterial();
+            return new Part { Go = go, Line = line, Trough = trough, Gradient = new Gradient(), Colours = new GradientColorKey[GradientKeys], Alphas = new GradientAlphaKey[2] };
+        }
+
+        private static Part MakeLine()
+        {
+            var go = new GameObject("RodnarokSignLine");
+            var line = NewLine(go);
+            line.useWorldSpace = true;
+            return new Part { Go = go, Line = line };
+        }
+
+        private static Part MakeSpot()
+        {
+            var go = new GameObject("RodnarokSignSpot");
+            var sprite = go.AddComponent<SpriteRenderer>();
+            sprite.sprite = DotSprite();
+            sprite.enabled = false;
+            return new Part { Go = go, Sprite = sprite };
+        }
+
+        /// <summary>A plain line in the world, of a number of points, width and flat across.</summary>
+        private static Part Line(int points, float width)
+        {
+            var part = Take(ref _lines, MakeLine);
+            var line = part.Line;
+            line.loop = false;
+            line.positionCount = points;
+            line.widthMultiplier = width;
+            line.widthCurve = Even;
+            line.enabled = false;
+            return part;
+        }
+
+        /// <summary>A spot at a place, hidden until it first shows.</summary>
+        private static Part Spot(Vector3 at)
+        {
+            var part = Take(ref _spots, MakeSpot);
+            part.Go.transform.SetPositionAndRotation(at, Quaternion.identity);
+            part.Go.transform.localScale = Vector3.one;
+            part.Sprite.enabled = false;
+            return part;
+        }
+
+        private static void Ring(Vector3 at, float radius, float life, float strength, float delay, float width = 0.07f)
+        {
+            radius *= _size;
+            var part = Take(ref _rings, MakeRing);
+            var line = part.Line;
+            var trough = part.Trough;
+            part.Go.transform.SetPositionAndRotation(at, Quaternion.identity);
+            line.enabled = false;
             trough.enabled = false;
-            var gradient = new Gradient();
-            var colours = new GradientColorKey[GradientKeys];
-            var alphas = new GradientAlphaKey[2];
-            Add(line.gameObject, life, delay, (p, q) =>
+            Add(part, life, delay, (p, q) =>
             {
                 // Thin against its size from the start, so a young ring is a ring and not a disc, and thinner as it spreads.
                 var r = radius * (0.25f + 0.75f * q);
@@ -442,12 +589,12 @@ namespace Rodnarok
                     var t = k / (float)(GradientKeys - 1);
                     var a = t * Mathf.PI * 2f;
                     var facing = Mathf.Cos(a) * toSun.x + Mathf.Sin(a) * toSun.z;
-                    colours[k] = new GradientColorKey(crest * SignLight.SunSide(facing), t);
+                    p.Part.Colours[k] = new GradientColorKey(crest * SignLight.SunSide(facing), t);
                 }
-                alphas[0] = new GradientAlphaKey(crest.a, 0f);
-                alphas[1] = new GradientAlphaKey(crest.a, 1f);
-                gradient.SetKeys(colours, alphas);
-                line.colorGradient = gradient;
+                p.Part.Alphas[0] = new GradientAlphaKey(crest.a, 0f);
+                p.Part.Alphas[1] = new GradientAlphaKey(crest.a, 1f);
+                p.Part.Gradient.SetKeys(p.Part.Colours, p.Part.Alphas);
+                line.colorGradient = p.Part.Gradient;
                 var dark = Dark(at, alpha * 0.5f);
                 trough.startColor = dark;
                 trough.endColor = dark;
@@ -458,11 +605,11 @@ namespace Rodnarok
 
         private static void Dot(Vector3 at, float size, float life, float rise, float strength, float delay, Color colour)
         {
-            var dot = new GameObject("RodnarokSignDot").AddComponent<SpriteRenderer>();
-            dot.sprite = DotSprite();
-            dot.enabled = false;
+            size *= _size;
+            var part = Spot(at);
+            var dot = part.Sprite;
             var start = at;
-            Add(dot.gameObject, life, delay, (p, q) =>
+            Add(part, life, delay, (p, q) =>
             {
                 dot.transform.position = start + Vector3.up * rise * q;
                 dot.transform.localScale = Vector3.one * size;
@@ -474,27 +621,26 @@ namespace Rodnarok
 
         private static void Puff(Vector3 at, float strength)
         {
-            var puff = new GameObject("RodnarokSignSteam").AddComponent<SpriteRenderer>();
-            puff.sprite = DotSprite();
-            Add(puff.gameObject, 1.8f, 0f, (p, q) =>
+            var size = _size;
+            var part = Spot(at);
+            var puff = part.Sprite;
+            Add(part, 1.8f, 0f, (p, q) =>
             {
                 puff.transform.position = at + new Vector3(0.1f * q, 1.2f * q, 0f);
-                puff.transform.localScale = Vector3.one * (0.5f + 1.2f * q);
+                puff.transform.localScale = Vector3.one * (0.5f + 1.2f * q) * size;
                 Face(puff.transform);
                 puff.color = Lit(puff.transform.position, 0.65f * strength * (1f - q), new Color(0.92f, 0.92f, 0.92f));
+                puff.enabled = true;
             });
         }
 
         private static void Splash(Vector3 at, float height, float life, float strength, float delay)
         {
-            var line = new GameObject("RodnarokSignSplash").AddComponent<LineRenderer>();
-            line.useWorldSpace = true;
-            line.positionCount = 2;
-            line.widthMultiplier = 0.07f;
-            line.sharedMaterial = SignMaterial();
-            line.enabled = false;
+            height *= _size;
+            var part = Line(2, 0.07f);
+            var line = part.Line;
             var lean = new Vector3(Random.Range(-0.05f, 0.05f), 0f, Random.Range(-0.05f, 0.05f));
-            Add(line.gameObject, life, delay, (p, q) =>
+            Add(part, life, delay, (p, q) =>
             {
                 line.SetPosition(0, at);
                 line.SetPosition(1, at + lean + Vector3.up * height * Mathf.Sin(q * Mathf.PI));
@@ -508,12 +654,10 @@ namespace Rodnarok
         /// <summary>The Pufferfish's dome: a half ring standing on the water, facing the camera, swelling.</summary>
         private static void Arc(Vector3 at, float radius, float life, float strength)
         {
-            var line = new GameObject("RodnarokSignDome").AddComponent<LineRenderer>();
-            line.useWorldSpace = true;
-            line.positionCount = RingPoints / 2 + 1;
-            line.widthMultiplier = 0.07f;
-            line.sharedMaterial = SignMaterial();
-            Add(line.gameObject, life, 0f, (p, q) =>
+            radius *= _size;
+            var part = Line(RingPoints / 2 + 1, 0.07f);
+            var line = part.Line;
+            Add(part, life, 0f, (p, q) =>
             {
                 var camera = Utils.GetMainCamera();
                 var right = camera != null ? Flat(camera.transform.right) : Vector3.right;
@@ -526,25 +670,147 @@ namespace Rodnarok
                 var c = Lit(at, 0.8f * strength);
                 line.startColor = c;
                 line.endColor = c;
+                line.enabled = true;
             });
         }
 
         /// <summary>A dark patch spreading on the water, in the trough's colour.</summary>
         private static void Blob(Vector3 at, Vector3 scale, float alpha, float life)
         {
-            var blob = new GameObject("RodnarokSignBlob").AddComponent<SpriteRenderer>();
-            blob.sprite = DotSprite();
-            blob.transform.position = at;
+            scale *= _size;
+            var part = Spot(at);
+            var blob = part.Sprite;
             blob.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
-            Add(blob.gameObject, life, 0f, (p, q) =>
+            Add(part, life, 0f, (p, q) =>
             {
                 blob.transform.localScale = scale * (1f + q);
                 blob.color = Dark(at, alpha * (1f - q));
+                blob.enabled = true;
             });
         }
 
-        private static void Add(GameObject go, float life, float delay, Action<Piece, float> show) =>
-            Pieces.Add(new Piece { Go = go, Life = life, Delay = delay, Show = show });
+        /// <summary>How many fleeing fish have darted off, for the self-test.</summary>
+        private static int _darts;
+
+        [ForTest]
+        public static int DartsForTest() => _darts;
+
+        /// <summary>
+        /// A fish fleeing a hooked school or a fright darts off away from what frightened it: a short V
+        /// of a wake running out from where it was, lit as the other signs, with a ring where it started.
+        /// </summary>
+        private static void Dart(Vector3 fishAt, Vector3 from)
+        {
+            var (ax, az) = ScatterBurst.Away(fishAt.x, fishAt.z, from.x, from.z);
+            var away = new Vector3(ax, 0f, az);
+            var side = new Vector3(-az, 0f, ax);
+            var start = new Vector3(fishAt.x, Surface(fishAt) + 0.03f, fishAt.z);
+            _darts++;
+            Ring(start, 0.6f, 0.7f, 0.9f, 0f);
+            var part = Line(3, 0.06f);
+            var line = part.Line;
+            Add(part, ScatterBurst.Seconds, 0f, (p, q) =>
+            {
+                var head = start + away * ScatterBurst.Run(q);
+                var spread = 0.3f + 0.4f * q;
+                line.SetPosition(0, head - away * 0.9f - side * spread);
+                line.SetPosition(1, head);
+                line.SetPosition(2, head - away * 0.9f + side * spread);
+                line.widthMultiplier = 0.06f * SignLight.Taper(q);
+                var c = Lit(head, ScatterBurst.Alpha(q));
+                line.startColor = c;
+                line.endColor = c;
+                line.enabled = true;
+            });
+        }
+
+        // The float's tremble.
+
+        /// <summary>
+        /// The float trembles as the fish going for the bait closes its last 1.5 m: its look, never the
+        /// game's float, tilts toward the fish in twitches; with no fish so close it eases upright.
+        /// </summary>
+        private static void Tremble(Coming coming, Fish going, GameObject floatObject)
+        {
+            var target = 0f;
+            if (going != null)
+            {
+                var offset = going.transform.position - floatObject.transform.position;
+                var closeness = FloatTremble.Closeness(new Vector2(offset.x, offset.z).magnitude);
+                if (closeness > 0f)
+                {
+                    coming.Phase += Time.deltaTime / FloatTremble.Seconds(closeness);
+                    target = FloatTremble.Degrees(closeness, coming.Phase);
+                    var (x, z) = FloatTremble.Axis(offset.x, offset.z);
+                    coming.Axis = new Vector3(x, 0f, z);
+                }
+            }
+            coming.Tilt = target > coming.Tilt ? target : Mathf.MoveTowards(coming.Tilt, target, 60f * Time.deltaTime);
+            if (coming.Tilt <= 0f && coming.Look == null) return;
+            if (coming.Look == null) coming.Look = LookOf(floatObject);
+            TiltLook(coming, floatObject.transform);
+        }
+
+        /// <summary>The float's look: each child of the float holding something drawn, but no line, with where it sits.</summary>
+        private static List<(Transform T, Vector3 Pos, Quaternion Rot)> LookOf(GameObject floatObject)
+        {
+            var look = new List<(Transform T, Vector3 Pos, Quaternion Rot)>();
+            var root = floatObject.transform;
+            for (var i = 0; i < root.childCount; i++)
+            {
+                var child = root.GetChild(i);
+                if (child.GetComponentInChildren<LineRenderer>(true) != null) continue;
+                var drawn = child.GetComponentInChildren<MeshRenderer>(true) != null || child.GetComponentInChildren<SkinnedMeshRenderer>(true) != null;
+                if (drawn) look.Add((child, child.localPosition, child.localRotation));
+            }
+            return look;
+        }
+
+        private static void TiltLook(Coming coming, Transform root)
+        {
+            var axis = root.InverseTransformDirection(coming.Axis);
+            var turn = coming.Tilt > 0f && axis.sqrMagnitude > 0.0001f ? Quaternion.AngleAxis(coming.Tilt, axis) : Quaternion.identity;
+            foreach (var (t, pos, rot) in coming.Look)
+            {
+                if (t == null) continue;
+                t.localPosition = turn * pos;
+                t.localRotation = turn * rot;
+            }
+        }
+
+        /// <summary>Puts the float's look back as it was.</summary>
+        private static void Upright(Coming coming)
+        {
+            if (coming.Look == null) return;
+            foreach (var (t, pos, rot) in coming.Look)
+            {
+                if (t == null) continue;
+                t.localPosition = pos;
+                t.localRotation = rot;
+            }
+            coming.Look = null;
+            coming.Tilt = 0f;
+        }
+
+        /// <summary>How far a float's look tilts now, toward what, and how many parts of it tilt, for the self-test; zeros for no float.</summary>
+        [ForTest]
+        public static (float Degrees, Vector3 Axis, int Parts) TrembleForTest(ZDOID floatId) =>
+            Floats.TryGetValue(floatId, out var coming) ? (coming.Tilt, coming.Axis, coming.Look?.Count ?? 0) : (0f, Vector3.zero, 0);
+
+        /// <summary>How much bigger and bolder a float's sign shows for the stars of its fish, for the self-test; 1 and 1 for none.</summary>
+        [ForTest]
+        public static (float Size, float Bold) StarsForTest(ZDOID floatId) =>
+            Floats.TryGetValue(floatId, out var coming) ? (coming.Size, coming.Bold) : (1f, 1f);
+
+        /// <summary>A fish's stars as the game's item quality, 1 for none, from its networked data so every game reads the same.</summary>
+        private static int Quality(Fish fish)
+        {
+            var zdo = fish != null ? fish.GetComponent<ZNetView>()?.GetZDO() : null;
+            return zdo == null ? 1 : zdo.GetInt(ZDOVars.s_quality, 1);
+        }
+
+        private static void Add(Part part, float life, float delay, Action<Piece, float> show) =>
+            Pieces.Add(new Piece { Part = part, Life = life, Delay = delay, Show = show });
 
         private static void Age(float seconds)
         {
@@ -555,7 +821,7 @@ namespace Rodnarok
                 var q = (piece.Age - piece.Delay) / piece.Life;
                 if (piece.Go == null || q >= 1f)
                 {
-                    if (piece.Go != null) Object.Destroy(piece.Go);
+                    piece.Part.Pool.Return(piece.Part);
                     Pieces.RemoveAt(i);
                     continue;
                 }
@@ -565,7 +831,11 @@ namespace Rodnarok
 
         private static void End(ZDOID id)
         {
-            if (Floats.TryGetValue(id, out var coming) && coming.Lasting != null) Object.Destroy(coming.Lasting);
+            if (Floats.TryGetValue(id, out var coming))
+            {
+                if (coming.Lasting != null) Object.Destroy(coming.Lasting);
+                Upright(coming);
+            }
             Floats.Remove(id);
         }
 
@@ -573,11 +843,19 @@ namespace Rodnarok
         public static void Forget()
         {
             foreach (var coming in Floats.Values)
+            {
                 if (coming.Lasting != null) Object.Destroy(coming.Lasting);
+                Upright(coming);
+            }
             Floats.Clear();
             foreach (var piece in Pieces)
                 if (piece.Go != null) Object.Destroy(piece.Go);
             Pieces.Clear();
+            _rings?.Clear();
+            _lines?.Clear();
+            _spots?.Clear();
+            Lately.Clear();
+            DartedAt.Clear();
         }
 
         // Helpers.

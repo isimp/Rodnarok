@@ -6,6 +6,8 @@ The signs of a fish coming to your float follow the school's way in instead of j
 
 The signs take the light of the hour and the weather, warm at dusk and dull in rain, with a bright crest over a darker trough, and far ones fade into the fog.
 
+Your float twitches toward the fish going for the bait in its last moments, and once a fish is hooked or a school scared away the others dart off. A school holding a starred fish shows a little bolder, and a starred fish going for the bait shows bigger the more stars it has.
+
 ## 0.2.1
 
 Five difficulty levels from `VeryEasy` to `VeryHard`, `Normal` playing as before. Picking a level fills in the settings it sets, and changing one of them yourself makes it `Custom`. Server setting `Difficulty`.
