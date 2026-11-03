@@ -179,6 +179,10 @@ namespace Rodnarok
         [ForTest]
         public static float? RollForTest { get; set; }
 
+        /// <summary>The roll a shy school gives up by that the self-test sets in place of a random one; null for a random one.</summary>
+        [ForTest]
+        public static float? GiveUpRollForTest { get; set; }
+
         /// <summary>The fish of a float's school picked to take the bait, null for none, and how long until it may, for the self-test.</summary>
         [ForTest]
         public static (Fish Fish, float FreeIn) BiterForTest(FishingFloat ff) =>
@@ -211,12 +215,17 @@ namespace Rodnarok
         [ForTest]
         public static string LastGoneForTest { get; private set; } = "";
 
+        /// <summary>How many lines this game showed for schools scared away for good, for the self-test.</summary>
+        [ForTest]
+        public static int GoneToldForTest { get; private set; }
+
         /// <summary>Tells the one fishing why their school was scared away for good, naming another player whose steps it was.</summary>
         private static void TellGone(GoneWhy why, Player noiseBy = null)
         {
             var you = Player.m_localPlayer;
             if (you == null) return;
             LastGoneForTest = SchoolGone.Text(why, noiseBy == null || noiseBy == you ? null : noiseBy.GetPlayerName());
+            GoneToldForTest++;
             you.Message(MessageHud.MessageType.TopLeft, LastGoneForTest);
         }
 
@@ -664,7 +673,7 @@ namespace Rodnarok
                 var anglerDistance = angler != null ? Across(angler.transform.position, at) : Wary.FarOut;
                 var depth = WaterDepth(at);
                 cast.Shyness = Wary.Shyness(anglerDistance, depth);
-                if (Wary.GivesUp(cast.Shyness, Random.value, Rules.MostGivingUp))
+                if (Wary.GivesUp(cast.Shyness, GiveUpRollForTest ?? Random.value, Rules.MostGivingUp))
                 {
                     TellGone(SchoolGone.Shy(anglerDistance, depth));
                     GaveUpForTest++;

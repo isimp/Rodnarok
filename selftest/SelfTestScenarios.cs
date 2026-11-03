@@ -28,6 +28,8 @@ namespace Rodnarok
             foreach (var scenario in SelfTestRodOnly.All()) yield return scenario;
             foreach (var scenario in SelfTestCalling.All()) yield return scenario;
             foreach (var scenario in SelfTestWary.All()) yield return scenario;
+            foreach (var scenario in SelfTestGone.All()) yield return scenario;
+            foreach (var scenario in SelfTestDifficulty.All()) yield return scenario;
             foreach (var scenario in SelfTestBumps.All()) yield return scenario;
             foreach (var scenario in SelfTestBaitLost.All()) yield return scenario;
             foreach (var scenario in SelfTestBiomeBait.All()) yield return scenario;

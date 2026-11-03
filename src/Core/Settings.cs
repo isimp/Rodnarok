@@ -36,6 +36,18 @@ namespace Rodnarok
         private static ConfigEntry<bool> _seatedMotions;
         private static ConfigEntry<bool> _floatWisp;
 
+        /// <summary>The difficulty level as set: the server's while connected to one, else this player's.</summary>
+        public static Difficulty Difficulty => _difficulty != null ? _difficulty.Value : DifficultyLevels.Default;
+
+        /// <summary>Sets Difficulty as a player would, so the self-test can play each level and put the setting back; returns what it was.</summary>
+        [ForTest]
+        public static Difficulty DifficultyForTest(Difficulty level)
+        {
+            var was = Difficulty;
+            if (_difficulty != null) _difficulty.Value = level;
+            return was;
+        }
+
         /// <summary>Whether this player's Wisplight wisp guards their float; a player's own choice.</summary>
         public static bool FloatWisp => _floatWisp != null ? _floatWisp.Value : Rodnarok.FloatWisp.OnByDefault;
 
