@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1
+
+Five difficulty levels from `VeryEasy` to `VeryHard`, `Normal` playing as before; `Custom` keeps the separate settings. Server setting `Difficulty`.
+
+A school scared away for good tells you why: your steps or another player's, reeling through it, shyness close in or in shallow water, or a shot.
+
 ## 0.2.0
 
 Plain *Fishing Bait* also brings the fish of the biome your float lands in, such as a *Trollfish* in the Black Forest; biome baits still bring only their own fish. Server setting `BiomeFishOnBait`.
@@ -13,10 +19,6 @@ Each fish pulls the line by its own speed: a *Pike* or *Tuna* harder, an *Angler
 A seated cast goes where you aim.
 
 Fast fish such as *Pike* and *Tuna* now reach the hook instead of circling it, and a school still flinches when you reel quickly away from it.
-
-Five difficulty levels from `VeryEasy` to `VeryHard`, `Normal` playing as before; `Custom` keeps the separate settings. Server setting `Difficulty`.
-
-A school scared away for good tells you why: your steps or another player's, reeling through it, shyness close in or in shallow water, or a shot.
 
 ## 0.1.1
 
