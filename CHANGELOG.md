@@ -2,7 +2,7 @@
 
 ## 0.2.1
 
-Five difficulty levels from `VeryEasy` to `VeryHard`, `Normal` playing as before; `Custom` keeps the separate settings. Server setting `Difficulty`.
+Five difficulty levels from `VeryEasy` to `VeryHard`, `Normal` playing as before. Picking a level fills in the settings it sets, and changing one of them yourself makes it `Custom`. Server setting `Difficulty`.
 
 A school scared away for good tells you why: your steps or another player's, reeling through it, shyness close in or in shallow water, or a shot.
 

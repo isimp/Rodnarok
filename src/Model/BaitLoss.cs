@@ -1,4 +1,6 @@
 using System;
+using System.Globalization;
+using System.Linq;
 
 namespace Rodnarok
 {
@@ -23,6 +25,24 @@ namespace Rodnarok
 
         /// <summary>Whether this miss takes the bait, for a roll from 0 to 1.</summary>
         public static bool Taken(bool on, int misses, double roll, double[] chances) => on && roll < TakeChance(misses, chances);
+
+        /// <summary>The chances for the first, second and later misses as a setting shows them: percents, comma separated.</summary>
+        public static string ChancesText(double[] chances) =>
+            chances == null ? "" : string.Join(", ", chances.Select(c => Math.Round(c * 100.0, 2).ToString(CultureInfo.InvariantCulture)));
+
+        /// <summary>The chances a setting's text gives, each a percent from 0 to 100; null for text that is no such list.</summary>
+        public static double[] ParseChances(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return null;
+            var parts = text.Split(',');
+            var chances = new double[parts.Length];
+            for (var i = 0; i < parts.Length; i++)
+            {
+                if (!double.TryParse(parts[i].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var percent) || percent < 0.0 || percent > 100.0) return null;
+                chances[i] = percent / 100.0;
+            }
+            return chances;
+        }
 
         /// <summary>Whether every fish of a school has missed the bait and learned, so the school swims off.</summary>
         public static bool SchoolLearned(int learned, int size) => learned >= size;

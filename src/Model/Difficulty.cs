@@ -60,6 +60,34 @@ namespace Rodnarok
             }
         }
 
+        /// <summary>
+        /// Whether rules hold every number a level sets as that level sets it, so the fields a player
+        /// sees still show the level; any other level is no longer it. Custom matches whatever they hold.
+        /// </summary>
+        public static bool Matches(Difficulty level, FishingRules rules)
+        {
+            if (level == Difficulty.Custom) return true;
+            var own = Rules(level, rules);
+            return Same(own.HookWindow, rules.HookWindow) && Same(own.SnapSeconds, rules.SnapSeconds) && Same(own.EaseSeconds, rules.EaseSeconds)
+                && Same(own.RunSpeed, rules.RunSpeed) && Same(own.StallStaminaPerSecond, rules.StallStaminaPerSecond) && Same(own.ReelStaminaShare, rules.ReelStaminaShare)
+                && own.Wary == rules.Wary && own.BaitLost == rules.BaitLost && own.Bumps == rules.Bumps
+                && Same(own.Hearing, rules.Hearing) && own.FrightToLeave == rules.FrightToLeave && Same((float)own.MostGivingUp, (float)rules.MostGivingUp)
+                && SameChances(own.BaitTakeChances, rules.BaitTakeChances);
+        }
+
+        /// <summary>Whether two numbers are the same as a config file writes and reads them back.</summary>
+        private static bool Same(float a, float b) => System.Math.Abs(a - b) < 0.0005f;
+
+        private static bool SameChances(double[] a, double[] b)
+        {
+            if (a == null || b == null || a.Length != b.Length) return a == b;
+            for (var i = 0; i < a.Length; i++)
+            {
+                if (!Same((float)a[i], (float)b[i])) return false;
+            }
+            return true;
+        }
+
         /// <summary>Normal's numbers: the rules as Rodnarok fished before levels.</summary>
         private static FishingRules Normal => FishingRules.Default;
     }

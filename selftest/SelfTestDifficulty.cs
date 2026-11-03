@@ -10,11 +10,14 @@ namespace Rodnarok
     /// The Difficulty setting, as a player sets it, changes what the fishing plays by at once. Each
     /// level is set in turn and the rules the game fishes by are read back: the hook window, the
     /// share of the game's reeling stamina, whether schools are wary and whether fish bump the
-    /// float. Then the game itself is fished at the levels: a Perch hooked beside a float and held
-    /// through its rests costs half the stamina a second on Very easy that it costs on Normal; a
-    /// bite 0.8 s old can no longer be hooked on Very hard, where one 2.2 s old still can on Very
-    /// easy. Needs a world of the player's own, since a server's level wins, and for the fishing
-    /// water at least 3 m deep beside the character. The setting, the rod and the fish are put back.
+    /// float, and the fields it sets show its numbers; on Hard an edited HookWindow switches the
+    /// level to Custom, which plays it and keeps Hard's other numbers. Then the game itself is
+    /// fished at the levels: a Perch hooked beside a float and held through its rests costs half
+    /// the stamina a second on Very easy that it costs on Normal; a bite 0.8 s old can no longer be
+    /// hooked on Very hard, where one 2.2 s old still can on Very easy. Needs a world of the
+    /// player's own, since a server's level wins, and a level, not Custom, whose numbers would be
+    /// written over; for the fishing, water at least 3 m deep beside the character. The setting,
+    /// the rod and the fish are put back.
     /// </summary>
     internal static class SelfTestDifficulty
     {
@@ -48,7 +51,7 @@ namespace Rodnarok
 
         public static IEnumerable<Scenario> All()
         {
-            yield return new Scenario("EachDifficultyLevelSetsTheRulesTheGameFishesBy", EachLevelSetsTheRules);
+            yield return new Scenario("EachDifficultyLevelSetsTheRulesAndShowsInItsFieldsAndAnEditMakesItCustom", EachLevelSetsTheRules);
             yield return new Scenario("VeryEasyReelsForHalfTheStaminaAndVeryHardGivesLessTimeToHook", LevelsInTheGame);
         }
 
@@ -63,8 +66,17 @@ namespace Rodnarok
             return took;
         }
 
+        /// <summary>Whether a scenario may change the level: not on Custom, whose numbers are the player's own and would be written over.</summary>
+        private static bool MayChangeTheLevel(ScenarioCheck check)
+        {
+            var custom = Settings.Difficulty == Difficulty.Custom;
+            check.Needs(!custom, "Difficulty at a level, not Custom: playing the levels writes over the numbers Custom keeps");
+            return !custom;
+        }
+
         private static IEnumerable EachLevelSetsTheRules(ScenarioCheck check)
         {
+            if (!MayChangeTheLevel(check)) yield break;
             var was = Settings.Difficulty;
             try
             {
@@ -78,7 +90,21 @@ namespace Rodnarok
                     check.That(Mathf.Approximately(rules.ReelStaminaShare, reelShare), level + " reels for " + F(reelShare * 100f, "0") + "% of the game's stamina, the rules say " + F(rules.ReelStaminaShare * 100f, "0") + "%");
                     check.That(rules.Wary == wary, level + (wary ? " has wary schools" : " has no wary schools") + ", the rules say " + (rules.Wary ? "wary" : "not wary"));
                     check.That(rules.Bumps == bumps, level + (bumps ? " has fish bump the float" : " has no bumps") + ", the rules say " + (rules.Bumps ? "bumps" : "none"));
+                    var fields = Settings.FieldsForTest;
+                    check.That(DifficultyLevels.Matches(level, fields) && Mathf.Approximately(fields.HookWindow, hookWindow), level + " shows its numbers in the fields it sets, HookWindow showing "
+                        + F(fields.HookWindow, "0.0") + " s, WaryHearing " + F(fields.Hearing) + ", BaitLossChances " + BaitLoss.ChancesText(fields.BaitTakeChances));
                 }
+
+                // A field the level sets edited by hand: the level turns Custom and plays the field as set, keeping the rest.
+                if (!Play(check, Difficulty.Hard)) yield break;
+                var hard = PlayRules.Now;
+                Settings.HookWindowForTest(1.2f);
+                yield return null;
+                var edited = PlayRules.Now;
+                check.That(Settings.Difficulty == Difficulty.Custom, "editing HookWindow on Hard switches Difficulty to Custom; it is " + Settings.Difficulty);
+                check.That(Mathf.Approximately(edited.HookWindow, 1.2f), "on Custom the edited HookWindow is played, " + F(edited.HookWindow, "0.0") + " s");
+                check.That(Mathf.Approximately(edited.Hearing, hard.Hearing) && edited.FrightToLeave == hard.FrightToLeave && edited.Bumps == hard.Bumps && Mathf.Approximately(edited.SnapSeconds, hard.SnapSeconds),
+                    "the other numbers stay Hard's: hearing " + F(edited.Hearing) + ", frights " + edited.FrightToLeave.ToString(CultureInfo.InvariantCulture) + ", snap " + F(edited.SnapSeconds) + " s, bumps " + (edited.Bumps ? "on" : "off"));
             }
             finally
             {
@@ -97,6 +123,7 @@ namespace Rodnarok
             var perch = ZNetScene.instance.GetPrefab("Fish1");
             check.That(floatPrefab != null && noBait != null && perch != null, "the float, the " + NoBait + " and the Perch prefabs are there");
             if (floatPrefab == null || noBait == null || perch == null) yield break;
+            if (!MayChangeTheLevel(check)) yield break;
 
             var was = Settings.Difficulty;
             var gear = SelfTestGear.RodInHand(player);

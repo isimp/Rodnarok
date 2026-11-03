@@ -240,6 +240,85 @@ namespace Rodnarok.Tests
         }
 
         [Fact]
+        public void EachLevelsOwnNumbersMatchIt()
+        {
+            foreach (var level in Levels) Assert.True(DifficultyLevels.Matches(level, At(level)), level.ToString());
+        }
+
+        [Fact]
+        public void AnotherLevelsNumbersDoNotMatchIt()
+        {
+            foreach (var level in Levels)
+            foreach (var other in Levels)
+                if (other != level) Assert.False(DifficultyLevels.Matches(level, At(other)), level + " against " + other);
+        }
+
+        [Fact]
+        public void EveryFieldChangedByHandNoLongerMatchesTheLevel()
+        {
+            var hard = At(Difficulty.Hard);
+            var changed = new[]
+            {
+                hard.With(hookWindow: 1.1f), hard.With(snapSeconds: 0.8f), hard.With(easeSeconds: 1.3f), hard.With(runSpeed: 2.6f),
+                hard.With(stallStaminaPerSecond: 3.5f), hard.With(reelStaminaShare: 0.9f), hard.With(wary: false), hard.With(baitLost: false),
+                hard.With(bumps: false), hard.With(hearing: 0.55f), hard.With(frightToLeave: 7), hard.With(mostGivingUp: 0.5),
+                hard.With(baitTakeChances: new[] { 0.2, 0.6, 0.9, 1.0 }),
+            };
+            foreach (var rules in changed) Assert.False(DifficultyLevels.Matches(Difficulty.Hard, rules));
+        }
+
+        [Fact]
+        public void FieldsNotSetByALevelNeverUnmatchIt()
+        {
+            var hard = At(Difficulty.Hard).With(waitMin: 50f, calmReach: 10f, schools: false, tension: false);
+            Assert.True(DifficultyLevels.Matches(Difficulty.Hard, hard));
+        }
+
+        [Fact]
+        public void CustomMatchesWhateverTheFieldsHold()
+        {
+            Assert.True(DifficultyLevels.Matches(Difficulty.Custom, FishingRules.Default.With(hookWindow: 4f, wary: false)));
+        }
+
+        [Fact]
+        public void ANumberReadBackFromTheConfigFileStillMatches()
+        {
+            var hard = At(Difficulty.Hard);
+            var readBack = hard.With(hookWindow: float.Parse(hard.HookWindow.ToString(System.Globalization.CultureInfo.InvariantCulture), System.Globalization.CultureInfo.InvariantCulture) + 0.00001f);
+            Assert.True(DifficultyLevels.Matches(Difficulty.Hard, readBack));
+        }
+
+        [Fact]
+        public void EachLevelsBaitChancesReadBackFromTheirText()
+        {
+            foreach (var level in Levels)
+                Assert.Equal(At(level).BaitTakeChances, BaitLoss.ParseChances(BaitLoss.ChancesText(At(level).BaitTakeChances)));
+        }
+
+        [Fact]
+        public void BaitChancesAreWrittenAsPercentsOfEachMiss()
+        {
+            Assert.Equal("10, 40, 90, 98", BaitLoss.ChancesText(FishingRules.Default.BaitTakeChances));
+        }
+
+        [Fact]
+        public void BaitChancesTextThatIsNoListOfPercentsReadsAsNone()
+        {
+            Assert.Null(BaitLoss.ParseChances(""));
+            Assert.Null(BaitLoss.ParseChances(null));
+            Assert.Null(BaitLoss.ParseChances("ten, forty"));
+            Assert.Null(BaitLoss.ParseChances("10, 140"));
+            Assert.Null(BaitLoss.ParseChances("-5, 40"));
+        }
+
+        [Fact]
+        public void BaitChancesTextMayUseSpacesOrNone()
+        {
+            Assert.Equal(new[] { 0.05, 0.2 }, BaitLoss.ParseChances("5,20"));
+            Assert.Equal(new[] { 0.05, 0.2 }, BaitLoss.ParseChances(" 5 ,  20 "));
+        }
+
+        [Fact]
         public void ALevelKeepsTheFeatureSwitchesWaitsAndCalmWaterOfTheSettings()
         {
             var settings = FishingRules.Default.With(waitMin: 50f, waitMax: 90f, calmReach: 10f, calmKeep: 0.5f, schools: false, tension: false, pullBySpeed: false, biomeFishOnBait: false, callWorldFish: false);
