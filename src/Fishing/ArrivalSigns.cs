@@ -52,7 +52,14 @@ namespace Rodnarok
             public float Tilt;
             public Vector3 Axis;
             public List<(Transform T, Vector3 Pos, Quaternion Rot)> Look;
+            public WaterVolume Water;
+            public readonly float[] WakeY = new float[WakePoints];
+            public readonly float[] WakeSamples = new float[WakePoints / WakeEvery + 2];
+            public readonly int[] WakeIndex = new int[WakePoints / WakeEvery + 2];
         }
+
+        /// <summary>How many points along a wake apart the waves are sampled; the wake follows them between.</summary>
+        private const int WakeEvery = 4;
 
         private const int WakePoints = (int)(SignPath.WakeSeconds / SignPath.TrailStep) + 2;
 
@@ -82,6 +89,8 @@ namespace Rodnarok
         private static float _fogDensity;
         private static float _fogStart;
         private static float _fogEnd;
+        private static float _wind;
+        private static Vector3 _windFlat = Vector3.forward;
 
         /// <summary>How much bigger and bolder the sign being drawn shows for the stars of its fish (<see cref="SignStars"/>).</summary>
         private static float _size = 1f;
@@ -362,7 +371,9 @@ namespace Rodnarok
             var go = coming.Lasting;
             var path = coming.Path;
             var showing = path.Showing;
-            var strength = Mathf.Min(1f, ArrivalSign.Strength(nearness) * _bold) * showing;
+            coming.Water = WaterOf(pathAt);
+            var strength = Mathf.Min(1f, ArrivalSign.Strength(nearness) * _bold) * showing * WaterMood.Clarity(RoughnessAt(coming.Water, pathAt));
+            WakeHeights(coming, surface);
             var moving = SignPath.Moving(path.Speed);
             var heading = new Vector3(path.HeadX, 0f, path.HeadZ);
             var at = new Vector3(pathAt.x, surface + 0.03f, pathAt.z);
@@ -379,10 +390,10 @@ namespace Rodnarok
                     rim.localScale = new Vector3(1.8f, 0.45f, 1f) * _size;
                     rim.position = at + Flat(_toSun) * 0.15f + Vector3.up * 0.005f;
                     rim.GetComponent<SpriteRenderer>().color = Lit(at, 0.5f * strength * (0.4f + 0.6f * moving));
-                    SetWake(go.transform.Find("WakeLeftTrough"), coming, surface + 0.025f, -1f, 0.45f * strength * moving, dark: true);
-                    SetWake(go.transform.Find("WakeRightTrough"), coming, surface + 0.025f, 1f, 0.45f * strength * moving, dark: true);
-                    SetWake(go.transform.Find("WakeLeft"), coming, surface + 0.03f, -1f, 0.7f * strength * moving);
-                    SetWake(go.transform.Find("WakeRight"), coming, surface + 0.03f, 1f, 0.7f * strength * moving);
+                    SetWake(go.transform.Find("WakeLeftTrough"), coming, 0.025f, -1f, 0.45f * strength * moving, dark: true);
+                    SetWake(go.transform.Find("WakeRightTrough"), coming, 0.025f, 1f, 0.45f * strength * moving, dark: true);
+                    SetWake(go.transform.Find("WakeLeft"), coming, 0.03f, -1f, 0.7f * strength * moving);
+                    SetWake(go.transform.Find("WakeRight"), coming, 0.03f, 1f, 0.7f * strength * moving);
                     break;
                 case ArrivalSignKind.Glow:
                     var pulse = (0.75f + 0.25f * Mathf.Sin(Time.time * 3f)) * showing;
@@ -403,7 +414,7 @@ namespace Rodnarok
                     // Dark against the day's water, by night edged in the night's own light, so it shows on dark water too.
                     var finColour = Color.Lerp(new Color(0.12f, 0.16f, 0.2f), _crest * 0.75f, _darkness);
                     fin.GetComponent<MeshRenderer>().material.color = Fogged(at, new Color(finColour.r, finColour.g, finColour.b, 0.9f * showing));
-                    SetWake(go.transform.Find("Wake"), coming, surface + 0.03f, 0f, up ? 0.6f * strength * moving : 0f);
+                    SetWake(go.transform.Find("Wake"), coming, 0.03f, 0f, up ? 0.6f * strength * moving : 0f);
                     break;
             }
         }
@@ -424,7 +435,7 @@ namespace Rodnarok
         /// the point ages, or on the path itself for a side of 0; a crest lit by the light, or its
         /// dark trough a little further out.
         /// </summary>
-        private static void SetWake(Transform wake, Coming coming, float y, float side, float alpha, bool dark = false)
+        private static void SetWake(Transform wake, Coming coming, float lift, float side, float alpha, bool dark = false)
         {
             var line = wake.GetComponent<LineRenderer>();
             var trail = coming.Path.Trail;
@@ -445,11 +456,11 @@ namespace Rodnarok
                     length = 1f;
                 }
                 var off = side * (SignPath.WakeSide(trail[i].Age) * _size + (dark ? 0.09f : 0f));
-                coming.Wake[i] = new Vector3(point.X - dz / length * off, y, point.Z + dx / length * off);
+                coming.Wake[i] = new Vector3(point.X - dz / length * off, coming.WakeY[i] + lift, point.Z + dx / length * off);
             }
             line.positionCount = n;
             if (n > 0) line.SetPositions(coming.Wake);
-            var head = new Vector3(coming.Path.At.X, y, coming.Path.At.Z);
+            var head = new Vector3(coming.Path.At.X, coming.WakeY[0] + lift, coming.Path.At.Z);
             var colour = dark ? Dark(head, alpha) : Lit(head, alpha);
             line.startColor = colour;
             line.endColor = new Color(colour.r, colour.g, colour.b, 0f);
@@ -468,9 +479,13 @@ namespace Rodnarok
             public GradientColorKey[] Colours;
             public GradientAlphaKey[] Alphas;
             public PartPool<Part> Pool;
+            public float[] Heights;
         }
 
         private const int PartsKept = 64;
+
+        /// <summary>How many places round a ring the waves are sampled at; the ring follows them between.</summary>
+        private const int RingSamples = 8;
         private static readonly AnimationCurve Even = AnimationCurve.Constant(0f, 1f, 1f);
         private static PartPool<Part> _rings;
         private static PartPool<Part> _lines;
@@ -515,7 +530,7 @@ namespace Rodnarok
             trough.useWorldSpace = false;
             trough.loop = true;
             trough.positionCount = RingPoints;
-            return new Part { Go = go, Line = line, Trough = trough, Gradient = new Gradient(), Colours = new GradientColorKey[GradientKeys], Alphas = new GradientAlphaKey[2] };
+            return new Part { Go = go, Line = line, Trough = trough, Gradient = new Gradient(), Colours = new GradientColorKey[GradientKeys], Alphas = new GradientAlphaKey[GradientKeys], Heights = new float[RingSamples] };
         }
 
         private static Part MakeLine()
@@ -567,6 +582,11 @@ namespace Rodnarok
             part.Go.transform.SetPositionAndRotation(at, Quaternion.identity);
             line.enabled = false;
             trough.enabled = false;
+            // The water it is on: rough water shows it fainter and broken, each ring's breaks in its own places.
+            var water = WaterOf(at);
+            var roughness = RoughnessAt(water, at);
+            var clarity = WaterMood.Clarity(roughness);
+            var seed = Random.value;
             Add(part, life, delay, (p, q) =>
             {
                 // Thin against its size from the start, so a young ring is a ring and not a disc, and thinner as it spreads.
@@ -574,14 +594,26 @@ namespace Rodnarok
                 var w = Mathf.Min(width, r * 0.12f) * SignLight.Taper(q);
                 line.widthMultiplier = w;
                 trough.widthMultiplier = w * 1.4f;
+                // Drifting downwind, and near the camera rising and falling with the waves, sampled round it and followed between.
+                var centre = at + Downwind(q * life);
+                var follows = Near(centre);
+                var baseY = follows ? SurfaceOn(water, centre) + 0.02f : at.y;
+                p.Part.Go.transform.position = new Vector3(centre.x, baseY, centre.z);
+                var heights = p.Part.Heights;
+                for (var k = 0; k < heights.Length; k++)
+                {
+                    var a = k * Mathf.PI * 2f / heights.Length;
+                    heights[k] = follows ? SurfaceOn(water, centre + new Vector3(Mathf.Cos(a) * r, 0f, Mathf.Sin(a) * r)) + 0.02f - baseY : 0f;
+                }
                 for (var i = 0; i < RingPoints; i++)
                 {
                     var a = i * Mathf.PI * 2f / RingPoints;
-                    line.SetPosition(i, new Vector3(Mathf.Cos(a) * r, 0f, Mathf.Sin(a) * r));
-                    trough.SetPosition(i, new Vector3(Mathf.Cos(a) * r * 0.93f, 0f, Mathf.Sin(a) * r * 0.93f));
+                    var h = WaterMood.AroundLoop(heights, i / (float)RingPoints);
+                    line.SetPosition(i, new Vector3(Mathf.Cos(a) * r, h, Mathf.Sin(a) * r));
+                    trough.SetPosition(i, new Vector3(Mathf.Cos(a) * r * 0.93f, h, Mathf.Sin(a) * r * 0.93f));
                 }
-                var alpha = 0.6f * strength * Mathf.Min(1f, q * 6f) * (1f - q);
-                var crest = Lit(at, alpha);
+                var alpha = 0.6f * strength * Mathf.Min(1f, q * 6f) * (1f - q) * clarity;
+                var crest = Lit(centre, alpha);
                 // Brightest where the ring faces the light across the water.
                 var toSun = Flat(_toSun);
                 for (var k = 0; k < GradientKeys; k++)
@@ -590,12 +622,11 @@ namespace Rodnarok
                     var a = t * Mathf.PI * 2f;
                     var facing = Mathf.Cos(a) * toSun.x + Mathf.Sin(a) * toSun.z;
                     p.Part.Colours[k] = new GradientColorKey(crest * SignLight.SunSide(facing), t);
+                    p.Part.Alphas[k] = new GradientAlphaKey(crest.a * WaterMood.Broken(roughness, t, seed), t);
                 }
-                p.Part.Alphas[0] = new GradientAlphaKey(crest.a, 0f);
-                p.Part.Alphas[1] = new GradientAlphaKey(crest.a, 1f);
                 p.Part.Gradient.SetKeys(p.Part.Colours, p.Part.Alphas);
                 line.colorGradient = p.Part.Gradient;
-                var dark = Dark(at, alpha * 0.5f);
+                var dark = Dark(centre, alpha * 0.5f);
                 trough.startColor = dark;
                 trough.endColor = dark;
                 line.enabled = true;
@@ -608,17 +639,21 @@ namespace Rodnarok
             size *= _size;
             var part = Spot(at);
             var dot = part.Sprite;
-            var start = at;
+            var water = WaterOf(at);
+            var clarity = WaterMood.Clarity(RoughnessAt(water, at));
             Add(part, life, delay, (p, q) =>
             {
-                dot.transform.position = start + Vector3.up * rise * q;
+                var place = at + Downwind(q * life);
+                var y = Near(place) ? SurfaceOn(water, place) + 0.02f : at.y;
+                dot.transform.position = new Vector3(place.x, y + rise * q, place.z);
                 dot.transform.localScale = Vector3.one * size;
                 Face(dot.transform);
-                dot.color = Lit(dot.transform.position, 0.85f * strength * (1f - q), colour);
+                dot.color = Lit(dot.transform.position, 0.85f * strength * (1f - q) * clarity, colour);
                 dot.enabled = true;
             });
         }
 
+        /// <summary>Steam rising off the water, leaning downwind as it rises.</summary>
         private static void Puff(Vector3 at, float strength)
         {
             var size = _size;
@@ -626,7 +661,7 @@ namespace Rodnarok
             var puff = part.Sprite;
             Add(part, 1.8f, 0f, (p, q) =>
             {
-                puff.transform.position = at + new Vector3(0.1f * q, 1.2f * q, 0f);
+                puff.transform.position = at + new Vector3(0.1f * q, 1.2f * q, 0f) + Downwind(q * 1.8f) * (1f + 2f * q);
                 puff.transform.localScale = Vector3.one * (0.5f + 1.2f * q) * size;
                 Face(puff.transform);
                 puff.color = Lit(puff.transform.position, 0.65f * strength * (1f - q), new Color(0.92f, 0.92f, 0.92f));
@@ -640,11 +675,14 @@ namespace Rodnarok
             var part = Line(2, 0.07f);
             var line = part.Line;
             var lean = new Vector3(Random.Range(-0.05f, 0.05f), 0f, Random.Range(-0.05f, 0.05f));
+            var water = WaterOf(at);
+            var clarity = WaterMood.Clarity(RoughnessAt(water, at));
             Add(part, life, delay, (p, q) =>
             {
-                line.SetPosition(0, at);
-                line.SetPosition(1, at + lean + Vector3.up * height * Mathf.Sin(q * Mathf.PI));
-                var c = Lit(at, 0.9f * strength * (1f - q));
+                var foot = Near(at) ? new Vector3(at.x, SurfaceOn(water, at) + 0.02f, at.z) : at;
+                line.SetPosition(0, foot);
+                line.SetPosition(1, foot + lean + Vector3.up * height * Mathf.Sin(q * Mathf.PI));
+                var c = Lit(foot, 0.9f * strength * (1f - q) * clarity);
                 line.startColor = c;
                 line.endColor = c;
                 line.enabled = true;
@@ -657,17 +695,20 @@ namespace Rodnarok
             radius *= _size;
             var part = Line(RingPoints / 2 + 1, 0.07f);
             var line = part.Line;
+            var water = WaterOf(at);
+            var clarity = WaterMood.Clarity(RoughnessAt(water, at));
             Add(part, life, 0f, (p, q) =>
             {
                 var camera = Utils.GetMainCamera();
                 var right = camera != null ? Flat(camera.transform.right) : Vector3.right;
+                var foot = Near(at) ? new Vector3(at.x, SurfaceOn(water, at) + 0.02f, at.z) : at;
                 var r = 0.05f + radius * q;
                 for (var i = 0; i <= RingPoints / 2; i++)
                 {
                     var a = i * Mathf.PI / (RingPoints / 2);
-                    line.SetPosition(i, at + right * Mathf.Cos(a) * r + Vector3.up * Mathf.Sin(a) * r * 0.8f);
+                    line.SetPosition(i, foot + right * Mathf.Cos(a) * r + Vector3.up * Mathf.Sin(a) * r * 0.8f);
                 }
-                var c = Lit(at, 0.8f * strength);
+                var c = Lit(foot, 0.8f * strength * clarity);
                 line.startColor = c;
                 line.endColor = c;
                 line.enabled = true;
@@ -681,10 +722,13 @@ namespace Rodnarok
             var part = Spot(at);
             var blob = part.Sprite;
             blob.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+            var water = WaterOf(at);
+            var clarity = WaterMood.Clarity(RoughnessAt(water, at));
             Add(part, life, 0f, (p, q) =>
             {
+                if (Near(at)) blob.transform.position = new Vector3(at.x, SurfaceOn(water, at) + 0.02f, at.z);
                 blob.transform.localScale = scale * (1f + q);
-                blob.color = Dark(at, alpha * (1f - q));
+                blob.color = Dark(at, alpha * (1f - q) * clarity);
                 blob.enabled = true;
             });
         }
@@ -709,15 +753,17 @@ namespace Rodnarok
             Ring(start, 0.6f, 0.7f, 0.9f, 0f);
             var part = Line(3, 0.06f);
             var line = part.Line;
+            var water = WaterOf(start);
+            var clarity = WaterMood.Clarity(RoughnessAt(water, start));
             Add(part, ScatterBurst.Seconds, 0f, (p, q) =>
             {
                 var head = start + away * ScatterBurst.Run(q);
                 var spread = 0.3f + 0.4f * q;
-                line.SetPosition(0, head - away * 0.9f - side * spread);
-                line.SetPosition(1, head);
-                line.SetPosition(2, head - away * 0.9f + side * spread);
+                line.SetPosition(0, OnWater(water, head - away * 0.9f - side * spread, start.y));
+                line.SetPosition(1, OnWater(water, head, start.y));
+                line.SetPosition(2, OnWater(water, head - away * 0.9f + side * spread, start.y));
                 line.widthMultiplier = 0.06f * SignLight.Taper(q);
-                var c = Lit(head, ScatterBurst.Alpha(q));
+                var c = Lit(head, ScatterBurst.Alpha(q) * clarity);
                 line.startColor = c;
                 line.endColor = c;
                 line.enabled = true;
@@ -889,6 +935,108 @@ namespace Rodnarok
             _fogEnd = RenderSettings.fogEndDistance;
             var camera = Utils.GetMainCamera();
             if (camera != null) _camera = camera.transform.position;
+            // The wind the game's waves blow by, for signs drifting downwind.
+            _wind = env != null ? env.GetWindIntensity() : 0f;
+            if (env != null) _windFlat = Flat(env.GetWindDir());
+        }
+
+        /// <summary>
+        /// The heights of the water under a wake's points: near the camera sampled every few points
+        /// along where the path has been and followed between, farther all at the path's surface.
+        /// </summary>
+        private static void WakeHeights(Coming coming, float surface)
+        {
+            var trail = coming.Path.Trail;
+            var n = Math.Min(trail.Count, coming.WakeY.Length);
+            if (n == 0) return;
+            if (!Near(new Vector3(trail[0].At.X, surface, trail[0].At.Z)))
+            {
+                for (var i = 0; i < n; i++) coming.WakeY[i] = surface;
+                return;
+            }
+            var count = 0;
+            for (var i = 0; i < n; i += WakeEvery) Sample(coming, i, count++, surface);
+            if (coming.WakeIndex[count - 1] != n - 1) Sample(coming, n - 1, count++, surface);
+            var j = 0;
+            for (var i = 0; i < n; i++)
+            {
+                if (count == 1)
+                {
+                    coming.WakeY[i] = coming.WakeSamples[0];
+                    continue;
+                }
+                while (j < count - 2 && i > coming.WakeIndex[j + 1]) j++;
+                var from = coming.WakeIndex[j];
+                var to = coming.WakeIndex[j + 1];
+                coming.WakeY[i] = Mathf.Lerp(coming.WakeSamples[j], coming.WakeSamples[j + 1], to > from ? (i - from) / (float)(to - from) : 0f);
+            }
+        }
+
+        private static void Sample(Coming coming, int point, int slot, float surface)
+        {
+            var at = coming.Path.Trail[point].At;
+            coming.WakeIndex[slot] = point;
+            coming.WakeSamples[slot] = SurfaceOn(coming.Water, new Vector3(at.X, surface, at.Z));
+        }
+
+        private static readonly Collider[] WaterHits = new Collider[8];
+        private static int _waterMask;
+
+        /// <summary>The game's water a place lies in, found once for a sign so its waves are read without a search each frame; none outside water.</summary>
+        private static WaterVolume WaterOf(Vector3 at)
+        {
+            if (_waterMask == 0) _waterMask = LayerMask.GetMask("WaterVolume");
+            var hits = Physics.OverlapSphereNonAlloc(at, 0f, WaterHits, _waterMask);
+            for (var i = 0; i < hits; i++)
+            {
+                var water = WaterHits[i] != null ? WaterHits[i].GetComponent<WaterVolume>() : null;
+                if (water != null && water.GetLiquidType() == LiquidType.Water) return water;
+            }
+            return null;
+        }
+
+        /// <summary>The water's surface at a place, waves and all, by the game's own wave sum.</summary>
+        private static float SurfaceOn(WaterVolume water, Vector3 at) => water != null ? water.GetWaterSurface(at) : Surface(at);
+
+        /// <summary>A place on the water's surface near the camera, or at a fixed height farther off.</summary>
+        private static Vector3 OnWater(WaterVolume water, Vector3 at, float flatY) =>
+            new Vector3(at.x, Near(at) ? SurfaceOn(water, at) + 0.03f : flatY, at.z);
+
+        /// <summary>How rough the water is at a place: the game's wave strength there, its depth setting times the wind.</summary>
+        private static float RoughnessAt(WaterVolume water, Vector3 at) => water != null ? WaterMood.Roughness(water.Depth(at), _wind) : 0f;
+
+        /// <summary>How far downwind a sign has drifted after a number of seconds.</summary>
+        private static Vector3 Downwind(float seconds) => _windFlat * WaterMood.Drift(_wind, seconds);
+
+        private static bool Near(Vector3 at) => WaterMood.FollowsWaves(Vector3.Distance(_camera, at));
+
+        /// <summary>How rough the water is at a float, how clearly signs show there, and the wind, for the self-test.</summary>
+        [ForTest]
+        public static (float Roughness, float Clarity, float Depth, float Wind) WaterForTest(Vector3 at)
+        {
+            var water = WaterOf(at);
+            var roughness = RoughnessAt(water, at);
+            return (roughness, WaterMood.Clarity(roughness), water != null ? water.Depth(at) : -1f, _wind);
+        }
+
+        /// <summary>How far any showing ring near the camera lies from the water under it, at worst, in metres, for the self-test; -1 for none.</summary>
+        [ForTest]
+        public static float RingFitForTest()
+        {
+            var worst = -1f;
+            foreach (var piece in Pieces)
+            {
+                var part = piece.Part;
+                if (part?.Trough == null || part.Go == null || !part.Line.enabled) continue;
+                var centre = part.Go.transform.position;
+                if (!Near(centre)) continue;
+                for (var i = 0; i < RingPoints; i += 4)
+                {
+                    var point = part.Go.transform.TransformPoint(part.Line.GetPosition(i));
+                    worst = Mathf.Max(worst, Mathf.Abs(point.y - (Surface(point) + 0.02f)));
+                }
+            }
+            return worst;
         }
 
         /// <summary>How much of the game's fog lies between the camera and a place.</summary>

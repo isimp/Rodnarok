@@ -22,7 +22,8 @@ namespace Rodnarok
     /// The float must tremble toward the Perch going for the bait in its last 1.5 m; hooked, the
     /// rest of the school must dart off and the float's look stand upright again; the signs must
     /// use their parts again rather than make new ones; a two-star Perch must show its hint coming
-    /// and its size going for the bait, pictured; and the crest must be lit by the game's light.
+    /// and its size going for the bait, pictured; the crest must be lit by the game's light; and
+    /// rings near the camera must lie on the waves, the water's roughness noted.
     /// A Wisplight's wisp stays with the character meanwhile, so it does not sit in the pictures.
     /// The rules, the setting, the rod, the floats and the fish are put back after.
     /// </summary>
@@ -118,6 +119,7 @@ namespace Rodnarok
                 Fish going = null;
                 Fish bitBy = null;
                 var madeBefore = ArrivalSigns.PartsMadeForTest();
+                var ringFit = -1f;
                 var tiltMost = 0f;
                 var tiltToward = 0f;
                 var lookParts = 0;
@@ -160,6 +162,7 @@ namespace Rodnarok
                     }
                     bit = Nibbler(ff) != null && NibbleTime(ff) > 0f;
                     if (bit) bitBy = Nibbler(ff);
+                    ringFit = Mathf.Max(ringFit, ArrivalSigns.RingFitForTest());
                     yield return null;
                 }
                 check.That(kindWhileComing == ArrivalSignKind.Rings && lastShown >= 3, "the Perch coming shows its rings on the way in: " + kindWhileComing + ", " + lastShown + " times");
@@ -170,6 +173,11 @@ namespace Rodnarok
                 else
                     check.Note("the school was not seen both far off and near, so how often the rings came was not compared");
                 check.That(bit, "a Perch bit within 90 s");
+                // Near the camera the rings rise and fall with the waves, and the water's roughness sets how clearly they show.
+                if (ringFit >= 0f) check.That(ringFit <= 0.08f, "the rings lie on the waves, at worst " + ringFit.ToString("0.000", CultureInfo.InvariantCulture) + " m off the water");
+                else check.Note("no ring showed near enough to the camera to check it lies on the waves");
+                var water = ArrivalSigns.WaterForTest(spot.Value);
+                check.That(water.Depth >= 0f && Mathf.Abs(water.Clarity - WaterMood.Clarity(water.Roughness)) < 0.001f, "the signs read the water at the float: depth " + F(water.Depth) + ", wind " + F(water.Wind) + ", roughness " + F(water.Roughness) + ", shown " + (water.Clarity * 100f).ToString("0", CultureInfo.InvariantCulture) + "% clear");
                 var made = ArrivalSigns.PartsMadeForTest() - madeBefore;
                 check.That(made <= 8 || made * 2 <= lastShown, "the signs use their parts again: " + made + " parts made for " + lastShown + " showings");
 

@@ -8,6 +8,8 @@ The signs take the light of the hour and the weather, warm at dusk and dull in r
 
 Your float twitches toward the fish going for the bait in its last moments, and once a fish is hooked or a school scared away the others dart off. A school holding a starred fish shows a little bolder, and a starred fish going for the bait shows bigger the more stars it has.
 
+The signs ride the waves and drift with the wind. Calm water shows them clear and whole, rough water fainter and broken, so a *Serpent trophy*'s calm water reads best.
+
 ## 0.2.1
 
 Five difficulty levels from `VeryEasy` to `VeryHard`, `Normal` playing as before. Picking a level fills in the settings it sets, and changing one of them yourself makes it `Custom`. Server setting `Difficulty`.
