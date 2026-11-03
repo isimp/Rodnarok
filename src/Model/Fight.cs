@@ -43,8 +43,14 @@ namespace Rodnarok
             var cheaper = Lerp(1f, rules.SkillCostShare, skill);
             if (struggling) return new ReelStep(0f, rules.StallStaminaPerSecond * cheaper * seconds);
             var speed = Lerp(rules.ReelSpeed, rules.ReelSpeedMaxSkill, skill);
-            return new ReelStep(speed * seconds, fish.RestStamina * fish.Quality * cheaper * seconds);
+            return new ReelStep(speed * seconds, StaminaFigureWhileResting(rules, fish.RestStamina) * fish.Quality * cheaper * seconds);
         }
+
+        /// <summary>
+        /// The stamina figure a resting fish gives the game, which charges it times the fish's
+        /// quality a second (then lowers it with skill): its own figure, by the level's share.
+        /// </summary>
+        public static float StaminaFigureWhileResting(FishingRules rules, float restStamina) => restStamina * rules.ReelStaminaShare;
 
         /// <summary>
         /// The stamina figure a struggling fish gives the game, which charges that figure times the

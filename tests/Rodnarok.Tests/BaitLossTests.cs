@@ -12,6 +12,7 @@ namespace Rodnarok.Tests
     public class BaitLossTests
     {
         private const float Window = 1.5f;
+        private static readonly double[] Chances = FishingRules.Default.BaitTakeChances;
 
         [Fact]
         public void ABiteNotHookedPastTheHookWindowIsAMiss()
@@ -40,38 +41,38 @@ namespace Rodnarok.Tests
         [Fact]
         public void TheFirstMissVerySeldomTakesTheBait()
         {
-            Assert.InRange(BaitLoss.TakeChance(1), 0.01, 0.15);
+            Assert.InRange(BaitLoss.TakeChance(1, Chances), 0.01, 0.15);
         }
 
         [Fact]
         public void EachMissIsMoreLikelyToTakeTheBaitThanTheOneBefore()
         {
-            for (var misses = 1; misses < 4; misses++) Assert.True(BaitLoss.TakeChance(misses + 1) > BaitLoss.TakeChance(misses));
+            for (var misses = 1; misses < 4; misses++) Assert.True(BaitLoss.TakeChance(misses + 1, Chances) > BaitLoss.TakeChance(misses, Chances));
         }
 
         [Fact]
         public void TheThirdMissAlmostAlwaysTakesTheBait()
         {
-            Assert.InRange(BaitLoss.TakeChance(3), 0.85, 0.95);
+            Assert.InRange(BaitLoss.TakeChance(3, Chances), 0.85, 0.95);
         }
 
         [Fact]
         public void LaterMissesKeepTakingItAlmostSurely()
         {
-            Assert.InRange(BaitLoss.TakeChance(10), 0.95, 1.0);
+            Assert.InRange(BaitLoss.TakeChance(10, Chances), 0.95, 1.0);
         }
 
         [Fact]
         public void TheRollDecidesWithinTheChance()
         {
-            Assert.True(BaitLoss.Taken(on: true, misses: 2, roll: BaitLoss.TakeChance(2) - 0.01));
-            Assert.False(BaitLoss.Taken(on: true, misses: 2, roll: BaitLoss.TakeChance(2) + 0.01));
+            Assert.True(BaitLoss.Taken(on: true, misses: 2, roll: BaitLoss.TakeChance(2, Chances) - 0.01, Chances));
+            Assert.False(BaitLoss.Taken(on: true, misses: 2, roll: BaitLoss.TakeChance(2, Chances) + 0.01, Chances));
         }
 
         [Fact]
         public void WithTheSettingOffMissesCostNothingAsInTheGame()
         {
-            Assert.False(BaitLoss.Taken(on: false, misses: 10, roll: 0.0));
+            Assert.False(BaitLoss.Taken(on: false, misses: 10, roll: 0.0, Chances));
         }
 
         [Fact]

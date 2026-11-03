@@ -17,32 +17,33 @@ namespace Rodnarok.Tests
     {
         private const float Walking = 15f;
         private const float Running = 30f;
+        private static readonly FishingRules Normal = FishingRules.Default;
 
         [Fact]
         public void WalkingCloseToTheSchoolIsHeard()
         {
-            Assert.True(Wary.Heard(distance: 5f, noise: Walking));
+            Assert.True(Wary.Heard(distance: 5f, noise: Walking, hearing: Normal.Hearing));
         }
 
         [Fact]
         public void UnderWaterOnlyPartOfTheGamesNoiseIsHeard()
         {
-            Assert.InRange(Wary.Hearing, 0.25f, 0.5f);
-            Assert.False(Wary.Heard(distance: 8f, noise: Walking));
-            Assert.False(Wary.Heard(distance: Walking * Wary.Hearing, noise: Walking));
+            Assert.InRange(Normal.Hearing, 0.25f, 0.5f);
+            Assert.False(Wary.Heard(distance: 8f, noise: Walking, hearing: Normal.Hearing));
+            Assert.False(Wary.Heard(distance: Walking * Normal.Hearing, noise: Walking, hearing: Normal.Hearing));
         }
 
         [Fact]
         public void RunningIsHeardFartherOut()
         {
-            Assert.True(Wary.Heard(distance: 9f, noise: Running));
-            Assert.False(Wary.Heard(distance: 16f, noise: Running));
+            Assert.True(Wary.Heard(distance: 9f, noise: Running, hearing: Normal.Hearing));
+            Assert.False(Wary.Heard(distance: 16f, noise: Running, hearing: Normal.Hearing));
         }
 
         [Fact]
         public void SittingSneakingOrStandingStillIsNotHeard()
         {
-            Assert.False(Wary.Heard(distance: 2f, noise: 0f));
+            Assert.False(Wary.Heard(distance: 2f, noise: 0f, hearing: Normal.Hearing));
         }
 
         [Fact]
@@ -72,15 +73,15 @@ namespace Rodnarok.Tests
         {
             var fright = 0;
             for (var i = 0; i < 6; i++) fright += Wary.Fright(heard: false);
-            Assert.False(Wary.Leaves(fright));
-            Assert.True(Wary.Leaves(Wary.FrightToLeave));
+            Assert.False(Wary.Leaves(fright, Normal.FrightToLeave));
+            Assert.True(Wary.Leaves(Normal.FrightToLeave, Normal.FrightToLeave));
         }
 
         [Fact]
         public void ThreeStartlesByNoiseDoNotDriveTheSchoolOff()
         {
-            Assert.False(Wary.Leaves(Wary.Fright(heard: true) * 3));
-            Assert.True(Wary.Leaves(Wary.Fright(heard: true) * 4));
+            Assert.False(Wary.Leaves(Wary.Fright(heard: true) * 3, Normal.FrightToLeave));
+            Assert.True(Wary.Leaves(Wary.Fright(heard: true) * 4, Normal.FrightToLeave));
         }
 
         [Fact]
@@ -157,9 +158,9 @@ namespace Rodnarok.Tests
         [Fact]
         public void AShyFishOftenGivesUpAndANotShyOneNever()
         {
-            Assert.True(Wary.GivesUp(1f, roll: Wary.MostGivingUp - 0.01));
-            Assert.False(Wary.GivesUp(1f, roll: Wary.MostGivingUp + 0.01));
-            Assert.False(Wary.GivesUp(0f, roll: 0.0));
+            Assert.True(Wary.GivesUp(1f, roll: Normal.MostGivingUp - 0.01, most: Normal.MostGivingUp));
+            Assert.False(Wary.GivesUp(1f, roll: Normal.MostGivingUp + 0.01, most: Normal.MostGivingUp));
+            Assert.False(Wary.GivesUp(0f, roll: 0.0, most: Normal.MostGivingUp));
         }
 
         [Fact]

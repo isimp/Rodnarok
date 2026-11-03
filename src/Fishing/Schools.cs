@@ -207,6 +207,19 @@ namespace Rodnarok
 
         private static FishingRules Rules => PlayRules.Now;
 
+        /// <summary>The last line this game showed for a school scared away for good, for the self-test.</summary>
+        [ForTest]
+        public static string LastGoneForTest { get; private set; } = "";
+
+        /// <summary>Tells the one fishing why their school was scared away for good, naming another player whose steps it was.</summary>
+        private static void TellGone(GoneWhy why, Player noiseBy = null)
+        {
+            var you = Player.m_localPlayer;
+            if (you == null) return;
+            LastGoneForTest = SchoolGone.Text(why, noiseBy == null || noiseBy == you ? null : noiseBy.GetPlayerName());
+            you.Message(MessageHud.MessageType.TopLeft, LastGoneForTest);
+        }
+
         /// <summary>Whether this game steers a fish as one of a school.</summary>
         public static bool IsOurs(Fish fish) => fish != null && Ours.Contains(fish);
 
@@ -379,6 +392,7 @@ namespace Rodnarok
             if (hit == null || !CastOf.TryGetValue(hit, out var cast) || cast.Spooked) return;
             cast.Spooked = true;
             SpookedForTest++;
+            TellGone(GoneWhy.Shot);
             foreach (var fish in cast.Fish.ToList())
             {
                 if (fish != null && !fish.IsHooked()) Leave(fish, from);
@@ -532,13 +546,14 @@ namespace Rodnarok
             {
                 StartledForTest++;
                 DriveOff(cast, at);
+                TellGone(GoneWhy.Reeled);
                 return true;
             }
             if (heard != null || fast || dragging)
             {
                 cast.QuietSince = now;
                 // A flinching school heard to as well darts; a darting one is not made to flinch.
-                if (!cast.Away || (heard != null && cast.Flinched)) Fright(cast, heard != null ? heard.transform.position : at, heard != null);
+                if (!cast.Away || (heard != null && cast.Flinched)) Fright(cast, heard != null ? heard.transform.position : at, heard);
             }
             else if (cast.Away && Wary.ComesBack(now - cast.QuietSince, cast.Flinched))
             {
@@ -547,12 +562,12 @@ namespace Rodnarok
             return cast.Away || cast.Spooked;
         }
 
-        /// <summary>The player heard by a school at a place: the game's noise ranges, halved under water.</summary>
+        /// <summary>The player heard by a school at a place: the game's noise ranges, cut under water to the level's share.</summary>
         private static Player HeardAt(Vector3 place)
         {
             foreach (var player in Player.GetAllPlayers())
             {
-                if (player != null && Wary.Heard(Vector3.Distance(player.transform.position, place), player.GetNoiseRange())) return player;
+                if (player != null && Wary.Heard(Vector3.Distance(player.transform.position, place), player.GetNoiseRange(), Rules.Hearing)) return player;
             }
             return null;
         }
@@ -562,17 +577,19 @@ namespace Rodnarok
         /// float sidesteps it off the float; enough frights drive it off. No fish of it goes for the
         /// bait meanwhile.
         /// </summary>
-        private static void Fright(Cast cast, Vector3 from, bool heard)
+        private static void Fright(Cast cast, Vector3 from, Player heardFrom)
         {
+            var heard = heardFrom != null;
             cast.Fright += Wary.Fright(heard);
             StartledForTest++;
             cast.BumpsAt.Clear();
             cast.Biter = -1;
             cast.BiterFreeAt = float.MaxValue;
             cast.ReadyAt = -1f;
-            if (Wary.Leaves(cast.Fright))
+            if (Wary.Leaves(cast.Fright, Rules.FrightToLeave))
             {
                 DriveOff(cast, from);
+                TellGone(SchoolGone.ByFright(heard), heardFrom);
                 return;
             }
             cast.Away = true;
@@ -644,9 +661,12 @@ namespace Rodnarok
                 cast.ReadyAt = Time.time;
                 var at = cast.Float.transform.position;
                 var angler = Player.m_localPlayer;
-                cast.Shyness = Wary.Shyness(angler != null ? Across(angler.transform.position, at) : Wary.FarOut, WaterDepth(at));
-                if (Wary.GivesUp(cast.Shyness, Random.value))
+                var anglerDistance = angler != null ? Across(angler.transform.position, at) : Wary.FarOut;
+                var depth = WaterDepth(at);
+                cast.Shyness = Wary.Shyness(anglerDistance, depth);
+                if (Wary.GivesUp(cast.Shyness, Random.value, Rules.MostGivingUp))
                 {
+                    TellGone(SchoolGone.Shy(anglerDistance, depth));
                     GaveUpForTest++;
                     cast.Spooked = true;
                     foreach (var fish in cast.Fish.ToList()) Leave(fish, at);

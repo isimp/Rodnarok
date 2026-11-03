@@ -4,7 +4,7 @@ namespace Rodnarok
 {
     /// <summary>
     /// A school is wary of the one fishing, without vanishing at every step. Under water it hears
-    /// about a third of the game's own noise, which a player makes walking (15 m) or running and jumping
+    /// a share of the game's own noise, a third on Normal, which a player makes walking (15 m) or running and jumping
     /// (30 m) and which fades at 4 m a second, while sneaking, sitting or standing still make none:
     /// a player heard at the float or the school startles it, and it darts a few metres off and
     /// comes back once all has been quiet a moment. A float moved quickly, as a short reel does,
@@ -16,9 +16,6 @@ namespace Rodnarok
     /// </summary>
     internal static class Wary
     {
-        /// <summary>The share of the game's noise range a fish hears under water.</summary>
-        public const float Hearing = 0.35f;
-
         /// <summary>How far a startled school darts from the noise, and how far a flinching one sidesteps from the float, in metres.</summary>
         public const float DartDistance = 6f;
         public const float FlinchDistance = 2.5f;
@@ -27,10 +24,9 @@ namespace Rodnarok
         public const float QuietBeforeComingBack = 3f;
         public const float StillBeforeComingBack = 1.5f;
 
-        /// <summary>How much a startle and a flinch frighten a school, and how much fright makes it leave.</summary>
+        /// <summary>How much a startle and a flinch frighten a school; how much makes it leave is the level's.</summary>
         public const int StartleFright = 2;
         public const int FlinchFright = 1;
-        public const int FrightToLeave = 8;
 
         /// <summary>How fast a float may move through the school, in metres a second, before it flinches.</summary>
         public const float FloatSpeed = 0.6f;
@@ -49,11 +45,8 @@ namespace Rodnarok
         /// <summary>How long the shyest fish hesitates before biting, in seconds.</summary>
         public const float LongestHesitation = 12f;
 
-        /// <summary>The share of schools of the shyest fish that give up and swim off without biting.</summary>
-        public const double MostGivingUp = 0.3;
-
-        /// <summary>Whether a player's noise reaches a fish: the game's own rule, its noise range against the distance, the range cut under water.</summary>
-        public static bool Heard(float distance, float noise) => distance < noise * Hearing;
+        /// <summary>Whether a player's noise reaches a fish: the game's own rule, its noise range against the distance, the range cut under water to the level's share.</summary>
+        public static bool Heard(float distance, float noise, float hearing) => distance < noise * hearing;
 
         /// <summary>Whether a school off the float comes back: a startled one all quiet for a while, a flinching one the float still a moment.</summary>
         public static bool ComesBack(float quietFor, bool flinched) => quietFor >= (flinched ? StillBeforeComingBack : QuietBeforeComingBack);
@@ -62,7 +55,7 @@ namespace Rodnarok
         public static int Fright(bool heard) => heard ? StartleFright : FlinchFright;
 
         /// <summary>Whether a school this frightened leaves.</summary>
-        public static bool Leaves(int fright) => fright >= FrightToLeave;
+        public static bool Leaves(int fright, int frightToLeave) => fright >= frightToLeave;
 
         /// <summary>Whether a float moving this fast makes a school near it flinch.</summary>
         public static bool FloatStartles(float speed, bool schoolNear) => schoolNear && speed > FloatSpeed;
@@ -87,8 +80,8 @@ namespace Rodnarok
         /// <summary>How long a fish this shy hesitates before biting, in seconds.</summary>
         public static float Hesitation(float shyness) => Clamp01(shyness) * LongestHesitation;
 
-        /// <summary>Whether a school this shy gives up and swims off without biting, for a roll from 0 to 1.</summary>
-        public static bool GivesUp(float shyness, double roll) => roll < Clamp01(shyness) * MostGivingUp;
+        /// <summary>Whether a school this shy gives up and swims off without biting, for a roll from 0 to 1, <paramref name="most"/> giving up when shyest.</summary>
+        public static bool GivesUp(float shyness, double roll, double most) => roll < Clamp01(shyness) * most;
 
         private static float Clamp01(float v) => v < 0f ? 0f : v > 1f ? 1f : v;
     }

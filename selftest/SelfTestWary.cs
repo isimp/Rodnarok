@@ -42,7 +42,7 @@ namespace Rodnarok
                 for (var waited = 0f; waited < 3f && Utils.FindChild(player.transform, "_RodTop") == null; waited += Time.deltaTime) yield return null;
                 foreach (var frame in SelfTestArrival.UntilNoSchoolLeaves()) yield return frame;
 
-                PlayRules.ForTest = Settings.Rules.With(waitMin: 1f, waitMax: 1f, schools: true, callWorldFish: false, wary: true);
+                PlayRules.ForTest = SelfTestRules.Normal.With(waitMin: 1f, waitMax: 1f, schools: true, callWorldFish: false, wary: true);
                 var bait = baitPrefab.GetComponent<ItemDrop>().m_itemData.Clone();
                 bait.m_dropPrefab = baitPrefab;
                 var go = Object.Instantiate(floatPrefab, spot.Value, Quaternion.identity);
@@ -66,7 +66,7 @@ namespace Rodnarok
                 var leavingBefore = Schools.LeavingForTest;
                 var before = FromPlayer(school, player);
                 var startedAt = school.ToDictionary(f => f, f => f != null ? f.transform.position : Vector3.zero);
-                player.AddNoise(Vector3.Distance(player.transform.position, ff.transform.position) / Wary.Hearing + 10f);
+                player.AddNoise(Vector3.Distance(player.transform.position, ff.transform.position) / PlayRules.Now.Hearing + 10f);
                 var away = false;
                 for (var waited = 0f; waited < 1f && !away; waited += Time.deltaTime)
                 {
@@ -117,6 +117,8 @@ namespace Rodnarok
                 for (var waited = 0f; waited < 1f; waited += Time.deltaTime) yield return null;
                 check.That(Schools.LeavingForTest > leavingBefore, "the float reeled in through the school a while drives it off; "
                     + (Schools.LeavingForTest - leavingBefore).ToString(CultureInfo.InvariantCulture) + " fish leaving");
+                var reeledOff = SchoolGone.Text(GoneWhy.Reeled, null);
+                check.That(Schools.LastGoneForTest == reeledOff, "driven off, the one fishing is told \"" + reeledOff + "\"; told \"" + Schools.LastGoneForTest + "\"");
             }
             finally
             {

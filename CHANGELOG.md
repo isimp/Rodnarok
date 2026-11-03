@@ -14,6 +14,10 @@ A seated cast goes where you aim.
 
 Fast fish such as *Pike* and *Tuna* now reach the hook instead of circling it, and a school still flinches when you reel quickly away from it.
 
+Five difficulty levels from `VeryEasy` to `VeryHard`, `Normal` playing as before; `Custom` keeps the separate settings. Server setting `Difficulty`.
+
+A school scared away for good tells you why: your steps or another player's, reeling through it, shyness close in or in shallow water, or a shot.
+
 ## 0.1.1
 
 A struggling fish takes line slower while the line still holds strain: short taps on the block button that keep the ring partly filled lose less line than letting go. Each struggle writes one log line: the line the fish took, eased off and held time, and any hold the game did not count.

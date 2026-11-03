@@ -14,18 +14,15 @@ namespace Rodnarok
     /// </summary>
     internal static class BaitLoss
     {
-        /// <summary>The chance that the first, second, third and later miss on a float takes its bait.</summary>
-        private static readonly double[] Chances = { 0.1, 0.4, 0.9, 0.98 };
-
         /// <summary>Whether a bite is a miss now: neither hooked nor any longer within the hook window.</summary>
         public static bool Missed(bool bitten, bool hooked, float sinceBite, float window) =>
             bitten && !hooked && sinceBite > window;
 
-        /// <summary>The chance that this miss on a float, counted from one, takes its bait.</summary>
-        public static double TakeChance(int misses) => misses < 1 ? 0.0 : Chances[Math.Min(misses, Chances.Length) - 1];
+        /// <summary>The chance that this miss on a float, counted from one, takes its bait, by the chances for the first, second and later misses.</summary>
+        public static double TakeChance(int misses, double[] chances) => misses < 1 || chances == null || chances.Length == 0 ? 0.0 : chances[Math.Min(misses, chances.Length) - 1];
 
         /// <summary>Whether this miss takes the bait, for a roll from 0 to 1.</summary>
-        public static bool Taken(bool on, int misses, double roll) => on && roll < TakeChance(misses);
+        public static bool Taken(bool on, int misses, double roll, double[] chances) => on && roll < TakeChance(misses, chances);
 
         /// <summary>Whether every fish of a school has missed the bait and learned, so the school swims off.</summary>
         public static bool SchoolLearned(int learned, int size) => learned >= size;

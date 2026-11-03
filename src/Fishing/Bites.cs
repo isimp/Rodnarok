@@ -123,7 +123,7 @@ namespace Rodnarok
             Misses[ff] = ++misses;
             if (!Learned.TryGetValue(ff, out var learned)) Learned[ff] = learned = new HashSet<Fish>();
             learned.Add(fish);
-            var taken = BaitLoss.Taken(rules.BaitLost, misses, Random.value);
+            var taken = BaitLoss.Taken(rules.BaitLost, misses, Random.value, rules.BaitTakeChances);
             var schoolOff = false;
             if (taken)
             {
@@ -172,12 +172,18 @@ namespace Rodnarok
             if (fish != null && fish.IsEscaping() && LineLength(ff) < before) LineLength(ff) = before;
         }
 
-        /// <summary>The stamina figure a struggling fish gives the game, so holding through a struggle costs the stall cost; null while it rests.</summary>
-        public static float? StruggleFigure(Fish fish)
+        /// <summary>
+        /// The stamina figure a hooked fish gives the game: struggling, so holding through costs the
+        /// stall cost; resting, its own figure by the level's reeling share. Null where the game's own
+        /// figure stands.
+        /// </summary>
+        public static float? StaminaFigure(Fish fish)
         {
-            if (!fish.IsEscaping()) return null;
+            var rules = PlayRules.Now;
+            if (!fish.IsEscaping())
+                return rules.ReelStaminaShare == 1f ? (float?)null : Fight.StaminaFigureWhileResting(rules, fish.m_staminaUse);
             var item = fish.GetComponent<ItemDrop>();
-            return Fight.StaminaFigureWhileStruggling(PlayRules.Now, item == null ? 1 : item.m_itemData.m_quality);
+            return Fight.StaminaFigureWhileStruggling(rules, item == null ? 1 : item.m_itemData.m_quality);
         }
     }
 }

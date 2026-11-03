@@ -16,7 +16,9 @@ namespace Rodnarok
         private static ConfigEntry<float> _waitMin;
         private static ConfigEntry<float> _waitMax;
         private static ConfigEntry<float> _hookWindow;
+        private static ConfigEntry<Difficulty> _difficulty;
         private static ConfigEntry<float> _stallStamina;
+        private static ConfigEntry<float> _reelStamina;
         private static ConfigEntry<float> _calmReach;
         private static ConfigEntry<float> _calmKeep;
         private static ConfigEntry<bool> _schools;
@@ -61,15 +63,16 @@ namespace Rodnarok
         /// <summary>Whether this player's casts show which fish can come; a player's own choice, never the server's.</summary>
         public static bool CastHints => _castHints != null && _castHints.Value;
 
-        /// <summary>The rules as the settings stand now; the defaults before they are bound.</summary>
+        /// <summary>The rules as the settings stand now, by the difficulty level; the defaults before they are bound.</summary>
         public static FishingRules Rules =>
             _waitMin == null
                 ? FishingRules.Default
-                : FishingRules.Default.With(
+                : DifficultyLevels.Rules(_difficulty.Value, FishingRules.Default.With(
                     hookWindow: _hookWindow.Value,
                     waitMin: _waitMin.Value,
                     waitMax: _waitMax.Value,
                     stallStaminaPerSecond: _stallStamina.Value,
+                    reelStaminaShare: _reelStamina.Value,
                     calmReach: _calmReach.Value,
                     calmKeep: _calmKeep.Value,
                     schools: _schools.Value,
@@ -82,20 +85,24 @@ namespace Rodnarok
                     biomeFishOnBait: _biomeFishOnBait.Value,
                     callWorldFish: _callWorldFish.Value,
                     wary: _wary.Value,
-                    baitLost: _baitLost.Value);
+                    baitLost: _baitLost.Value));
 
         public static void Bind(ConfigFile config)
         {
             var rules = FishingRules.Default;
             _sync = new ServerSync.ConfigSync(About.Guid) { DisplayName = About.Name, CurrentVersion = About.Version, ModRequired = true, IsLocked = true };
+            _difficulty = Sync(config.Bind(Section, "Difficulty", DifficultyLevels.Default,
+                "How hard the fishing is, in the five steps of the game's own combat setting. A level sets the hook window, how soon a held struggle snaps the line and how slowly easing off unstrains it, how fast an eased fish takes line, what holding through a struggle and reeling in a resting fish cost, how wary a school is, how fast missed bites wear the bait down, and whether fish bump the float first. VeryEasy: 2.5 s to hook, a Perch snaps a held line after 2 s, half the game's stamina for reeling in, schools are not wary, missed bites cost no bait. Easy: 2 s to hook, 1.5 s to snap, three quarters of the reeling stamina, schools hear a quarter of the game's noise and leave at 12 frights. Normal: 1.5 s to hook, 1 s to snap, the game's reeling stamina, schools hear 35% of the noise and leave at 8 frights. Hard: 1 s to hook, 0.75 s to snap, schools hear half the noise and leave at 6 frights, missed bites take the bait more often, fish bump the float first. VeryHard: the game's own half second to hook, 0.5 s to snap, schools hear the game's whole noise as the world's fish do and leave at 4 frights, the third miss always takes the bait. Custom uses HookWindow, SnapSeconds, EaseSeconds, RunSpeed, StallStamina, ReelStamina, Wary, BaitLost and Bumps as set; at any other level those are not used. The other settings apply at every level."));
             _waitMin = Sync(config.Bind(Section, "WaitMin", rules.WaitMin,
                 new ConfigDescription("Shortest time, in seconds, a school takes to swim in from out of sight after the float lands. A long way in takes as long as its fish need to stay together.", new AcceptableValueRange<float>(0f, 300f))));
             _waitMax = Sync(config.Bind(Section, "WaitMax", rules.WaitMax,
                 new ConfigDescription("Longest time, in seconds, a school takes to swim in from out of sight after the float lands, unless a long way in needs longer.", new AcceptableValueRange<float>(0f, 300f))));
             _hookWindow = Sync(config.Bind(Section, "HookWindow", rules.HookWindow,
-                new ConfigDescription("Seconds after a bite during which holding the line hooks the fish. The game gives half a second.", new AcceptableValueRange<float>(0.5f, 5f))));
+                new ConfigDescription("Seconds after a bite during which holding the line hooks the fish. The game gives half a second. Used only with Difficulty Custom.", new AcceptableValueRange<float>(0.5f, 5f))));
             _stallStamina = Sync(config.Bind(Section, "StallStamina", rules.StallStaminaPerSecond,
-                new ConfigDescription("Stamina a second for holding the line while a hooked fish struggles, before Fishing skill lowers it. The line gains nothing meanwhile.", new AcceptableValueRange<float>(0f, 20f))));
+                new ConfigDescription("Stamina a second for holding the line while a hooked fish struggles, before Fishing skill lowers it. The line gains nothing meanwhile. Used only with Difficulty Custom.", new AcceptableValueRange<float>(0f, 20f))));
+            _reelStamina = Sync(config.Bind(Section, "ReelStamina", rules.ReelStaminaShare,
+                new ConfigDescription("The share of the game's own stamina cost for reeling in a resting fish: 1 is the game's, 0.5 half of it. Used only with Difficulty Custom.", new AcceptableValueRange<float>(0.1f, 2f))));
             _calmReach = Sync(config.Bind(Section, "CalmReach", rules.CalmReach,
                 new ConfigDescription("How far an item stand calming the waters with a Serpent trophy reaches, in metres. Waves are calmed by the corners of the game's 64 m water tiles, so the calm water fades out over a tile. Below 46 m a stand in the middle of a tile may reach no corner and calm nothing.", new AcceptableValueRange<float>(0f, 128f))));
             _calmKeep = Sync(config.Bind(Section, "CalmKeep", rules.CalmKeep,
@@ -103,15 +110,15 @@ namespace Rodnarok
             _schools = Sync(config.Bind(Section, "Schools", rules.Schools,
                 "Whether the bait draws a school of its fish, as many as the world spawns together, of which one takes the bait. Off, a single fish comes."));
             _bumps = Sync(config.Bind(Section, "Bumps", rules.Bumps,
-                "Whether the fish that takes the bait first bumps the float lightly once or twice before it goes for the hook. A bump is a short, light dip, far lighter than the bite, and can never be hooked; reeling at one drags the float and startles a wary school. The real bite pulls the float under."));
+                "Whether the fish that takes the bait first bumps the float lightly once or twice before it goes for the hook. A bump is a short, light dip, far lighter than the bite, and can never be hooked; reeling at one drags the float and startles a wary school. The real bite pulls the float under. Used only with Difficulty Custom."));
             _tension = Sync(config.Bind(Section, "Tension", rules.Tension,
                 "Whether holding the line through a struggle strains it until it snaps, shown by the crosshair ring filling. Easing off lets the strain go while the fish takes line out. Off, holding through a struggle only stalls."));
             _snapSeconds = Sync(config.Bind(Section, "SnapSeconds", rules.SnapSeconds,
-                new ConfigDescription("Seconds of holding the line through a Perch's struggle until it snaps, with Tension on. With PullBySpeed on, a faster fish snaps it sooner and a slower one later.", new AcceptableValueRange<float>(0.5f, 10f))));
+                new ConfigDescription("Seconds of holding the line through a Perch's struggle until it snaps, with Tension on. With PullBySpeed on, a faster fish snaps it sooner and a slower one later. Used only with Difficulty Custom.", new AcceptableValueRange<float>(0.5f, 10f))));
             _easeSeconds = Sync(config.Bind(Section, "EaseSeconds", rules.EaseSeconds,
-                new ConfigDescription("Seconds of easing off, or of the fish resting, until a line strained to snapping is unstrained, with Tension on.", new AcceptableValueRange<float>(0.1f, 10f))));
+                new ConfigDescription("Seconds of easing off, or of the fish resting, until a line strained to snapping is unstrained, with Tension on. Used only with Difficulty Custom.", new AcceptableValueRange<float>(0.1f, 10f))));
             _runSpeed = Sync(config.Bind(Section, "RunSpeed", rules.RunSpeed,
-                new ConfigDescription("Metres of line a second a struggling Perch takes out while the line is eased off with no strain left on it, with Tension on; with strain still on the line it runs slower, half as fast at half strain. With PullBySpeed on, a faster fish takes more line and a slower one less. The fish swims away as fast as the line goes out. The line breaks past the game's 30 m as ever.", new AcceptableValueRange<float>(0f, 10f))));
+                new ConfigDescription("Metres of line a second a struggling Perch takes out while the line is eased off with no strain left on it, with Tension on; with strain still on the line it runs slower, half as fast at half strain. With PullBySpeed on, a faster fish takes more line and a slower one less. The fish swims away as fast as the line goes out. The line breaks past the game's 30 m as ever. Used only with Difficulty Custom.", new AcceptableValueRange<float>(0f, 10f))));
             _pullBySpeed = Sync(config.Bind(Section, "PullBySpeed", rules.PullBySpeed,
                 "Whether each fish pulls the line by its own swimming speed in the game, with Tension on. SnapSeconds and RunSpeed are a Perch's (speed 3); a faster fish snaps a held line sooner and takes more line eased off, by the fourth root of its speed against the Perch's: a Pike (5) snaps it after 0.88 s and runs 2.3 m/s, a Tuna (10) after 0.74 s and 2.7 m/s, an Anglerfish (2) after 1.1 s and 1.8 m/s. Off, every fish pulls as a Perch."));
             _biomeFishOnBait = Sync(config.Bind(Section, "BiomeFishOnBait", rules.BiomeFishOnBait,
@@ -119,9 +126,9 @@ namespace Rodnarok
             _callWorldFish = Sync(config.Bind(Section, "CallWorldFish", rules.CallWorldFish,
                 "Whether a fish of the world's own that takes the bait, within the float's reach and able to swim to it, is called to the float instead of a school. Off, a school comes wherever the water allows one."));
             _baitLost = Sync(config.Bind(Section, "BaitLost", rules.BaitLost,
-                "Whether missed bites wear the bait down. On, each bite not hooked in time may take the bait, more likely each time (10%, 40%, 90%, then 98%): taken, the float is bare, nothing bites it again, the school swims off, and reeling it in gives no bait back. A fish that missed bites that float no more, and once every fish of the school has missed, the school swims off and leaves the bait. Off, fish bite the same bait again and again, as in the game."));
+                "Whether missed bites wear the bait down. On, each bite not hooked in time may take the bait, more likely each time (10%, 40%, 90%, then 98%): taken, the float is bare, nothing bites it again, the school swims off, and reeling it in gives no bait back. A fish that missed bites that float no more, and once every fish of the school has missed, the school swims off and leaves the bait. Off, fish bite the same bait again and again, as in the game. Used only with Difficulty Custom."));
             _wary = Sync(config.Bind(Section, "Wary", rules.Wary,
-                "Whether a school is wary of the one fishing. On, a player walking or running close to the school (35% of the game's own noise: walking about 5 m, running about 10.5 m; sneaking, sitting and standing still make none) makes it dart 6 m off and come back once all is quiet for 3 s; a short reel with the school near makes it flinch 2.5 m aside, back once the float is still for 1.5 s. A dart counts 2 frights, a flinch 1; at 8, or with the float reeled through it for 2 s, the school leaves. Close in (within 4 m, not shy from 12 m) and in shallow water (under 1 m, not shy from 3 m) a fish hesitates up to 12 s before biting and up to 30% of such schools give up and swim off. Off, a school bites wherever it is."));
+                "Whether a school is wary of the one fishing. On, a player walking or running close to the school (35% of the game's own noise: walking about 5 m, running about 10.5 m; sneaking, sitting and standing still make none) makes it dart 6 m off and come back once all is quiet for 3 s; a short reel with the school near makes it flinch 2.5 m aside, back once the float is still for 1.5 s. A dart counts 2 frights, a flinch 1; at 8, or with the float reeled through it for 2 s, the school leaves. Close in (within 4 m, not shy from 12 m) and in shallow water (under 1 m, not shy from 3 m) a fish hesitates up to 12 s before biting and up to 30% of such schools give up and swim off. Off, a school bites wherever it is. Used only with Difficulty Custom."));
             // Shown only to this player, so each player sets it and the server never does.
             _castHints = config.Bind("Display", "CastHints", CastHint.OnByDefault,
                 "Whether each cast shows a short line at the top left saying which of the bait's fish can come to the water there, and which would need bigger or deeper water. Your own setting; the server's does not apply.");

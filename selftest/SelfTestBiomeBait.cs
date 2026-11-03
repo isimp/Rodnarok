@@ -65,7 +65,7 @@ namespace Rodnarok
                 FishBook.BiomeForTest = BlackForest;
                 // The last roll picks the last of the bait's fish that fit: the Trollfish among Perch, Pike and Trollfish.
                 Schools.RollForTest = 0.999f;
-                PlayRules.ForTest = Settings.Rules.With(waitMin: 1f, waitMax: 1f, schools: true, callWorldFish: false, wary: false, baitLost: false, bumps: false, biomeFishOnBait: true);
+                PlayRules.ForTest = SelfTestRules.Normal.With(waitMin: 1f, waitMax: 1f, schools: true, callWorldFish: false, wary: false, baitLost: false, bumps: false, biomeFishOnBait: true);
                 var bait = baitPrefab.GetComponent<ItemDrop>().m_itemData.Clone();
                 bait.m_dropPrefab = baitPrefab;
                 ff = Cast(floatPrefab, spot.Value, player, bait);

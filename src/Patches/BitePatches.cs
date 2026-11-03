@@ -71,13 +71,13 @@ namespace Rodnarok
         }
     }
 
-    /// <summary>A struggling fish costs the stall cost to hold, the same for every fish.</summary>
+    /// <summary>A struggling fish costs the stall cost to hold, the same for every fish; a resting one the level's share of its own.</summary>
     [HarmonyPatch(typeof(Fish), nameof(Fish.GetStaminaUse))]
     internal static class StallCost
     {
         private static bool Prefix(Fish __instance, ref float __result)
         {
-            var figure = Bites.StruggleFigure(__instance);
+            var figure = Bites.StaminaFigure(__instance);
             if (figure == null) return true;
             __result = figure.Value;
             return false;

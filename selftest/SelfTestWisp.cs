@@ -106,7 +106,7 @@ namespace Rodnarok
                 for (var waited = 0f; waited < 2f; waited += Time.deltaTime) yield return null;
                 Vector3 Home() => player.transform.position + player.transform.TransformVector(wisplight.m_offset);
                 var ownLight = flicker != null ? flicker.intensity : 0f;
-                PlayRules.ForTest = Settings.Rules.With(callWorldFish: false, wary: false, baitLost: false);
+                PlayRules.ForTest = SelfTestRules.Normal.With(callWorldFish: false, wary: false, baitLost: false);
                 var window = PlayRules.Now.HookWindow;
 
                 var bait = noBait.GetComponent<ItemDrop>().m_itemData.Clone();

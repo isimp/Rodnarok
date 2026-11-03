@@ -21,6 +21,9 @@ namespace Rodnarok
         /// <summary>Stamina a second for holding the line while the fish struggles, before skill lowers it.</summary>
         public float StallStaminaPerSecond { get; private set; } = 2f;
 
+        /// <summary>The share of the game's own stamina cost for reeling in a resting fish.</summary>
+        public float ReelStaminaShare { get; private set; } = 1f;
+
         /// <summary>Whether holding through a struggle strains the line; without, holding only stalls.</summary>
         public bool Tension { get; private set; } = true;
 
@@ -63,8 +66,20 @@ namespace Rodnarok
         /// <summary>Whether a school is wary of the one fishing: startled by noise and a quickly dragged float, shy close in and in shallow water.</summary>
         public bool Wary { get; private set; } = true;
 
+        /// <summary>The share of the game's noise range a wary school hears under water.</summary>
+        public float Hearing { get; private set; } = 0.35f;
+
+        /// <summary>How much fright makes a wary school leave; a startle counts 2, a flinch 1.</summary>
+        public int FrightToLeave { get; private set; } = 8;
+
+        /// <summary>The share of schools of the shyest fish that give up and swim off without biting.</summary>
+        public double MostGivingUp { get; private set; } = 0.3;
+
         /// <summary>Whether a bite not hooked in time takes the bait, so the float is bare and reeling it in gives none back.</summary>
         public bool BaitLost { get; private set; } = true;
+
+        /// <summary>The chance that the first, second, third and later miss on a float takes its bait.</summary>
+        public double[] BaitTakeChances { get; private set; } = { 0.1, 0.4, 0.9, 0.98 };
 
         /// <summary>Whether the fish that takes the bait bumps the float lightly before it bites.</summary>
         public bool Bumps { get; private set; }
@@ -97,9 +112,19 @@ namespace Rodnarok
             bool? wary = null,
             bool? baitLost = null,
             bool? pullBySpeed = null,
-            bool? biomeFishOnBait = null)
+            bool? biomeFishOnBait = null,
+            float? reelStaminaShare = null,
+            float? hearing = null,
+            int? frightToLeave = null,
+            double? mostGivingUp = null,
+            double[] baitTakeChances = null)
         {
             var copy = (FishingRules)MemberwiseClone();
+            copy.ReelStaminaShare = reelStaminaShare ?? ReelStaminaShare;
+            copy.Hearing = hearing ?? Hearing;
+            copy.FrightToLeave = frightToLeave ?? FrightToLeave;
+            copy.MostGivingUp = mostGivingUp ?? MostGivingUp;
+            copy.BaitTakeChances = baitTakeChances ?? BaitTakeChances;
             copy.CallWorldFish = callWorldFish ?? CallWorldFish;
             copy.Wary = wary ?? Wary;
             copy.BaitLost = baitLost ?? BaitLost;

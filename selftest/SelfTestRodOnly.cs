@@ -52,7 +52,7 @@ namespace Rodnarok
 
                 // The school of a scenario before may still be leaving, and a new one waits for it.
                 foreach (var frame in SelfTestArrival.UntilNoSchoolLeaves()) yield return frame;
-                PlayRules.ForTest = Settings.Rules.With(waitMin: 1f, waitMax: 1f, schools: true, callWorldFish: false, wary: false, baitLost: false);
+                PlayRules.ForTest = SelfTestRules.Normal.With(waitMin: 1f, waitMax: 1f, schools: true, callWorldFish: false, wary: false, baitLost: false);
                 var bait = baitPrefab.GetComponent<ItemDrop>().m_itemData.Clone();
                 bait.m_dropPrefab = baitPrefab;
                 var go = Object.Instantiate(floatPrefab, spot.Value, Quaternion.identity);
@@ -93,6 +93,8 @@ namespace Rodnarok
                 check.That(target != null && target.GetComponent<Fish>() != null, "the fish hit is still a swimming fish, not an item to take");
                 check.That(Carried(player, name) == carried, "nothing reached the inventory, " + carried.ToString(CultureInfo.InvariantCulture) + " carried before and " + Carried(player, name).ToString(CultureInfo.InvariantCulture) + " after");
                 check.That(Schools.SpookedForTest == spooked + 1, "the school was spooked");
+                var shotOff = SchoolGone.Text(GoneWhy.Shot, null);
+                check.That(Schools.LastGoneForTest == shotOff, "spooked, the one fishing is told \"" + shotOff + "\"; told \"" + Schools.LastGoneForTest + "\"");
 
                 // Spooked, it takes no bait and swims off.
                 var bit = false;

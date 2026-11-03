@@ -89,7 +89,7 @@ namespace Rodnarok
                 }
                 if (!tipShown) yield break;
                 foreach (var frame in SelfTestArrival.UntilNoSchoolLeaves()) yield return frame;
-                PlayRules.ForTest = Settings.Rules.With(tension: true, pullBySpeed: true, callWorldFish: false, wary: false, baitLost: false);
+                PlayRules.ForTest = SelfTestRules.Normal.With(tension: true, pullBySpeed: true, callWorldFish: false, wary: false, baitLost: false);
                 var rules = PlayRules.Now;
                 var skill = player.GetSkillFactor(Skills.SkillType.Fishing);
 
