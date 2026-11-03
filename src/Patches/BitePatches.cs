@@ -42,7 +42,7 @@ namespace Rodnarok
         }
     }
 
-    /// <summary>A float whose bait was taken takes no bite, nor one from a fish that missed it before, at the game that owns it.</summary>
+    /// <summary>A float whose bait was taken takes no bite, nor one from a fish that missed it before, nor a second while the last can still be hooked, at the game that owns it.</summary>
     [HarmonyPatch(typeof(FishingFloat), "RPC_Nibble")]
     internal static class BareFloatTakesNoBite
     {

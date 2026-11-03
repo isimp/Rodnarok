@@ -139,9 +139,10 @@ namespace Rodnarok
                 player.Message(MessageHud.MessageType.TopLeft, taken ? TakenText : schoolOff ? SchoolOffText : NibbledText);
         }
 
-        /// <summary>Whether a float takes this fish's bite: not once its bait was taken, nor from a fish that missed it before.</summary>
+        /// <summary>Whether a float refuses this fish's bite: once its bait was taken, from a fish that missed it before, or while the last bite can still be hooked.</summary>
         public static bool Refuses(FishingFloat ff, Fish fish) =>
-            ff != null && (Bare.Contains(ff) || (fish != null && Learned.TryGetValue(ff, out var learned) && learned.Contains(fish)));
+            ff != null && (Bare.Contains(ff) || (fish != null && Learned.TryGetValue(ff, out var learned) && learned.Contains(fish))
+                || !Bite.TakesNibble(Nibbler(ff) != null, Time.time - NibbleTime(ff), PlayRules.Now.HookWindow));
 
         private static void PullFor(FishingFloat ff, Dictionary<FishingFloat, float> pulls, float pull)
         {

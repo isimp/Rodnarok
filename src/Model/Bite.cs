@@ -16,5 +16,12 @@ namespace Rodnarok
 
         /// <summary>Whether reeling this long after the bite still hooks the fish.</summary>
         public static bool InHookWindow(float sinceBite, float window) => sinceBite >= 0f && sinceBite <= window;
+
+        /// <summary>
+        /// Whether the float takes a new bite: not while the last one can still be hooked. The game
+        /// takes one a second after the last, which inside a longer hook window would dip the float
+        /// again and start the window over.
+        /// </summary>
+        public static bool TakesNibble(bool bitten, float sinceBite, float window) => !bitten || !InHookWindow(sinceBite, window);
     }
 }

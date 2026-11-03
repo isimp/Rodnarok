@@ -52,5 +52,31 @@ namespace Rodnarok.Tests
         {
             Assert.Equal(1.5f, FishingRules.Default.HookWindow);
         }
+
+        [Fact]
+        public void AFloatWithNoBiteTakesOne()
+        {
+            Assert.True(Bite.TakesNibble(bitten: false, sinceBite: 0.2f, window: 1.5f));
+        }
+
+        [Fact]
+        public void ABiteStillWithinItsHookWindowTakesNoSecondOne()
+        {
+            // The game takes a new nibble a second after the last, inside Rodnarok's longer hook window.
+            Assert.False(Bite.TakesNibble(bitten: true, sinceBite: 1.1f, window: 1.5f));
+            Assert.False(Bite.TakesNibble(bitten: true, sinceBite: 1.5f, window: 1.5f));
+        }
+
+        [Fact]
+        public void OnceTheHookWindowIsOverTheFloatTakesABiteAgain()
+        {
+            Assert.True(Bite.TakesNibble(bitten: true, sinceBite: 1.6f, window: 1.5f));
+        }
+
+        [Fact]
+        public void ALongerWindowHoldsOffASecondBiteLonger()
+        {
+            Assert.False(Bite.TakesNibble(bitten: true, sinceBite: 2.2f, window: 2.5f));
+        }
     }
 }

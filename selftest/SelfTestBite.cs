@@ -46,6 +46,9 @@ namespace Rodnarok
         private const float RiseSeconds = 0.5f;
         private const float HoldAgainAt = 0.05f;
 
+        /// <summary>How long a run goes before its pace is checked, in seconds: a few physics steps.</summary>
+        private const float RunSettles = 0.1f;
+
         private static readonly AccessTools.FieldRef<Character, Quaternion> LookYaw = AccessTools.FieldRefAccess<Character, Quaternion>("m_lookYaw");
         private static readonly AccessTools.FieldRef<Player, float> LookPitch = AccessTools.FieldRefAccess<Player, float>("m_lookPitch");
 
@@ -224,6 +227,17 @@ namespace Rodnarok
                     check.That(!Hud.instance.m_crosshairBow.gameObject.activeSelf || Hud.instance.m_crosshairBow.color.a < 0.05f, "the game's bow ring is not shown beside it");
                 }
 
+                // A second bite past the game's one second but within the hook window is refused, and taken once the window is over.
+                var bitAt = NibbleTime(ff);
+                for (var waited = 0f; waited < 1f && Time.time - bitAt < 1.1f; waited += Time.deltaTime) yield return null;
+                var secondAfter = Time.time - bitAt;
+                ff.RPC_Nibble(0L, biter.GetZDOID(), true);
+                check.That(Mathf.Approximately(NibbleTime(ff), bitAt), "a second bite " + secondAfter.ToString("0.0", CultureInfo.InvariantCulture) + " s after the first, within the "
+                    + rules.HookWindow.ToString("0.0", CultureInfo.InvariantCulture) + " s hook window, is refused; the bite time moved by " + (NibbleTime(ff) - bitAt).ToString("0.00", CultureInfo.InvariantCulture) + " s");
+                NibbleTime(ff) = Time.time - (rules.HookWindow + 0.1f);
+                ff.RPC_Nibble(0L, biter.GetZDOID(), true);
+                check.That(Time.time - NibbleTime(ff) < 0.01f, "past the hook window the float takes a bite again");
+
                 // Reeling after the hook window hooks nothing; within it, past the game's half second, it hooks.
                 Nibbler(ff) = biter;
                 NibbleTime(ff) = Time.time - (rules.HookWindow + 0.1f);
@@ -255,6 +269,7 @@ namespace Rodnarok
                 var restSpeedSeen = 0f;
                 int runFrames = 0, pacedWrong = 0, restPaced = 0, restSpeedWrong = 0;
                 var runningBefore = false;
+                var runningFor = 0f;
                 var pacedSeen = "";
                 var expected = rules.StallStaminaPerSecond * Mathf.Lerp(1f, rules.SkillCostShare, skill) + Mathf.Lerp(ff.m_hookedStaminaPerSec, ff.m_hookedStaminaPerSecMaxSkill, skill);
                 float struggleTime = 0f, heldTime = 0f, heldStamina = 0f, heldLine = 0f, strained = 0f;
@@ -285,10 +300,12 @@ namespace Rodnarok
                     Aim(player, ff);
                     yield return null;
                     if (ff == null || ff.GetCatch() != fish) break;
-                    // The fish takes its pace in its own step after the float's starts the run, so a
-                    // run's first frame is left out of the pace check.
+                    // The fish takes its pace in its own physics step after the float's starts the run,
+                    // and a frame may hold no step at all, so a run's first tenth of a second is left out
+                    // of the pace check.
                     var runningNow = Lines.IsRunning(fish);
-                    var settled = runningNow && runningBefore;
+                    runningFor = runningNow ? runningFor + Time.deltaTime : 0f;
+                    var settled = runningFor >= RunSettles;
                     // A run starting: the speed it swam until now is the one it comes back to.
                     if (runningNow && !runningBefore)
                     {
@@ -332,7 +349,7 @@ namespace Rodnarok
                                 if (Mathf.Abs(given - paying) > Mathf.Max(0.05f, paying * 0.25f))
                                 {
                                     pacedWrong++;
-                                    pacedSeen = given.ToString("0.00", CultureInfo.InvariantCulture) + " m/s given, the line " + paying.ToString("0.00", CultureInfo.InvariantCulture) + " m/s";
+                                    pacedSeen = given.ToString("0.00", CultureInfo.InvariantCulture) + " m/s given, the line " + paying.ToString("0.00", CultureInfo.InvariantCulture) + " m/s, " + runningFor.ToString("0.00", CultureInfo.InvariantCulture) + " s into the run";
                                 }
                             }
                             eased += strain - strainNow;

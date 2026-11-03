@@ -6,6 +6,8 @@ Five difficulty levels from `VeryEasy` to `VeryHard`, `Normal` playing as before
 
 A school scared away for good tells you why: your steps or another player's, reeling through it, shyness close in or in shallow water, or a shot.
 
+A bite no longer dips the float a second time while it can still be hooked.
+
 ## 0.2.0
 
 Plain *Fishing Bait* also brings the fish of the biome your float lands in, such as a *Trollfish* in the Black Forest; biome baits still bring only their own fish. Server setting `BiomeFishOnBait`.
