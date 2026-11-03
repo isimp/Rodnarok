@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2
+
+The signs of a fish coming to your float follow the school's way in instead of jumping between its fish, and the *Trollfish*'s wake trails where it swam. At the float they go quiet until one fish goes for the bait, which the sign then follows in.
+
 ## 0.2.1
 
 Five difficulty levels from `VeryEasy` to `VeryHard`, `Normal` playing as before. Picking a level fills in the settings it sets, and changing one of them yourself makes it `Custom`. Server setting `Difficulty`.

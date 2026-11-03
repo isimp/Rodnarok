@@ -35,11 +35,21 @@ namespace Rodnarok
         /// </summary>
         private static readonly KeyValuePair<int, int> ComingKey = ZDO.GetHashZDOID("Rodnarok.coming");
 
+        /// <summary>
+        /// The key holding the id of the float a fish is going for the bait of, the school's fish let
+        /// to it or a called fish, while it is marked as coming; none otherwise. Every game reads it
+        /// to follow that fish in with the sign.
+        /// </summary>
+        private static readonly KeyValuePair<int, int> GoingKey = ZDO.GetHashZDOID("Rodnarok.going");
+
         private static readonly AccessTools.FieldRef<FishingFloat, Fish> NibblerOf = AccessTools.FieldRefAccess<FishingFloat, Fish>("m_nibbler");
         private static readonly AccessTools.FieldRef<Fish, FishingFloat> FailedBait = AccessTools.FieldRefAccess<Fish, FishingFloat>("m_failedBait");
 
         /// <summary>What this game last wrote as each fish's float it is coming to, so it is written only when it changes.</summary>
         private static readonly Dictionary<Fish, ZDOID> Coming = new Dictionary<Fish, ZDOID>();
+
+        /// <summary>What this game last wrote as each fish's float it is going for the bait of.</summary>
+        private static readonly Dictionary<Fish, ZDOID> Going = new Dictionary<Fish, ZDOID>();
 
         /// <summary>The speed each fish going for the bait had before it slowed to meet the hook (<see cref="BiteApproach"/>).</summary>
         private static readonly Dictionary<Fish, float> SlowedFrom = new Dictionary<Fish, float>();
@@ -249,29 +259,62 @@ namespace Rodnarok
             return zdo == null ? ZDOID.None : zdo.GetZDOID(ComingKey);
         }
 
-        /// <summary>Marks the float a fish this game steers is coming to, none for none, writing it only when it changes.</summary>
+        /// <summary>The float a fish is going for the bait of, as the game steering it marked it; none for a fish going for none.</summary>
+        public static ZDOID GoingFor(Fish fish)
+        {
+            var zdo = fish != null ? fish.GetComponent<ZNetView>()?.GetZDO() : null;
+            return zdo == null ? ZDOID.None : zdo.GetZDOID(GoingKey);
+        }
+
+        /// <summary>Marks the float a fish this game steers is coming to, none for none, writing it only when it changes; a fish coming to none goes for no bait either.</summary>
         private static void MarkComing(Fish fish, ZDOID to)
         {
             if (fish == null) return;
-            if (Coming.TryGetValue(fish, out var was) ? was == to : to.IsNone()) return;
+            if (to.IsNone()) MarkGoing(fish, ZDOID.None);
+            Mark(fish, ComingKey, Coming, to);
+        }
+
+        /// <summary>Marks the float a fish this game steers is going for the bait of, none for none, writing it only when it changes.</summary>
+        private static void MarkGoing(Fish fish, ZDOID to) => Mark(fish, GoingKey, Going, to);
+
+        private static void Mark(Fish fish, KeyValuePair<int, int> key, Dictionary<Fish, ZDOID> written, ZDOID to)
+        {
+            if (fish == null) return;
+            if (written.TryGetValue(fish, out var was) ? was == to : to.IsNone()) return;
             var view = fish.GetComponent<ZNetView>();
             if (view == null || !view.IsValid() || !view.IsOwner()) return;
-            view.GetZDO().Set(ComingKey, to);
-            if (to.IsNone()) Coming.Remove(fish);
-            else Coming[fish] = to;
+            view.GetZDO().Set(key, to);
+            if (to.IsNone()) written.Remove(fish);
+            else written[fish] = to;
         }
 
         /// <summary>Marks a fish this game steers as coming to a float, none for none, for the self-test's pictures of each fish's sign.</summary>
         [ForTest]
         public static void MarkComingForTest(Fish fish, ZDOID to) => MarkComing(fish, to);
 
-        /// <summary>A school's fish, or the fish called, are coming to the float from when they set off until a fish bites.</summary>
+        /// <summary>
+        /// A school's fish, or the fish called, are coming to the float from when they set off until a
+        /// fish bites; the called fish goes for the bait all the way, a school's fish once it is let to.
+        /// </summary>
         private static void MarkCast(Cast cast)
         {
             var coming = cast.Came && !cast.Hooked && !cast.Spooked && cast.Float != null && NibblerOf(cast.Float) == null ? cast.Id : ZDOID.None;
-            if (cast.Called is object) MarkComing(cast.Called, coming);
-            foreach (var fish in cast.Fish) MarkComing(fish, coming);
+            if (cast.Called is object)
+            {
+                MarkComing(cast.Called, coming);
+                MarkGoing(cast.Called, coming);
+            }
+            var going = GoingForBait(cast);
+            foreach (var fish in cast.Fish)
+            {
+                MarkComing(fish, coming);
+                MarkGoing(fish, fish == going ? coming : ZDOID.None);
+            }
         }
+
+        /// <summary>The school's fish let go for the bait now; none before one is, or once the school is hooked.</summary>
+        private static Fish GoingForBait(Cast cast) =>
+            !cast.Hooked && cast.Biter >= 0 && cast.Biter < cast.Fish.Count && Time.time >= cast.BiterFreeAt ? cast.Fish[cast.Biter] : null;
 
         /// <summary>A called fish is the game's again, coming to no float.</summary>
         private static void Uncall(Fish fish)
@@ -502,7 +545,7 @@ namespace Rodnarok
                 Bites.Bump(cast.Float);
             }
             // The fish let go for the bait slows near the hook; every other keeps its speed.
-            var approaching = !cast.Hooked && cast.Biter >= 0 && cast.Biter < cast.Fish.Count && Time.time >= cast.BiterFreeAt ? cast.Fish[cast.Biter] : null;
+            var approaching = GoingForBait(cast);
             foreach (var fish in cast.Fish)
             {
                 if (fish == approaching) Approach(fish, cast.Float);
@@ -1304,6 +1347,7 @@ namespace Rodnarok
             Trail.Clear();
             CalledBy.Clear();
             Coming.Clear();
+            Going.Clear();
             SlowedFrom.Clear();
         }
 

@@ -9,9 +9,10 @@ namespace Rodnarok
     /// <summary>
     /// Every game shows the sign of each fish coming to a float (<see cref="ArrivalSign"/>), read
     /// from the mark the game steering the fish puts on it (<see cref="Schools.ComingTo"/>), so
-    /// every player at the water sees what comes. A float's coming fish show one sign together,
-    /// at one of them or, for a sign that travels, at the one nearest the float, more often and
-    /// stronger as they near it. The signs are drawn on the water's surface without the scene's
+    /// every player at the water sees what comes. A float's coming fish show one sign together, on
+    /// one path (<see cref="SignPath"/>): the school's way in, quiet while it mills about at the
+    /// float, then the fish going for the bait, more often and stronger as they near the float.
+    /// The signs are drawn on the water's surface without the scene's
     /// light, white by day and dimmer and moonlit by night as the game's night light weighs.
     /// </summary>
     internal static class ArrivalSigns
@@ -38,8 +39,14 @@ namespace Rodnarok
             public GameObject Lasting;
             public int Shown;
             public float Nearness;
+            public Vector3 ShownAt;
+            public readonly SignPath Path = new SignPath();
             public readonly List<Fish> Fish = new List<Fish>();
+            public readonly List<Spot> Places = new List<Spot>();
+            public readonly Vector3[] Wake = new Vector3[WakePoints];
         }
+
+        private const int WakePoints = (int)(SignPath.WakeSeconds / SignPath.TrailStep) + 2;
 
         private static readonly Dictionary<ZDOID, Coming> Floats = new Dictionary<ZDOID, Coming>();
         private static readonly List<Piece> Pieces = new List<Piece>();
@@ -54,6 +61,19 @@ namespace Rodnarok
         [ForTest]
         public static (ArrivalSignKind Kind, int Shown, float Nearness) ForTest(ZDOID floatId) =>
             Floats.TryGetValue(floatId, out var coming) ? (coming.Kind, coming.Shown, coming.Nearness) : (ArrivalSignKind.Rings, 0, 0f);
+
+        /// <summary>
+        /// A float's sign path for the self-test: whether it is quiet at the float or follows a fish
+        /// going for the bait, where it is and faces, how much a travelling sign shows, and where the
+        /// last showing came; null for no float with coming fish.
+        /// </summary>
+        [ForTest]
+        public static (bool Quiet, bool Going, Vector3 At, Vector3 Heading, float Showing, Vector3 ShownAt)? PathForTest(ZDOID floatId)
+        {
+            if (!Floats.TryGetValue(floatId, out var coming)) return null;
+            var path = coming.Path;
+            return (path.Quiet, path.Going, new Vector3(path.At.X, path.At.Y, path.At.Z), new Vector3(path.HeadX, 0f, path.HeadZ), path.Showing, coming.ShownAt);
+        }
 
         /// <summary>Each frame: the coming fish of every float show their signs, and the parts of signs shown age.</summary>
         public static void Tick()
@@ -86,48 +106,69 @@ namespace Rodnarok
                     Gone.Add(pair.Key);
                     continue;
                 }
-                Step(pair.Value, floatObject.transform.position);
+                Step(pair.Value, floatObject.transform.position, pair.Key);
             }
             foreach (var id in Gone) End(id);
             Age(Time.deltaTime);
         }
 
-        private static void Step(Coming coming, Vector3 at)
+        /// <summary>
+        /// One frame of a float's sign: its path steps to the school's centre, or to the fish going
+        /// for the bait when one is marked; a travelling sign rides the path, and showings come on
+        /// it, or by the float while the school mills about there.
+        /// </summary>
+        private static void Step(Coming coming, Vector3 at, ZDOID floatId)
         {
-            Fish lead = null;
             var nearest = float.MaxValue;
+            Fish going = null;
+            coming.Places.Clear();
             foreach (var fish in coming.Fish)
             {
-                var across = Across(fish.transform.position, at);
-                if (across < nearest)
-                {
-                    nearest = across;
-                    lead = fish;
-                }
+                var place = fish.transform.position;
+                nearest = Mathf.Min(nearest, Across(place, at));
+                coming.Places.Add(new Spot(place.x, place.y, place.z));
+                if (going == null && Schools.GoingFor(fish) == floatId) going = fish;
             }
-            if (lead == null) return;
+            if (coming.Places.Count == 0) return;
             var nearness = ArrivalSign.Nearness(nearest);
             coming.Nearness = nearness;
-            var surface = Surface(lead.transform.position);
+            var target = going != null ? new Spot(going.transform.position.x, going.transform.position.y, going.transform.position.z) : SignPath.Centre(coming.Places);
+            var floatSpot = new Spot(at.x, at.y, at.z);
+            var path = coming.Path;
+            path.Step(target, going != null, floatSpot, Time.deltaTime);
+            var pathAt = new Vector3(path.At.X, path.At.Y, path.At.Z);
+            var surface = Surface(pathAt);
 
-            // A sign that travels with the school stays on, at the fish nearest the float.
-            if (Lasts(coming.Kind))
+            // A sign that travels with the school rides the path, fading while the school mills about at the float.
+            var lasts = Lasts(coming.Kind);
+            if (lasts)
             {
                 if (coming.Lasting == null) coming.Lasting = Lasting(coming.Kind);
-                Place(coming.Lasting, coming.Kind, lead, at, nearness, surface);
+                Place(coming, pathAt, nearness, surface);
                 coming.Shown = Math.Max(coming.Shown, 1);
             }
-            if (Time.time < coming.NextAt || !ArrivalSign.Shows(coming.Kind, nearness)) return;
+            if (Time.time < coming.NextAt) return;
+            if (lasts && !path.Quiet) return;
+            if (!lasts && !ArrivalSign.Shows(coming.Kind, nearness)) return;
             if (coming.Kind == ArrivalSignKind.Swirl)
             {
                 if (coming.Swirled) return;
                 coming.Swirled = true;
             }
-            var by = coming.Fish[Random.Range(0, coming.Fish.Count)];
-            Show(coming, by.transform.position, at, nearness, Surface(by.transform.position));
+            var show = path.ShowAt(floatSpot);
+            var showAt = path.Quiet
+                ? Jitter(new Vector3(show.X, show.Y, show.Z), 0.4f)
+                : Jitter(new Vector3(show.X, show.Y, show.Z), 0.15f);
+            coming.ShownAt = showAt;
+            // A travelling sign, faded at the float, leaves a slow ring there that the school is in.
+            if (lasts) Ring(new Vector3(showAt.x, Surface(showAt) + 0.02f, showAt.z), 1.1f, 1.6f, ArrivalSign.Strength(nearness) * 0.8f, 0f);
+            else Show(coming, showAt, at, nearness, Surface(showAt));
             coming.Shown++;
-            var every = ArrivalSign.Every(nearness);
-            coming.NextAt = Time.time + (coming.Kind == ArrivalSignKind.Fizz ? 0.08f + 0.25f * (1f - nearness) : coming.Kind == ArrivalSignKind.Dome ? every * 1.5f : every);
+            coming.NextAt = Time.time + (path.Quiet ? SignPath.QuietEvery
+                : coming.Kind == ArrivalSignKind.Fizz ? 0.08f + 0.25f * (1f - nearness)
+                : path.Going ? SignPath.GoingEvery
+                : coming.Kind == ArrivalSignKind.Dome ? path.Every(nearness) * 1.5f
+                : path.Every(nearness));
         }
 
         private static bool Lasts(ArrivalSignKind kind) => kind == ArrivalSignKind.Bulge || kind == ArrivalSignKind.Glow || kind == ArrivalSignKind.Fin;
@@ -140,7 +181,7 @@ namespace Rodnarok
             switch (coming.Kind)
             {
                 case ArrivalSignKind.Rings:
-                    Ring(Jitter(at, 0.8f), 1.1f, 1.3f, strength, 0f);
+                    Ring(at, 1.1f, 1.3f, strength, 0f);
                     break;
                 case ArrivalSignKind.Flicker:
                     for (var i = 0; i < 5; i++) Ring(Jitter(at, 1.4f), 0.45f, 0.7f, strength, Random.Range(0f, 0.15f));
@@ -152,7 +193,7 @@ namespace Rodnarok
                     Blob(by2, new Vector3(1.3f, 0.5f, 1f), new Color(0.05f, 0.1f, 0.15f), 0.5f, 1.6f, true);
                     break;
                 case ArrivalSignKind.Bloop:
-                    var bloop = Jitter(at, 0.5f);
+                    var bloop = at;
                     Dot(bloop, 0.3f, 0.35f, 0.05f, strength, 0f, Color.white);
                     Ring(bloop, 0.85f, 0.8f, strength, 0.33f);
                     break;
@@ -160,12 +201,12 @@ namespace Rodnarok
                     for (var i = 0; i < 5; i++) Dot(Jitter(at, 0.8f), 0.1f, Random.Range(0.5f, 0.9f), 0.15f, strength, 0f, Color.white);
                     break;
                 case ArrivalSignKind.Dome:
-                    var dome = Jitter(at, 0.4f);
+                    var dome = at;
                     Arc(dome, 0.55f, 1.5f, strength);
                     Ring(dome, 1.1f, 0.7f, strength, 1.5f);
                     break;
                 case ArrivalSignKind.Steam:
-                    Puff(Jitter(at, 0.6f), strength);
+                    Puff(at, strength);
                     break;
                 case ArrivalSignKind.Boil:
                     for (var i = 0; i < 6; i++)
@@ -177,7 +218,7 @@ namespace Rodnarok
                     }
                     break;
                 case ArrivalSignKind.Zigzag:
-                    var dir = Random.Range(0f, Mathf.PI * 2f);
+                    var dir = Mathf.Atan2(coming.Path.HeadZ, coming.Path.HeadX);
                     var glint = at;
                     for (var i = 0; i < 6; i++)
                     {
@@ -229,25 +270,31 @@ namespace Rodnarok
             return go;
         }
 
-        /// <summary>Places a travelling sign at the fish nearest the float, heading the way the school swims.</summary>
-        private static void Place(GameObject go, ArrivalSignKind kind, Fish lead, Vector3 floatAt, float nearness, float surface)
+        /// <summary>
+        /// Places a travelling sign on the path, facing the way the path moves, its wake drawn where
+        /// the path has been and only while it moves; all of it as much as the path shows it.
+        /// </summary>
+        private static void Place(Coming coming, Vector3 pathAt, float nearness, float surface)
         {
-            var strength = ArrivalSign.Strength(nearness);
-            var heading = Flat(floatAt - lead.transform.position);
-            var at = new Vector3(lead.transform.position.x, surface + 0.03f, lead.transform.position.z);
+            var go = coming.Lasting;
+            var path = coming.Path;
+            var showing = path.Showing;
+            var strength = ArrivalSign.Strength(nearness) * showing;
+            var moving = SignPath.Moving(path.Speed);
+            var heading = new Vector3(path.HeadX, 0f, path.HeadZ);
+            var at = new Vector3(pathAt.x, surface + 0.03f, pathAt.z);
             go.transform.position = at;
             go.transform.rotation = Quaternion.LookRotation(heading, Vector3.up);
-            var side = Vector3.Cross(Vector3.up, heading);
-            switch (kind)
+            switch (coming.Kind)
             {
                 case ArrivalSignKind.Bulge:
                     var blob = go.transform.Find("Bulge").GetComponent<SpriteRenderer>();
-                    blob.color = Tint(Color.white, 0.5f * strength);
-                    SetWake(go.transform.Find("WakeLeft"), at - heading * 0.3f - side * 0.25f, at - heading * 1.4f - side * 0.9f, 0.7f * strength);
-                    SetWake(go.transform.Find("WakeRight"), at - heading * 0.3f + side * 0.25f, at - heading * 1.4f + side * 0.9f, 0.7f * strength);
+                    blob.color = Tint(Color.white, 0.5f * strength * (0.4f + 0.6f * moving));
+                    SetWake(go.transform.Find("WakeLeft"), coming, surface + 0.03f, -1f, 0.7f * strength * moving);
+                    SetWake(go.transform.Find("WakeRight"), coming, surface + 0.03f, 1f, 0.7f * strength * moving);
                     break;
                 case ArrivalSignKind.Glow:
-                    var pulse = 0.75f + 0.25f * Mathf.Sin(Time.time * 3f);
+                    var pulse = (0.75f + 0.25f * Mathf.Sin(Time.time * 3f)) * showing;
                     var light = go.GetComponentInChildren<Light>();
                     light.transform.position = at + Vector3.down * 0.6f;
                     light.intensity = (0.6f + 1.4f * nearness) * pulse;
@@ -258,12 +305,12 @@ namespace Rodnarok
                     break;
                 case ArrivalSignKind.Fin:
                     // Breaking the surface now and then, as a fin does.
-                    var up = Mathf.Sin(Time.time * 1.7f + 1f) > -0.2f;
+                    var up = Mathf.Sin(Time.time * 1.7f + 1f) > -0.2f && showing > 0.02f;
                     var fin = go.transform.Find("Fin");
                     fin.gameObject.SetActive(up);
                     // Dark against the day's water, by night a moonlit edge, so it shows on dark water too.
-                    fin.GetComponent<MeshRenderer>().material.color = Tint(Color.Lerp(new Color(0.12f, 0.16f, 0.2f), new Color(0.5f, 0.6f, 0.7f), _darkness), 0.9f, false);
-                    SetWake(go.transform.Find("Wake"), at - heading * 0.15f, at - heading * 1.6f, up ? 0.6f * strength : 0f);
+                    fin.GetComponent<MeshRenderer>().material.color = Tint(Color.Lerp(new Color(0.12f, 0.16f, 0.2f), new Color(0.5f, 0.6f, 0.7f), _darkness), 0.9f * showing, false);
+                    SetWake(go.transform.Find("Wake"), coming, surface + 0.03f, 0f, up ? 0.6f * strength * moving : 0f);
                     break;
             }
         }
@@ -273,16 +320,40 @@ namespace Rodnarok
             var line = new GameObject(name).AddComponent<LineRenderer>();
             line.transform.SetParent(parent.transform, false);
             line.useWorldSpace = true;
-            line.positionCount = 2;
+            line.positionCount = 0;
             line.widthMultiplier = 0.07f;
             line.sharedMaterial = SignMaterial();
         }
 
-        private static void SetWake(Transform wake, Vector3 from, Vector3 to, float alpha)
+        /// <summary>
+        /// A wake along where the path has been, newest point first: on one side of it, spreading as
+        /// the point ages, or on the path itself for a side of 0.
+        /// </summary>
+        private static void SetWake(Transform wake, Coming coming, float y, float side, float alpha)
         {
             var line = wake.GetComponent<LineRenderer>();
-            line.SetPosition(0, from);
-            line.SetPosition(1, to);
+            var trail = coming.Path.Trail;
+            var n = Math.Min(trail.Count, coming.Wake.Length);
+            for (var i = 0; i < n; i++)
+            {
+                var point = trail[i].At;
+                // The way the path went at this point, from the older point behind it to the newer one ahead.
+                var newer = trail[Math.Max(0, i - 1)].At;
+                var older = trail[Math.Min(n - 1, i + 1)].At;
+                var dx = newer.X - older.X;
+                var dz = newer.Z - older.Z;
+                var length = Mathf.Sqrt(dx * dx + dz * dz);
+                if (length < 0.0001f)
+                {
+                    dx = coming.Path.HeadX;
+                    dz = coming.Path.HeadZ;
+                    length = 1f;
+                }
+                var off = side * SignPath.WakeSide(trail[i].Age);
+                coming.Wake[i] = new Vector3(point.X - dz / length * off, y, point.Z + dx / length * off);
+            }
+            line.positionCount = n;
+            if (n > 0) line.SetPositions(coming.Wake);
             var colour = Tint(Color.white, alpha);
             line.startColor = colour;
             line.endColor = new Color(colour.r, colour.g, colour.b, 0f);

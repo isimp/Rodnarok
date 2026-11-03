@@ -14,7 +14,11 @@ namespace Rodnarok
     /// school nears, and once a fish bites the marks must be gone and no more signs show. Then one
     /// fish of each of the game's fish is put a few metres from a float and marked as coming: each
     /// must show its own sign, and a picture of each is taken, 5 m short of the float toward the
-    /// character, the character looking down at it. A Wisplight's wisp stays with the character
+    /// character, the character looking down at it. On the way in the showings must follow one
+    /// path, no further apart than the school can swim; at the float the signs go quiet, slow and by
+    /// the float; and the fish marked for every game as going for the bait must be the one that
+    /// bites. A Trollfish, Anglerfish and salmon are pictured swimming across the view, their sign
+    /// facing that way, and the Trollfish's bulge must fade at the float, leaving a slow ring there. A Wisplight's wisp stays with the character
     /// meanwhile, so it does not sit in the pictures. The rules, the setting, the rod, the floats
     /// and the fish are put back after.
     /// </summary>
@@ -99,16 +103,30 @@ namespace Rodnarok
 
                 var showsFar = new List<float>();
                 var showsNear = new List<float>();
+                var onTheWay = new List<(float Time, Vector3 At)>();
+                var quietShows = new List<(float Time, Vector3 At)>();
                 var lastShown = 0;
                 var kindWhileComing = ArrivalSignKind.Rings;
                 var bit = false;
+                var quietSeen = false;
+                Fish going = null;
                 for (var waited = 0f; waited < 90f && !bit; waited += Time.deltaTime)
                 {
                     var (kind, shown, nearness) = ArrivalSigns.ForTest(floatId);
+                    var path = ArrivalSigns.PathForTest(floatId);
                     if (shown > 0) kindWhileComing = kind;
-                    if (shown > lastShown)
+                    if (path.HasValue && path.Value.Quiet) quietSeen = true;
+                    foreach (var fish in school)
+                        if (fish != null && Schools.GoingFor(fish) == floatId) going = fish;
+                    if (shown > lastShown && path.HasValue)
                     {
-                        (nearness < 0.4f ? showsFar : nearness > 0.7f ? showsNear : new List<float>()).Add(Time.time);
+                        var p = path.Value;
+                        if (p.Quiet) quietShows.Add((Time.time, p.ShownAt));
+                        else if (!p.Going)
+                        {
+                            onTheWay.Add((Time.time, p.ShownAt));
+                            (nearness < 0.4f ? showsFar : nearness > 0.7f ? showsNear : new List<float>()).Add(Time.time);
+                        }
                         lastShown = shown;
                     }
                     bit = Nibbler(ff) != null && NibbleTime(ff) > 0f;
@@ -122,6 +140,27 @@ namespace Rodnarok
                 else
                     check.Note("the school was not seen both far off and near, so how often the rings came was not compared");
                 check.That(bit, "a Perch bit within 90 s");
+
+                // The signs walk one path: one showing after another no further apart than the school can swim between them.
+                var jumps = new List<string>();
+                for (var i = 1; i < onTheWay.Count; i++)
+                {
+                    var apart = Vector2.Distance(new Vector2(onTheWay[i].At.x, onTheWay[i].At.z), new Vector2(onTheWay[i - 1].At.x, onTheWay[i - 1].At.z));
+                    var could = Drift.MaxCruise * (onTheWay[i].Time - onTheWay[i - 1].Time) + 1f;
+                    if (apart > could) jumps.Add(F(apart) + " m in " + F(onTheWay[i].Time - onTheWay[i - 1].Time) + " s");
+                }
+                check.That(onTheWay.Count >= 2 && jumps.Count == 0, "on the way in the rings follow one path, " + onTheWay.Count + " showings, jumps: " + (jumps.Count == 0 ? "none" : string.Join(", ", jumps)));
+                // At the float the school goes quiet: slow showings by the float.
+                check.That(quietSeen, "the signs went quiet once the school was at the float");
+                if (quietShows.Count > 0)
+                {
+                    var farFromFloat = quietShows.Max(q => Vector2.Distance(new Vector2(q.At.x, q.At.z), new Vector2(spot.Value.x, spot.Value.z)));
+                    var quickest = quietShows.Count > 1 ? Enumerable.Range(1, quietShows.Count - 1).Min(i => quietShows[i].Time - quietShows[i - 1].Time) : SignPath.QuietEvery;
+                    check.That(farFromFloat < 1f && quickest > SignPath.QuietEvery - 0.2f, "quiet showings come by the float, at most " + F(farFromFloat) + " m off, every " + F(quickest) + " s or slower");
+                }
+                else check.Note("the school was quiet at the float too briefly for a quiet showing");
+                // The fish going for the bait is marked for every game, and it is the one that bites.
+                check.That(going != null && going == Nibbler(ff), "the fish marked as going for the bait is the one that bit" + (going == null ? ": none was marked" : ""));
                 for (var waited = 0f; waited < 1f; waited += Time.deltaTime) yield return null;
                 check.That(school.Where(f => f != null).All(f => Schools.ComingTo(f).IsNone()), "after the bite no fish of the school is marked as coming any more");
                 var afterBite = ArrivalSigns.ForTest(floatId).Shown;
@@ -154,6 +193,10 @@ namespace Rodnarok
                     var go = Object.Instantiate(fishPrefab, at, Quaternion.LookRotation(-away));
                     placed.Add(go);
                     var fish = go.GetComponent<Fish>();
+                    // A travelling sign is pictured on the move: its fish swims across the view at 2 m/s, steered by the test.
+                    var across = Vector3.Cross(Vector3.up, away);
+                    var swims = Travels(ArrivalSign.Of(prefab));
+                    if (swims) fish.m_speed = 0f;
                     yield return null;
                     Schools.MarkComingForTest(fish, floatId);
                     var expected = ArrivalSign.Of(prefab);
@@ -163,6 +206,7 @@ namespace Rodnarok
                     var shownAt = -1f;
                     for (var waited = 0f; waited < 4f; waited += Time.deltaTime)
                     {
+                        if (swims) go.transform.position = at + across * (-2f + 2f * waited);
                         Aim(player, at + Vector3.up * 1.5f);
                         var seen = ArrivalSigns.ForTest(floatId);
                         kindSeen = seen.Kind;
@@ -174,6 +218,30 @@ namespace Rodnarok
                     if (kindSeen != expected || shownBy == 0) wrong.Add(name + " showed " + kindSeen + " " + shownBy + " times, " + expected + " wanted");
                     var trouble = SelfTestPictures.Take("sign-" + name);
                     if (trouble != null) wrong.Add("no picture of the " + name + ": " + trouble);
+                    if (swims)
+                    {
+                        var path = ArrivalSigns.PathForTest(floatId);
+                        var facing = path.HasValue ? Vector3.Dot(path.Value.Heading, across) : 0f;
+                        if (facing < 0.9f) wrong.Add("the " + name + "'s sign faces " + F(facing) + " along the way it swims, not that way");
+                    }
+                    if (expected == ArrivalSignKind.Bulge)
+                    {
+                        // Milling at the float, the bulge fades and a slow ring by the float shows the school is there.
+                        var by = spot.Value + across * 1.5f + Vector3.down * 1.5f;
+                        for (var waited = 0f; waited < 2.5f; waited += Time.deltaTime)
+                        {
+                            go.transform.position = by;
+                            Aim(player, spot.Value + Vector3.up * 1.5f);
+                            yield return null;
+                        }
+                        var quiet = ArrivalSigns.PathForTest(floatId);
+                        if (!quiet.HasValue || !quiet.Value.Quiet || quiet.Value.Showing > 0.15f)
+                            wrong.Add("at the float the " + name + "'s bulge did not fade: " + (quiet.HasValue ? "quiet " + quiet.Value.Quiet + ", showing " + F(quiet.Value.Showing) : "no sign"));
+                        else if (Vector2.Distance(new Vector2(quiet.Value.ShownAt.x, quiet.Value.ShownAt.z), new Vector2(spot.Value.x, spot.Value.z)) > 1f)
+                            wrong.Add("at the float the " + name + " left no ring by the float");
+                        trouble = SelfTestPictures.Take("sign-" + name + "-at-float");
+                        if (trouble != null) wrong.Add("no picture of the " + name + " at the float: " + trouble);
+                    }
                     Schools.MarkComingForTest(fish, ZDOID.None);
                     ZNetScene.instance.Destroy(go);
                     placed.Remove(go);

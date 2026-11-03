@@ -5,6 +5,6 @@ namespace Rodnarok
     {
         public const string Guid = "isimp.Rodnarok";
         public const string Name = "Rodnarök";
-        public const string Version = "0.2.1";
+        public const string Version = "0.2.2";
     }
 }
