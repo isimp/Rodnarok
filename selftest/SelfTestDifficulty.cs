@@ -12,8 +12,8 @@ namespace Rodnarok
     /// share of the game's reeling stamina, whether schools are wary and whether fish bump the
     /// float, and the fields it sets show its numbers; on Hard an edited HookWindow switches the
     /// level to Custom, which plays it and keeps Hard's other numbers. Then the game itself is
-    /// fished at the levels: a Perch hooked beside a float and held through its rests costs half
-    /// the stamina a second on Very easy that it costs on Normal; a bite 0.8 s old can no longer be
+    /// fished at the levels: a Perch hooked beside a float and held through its rests costs what
+    /// the game's own drain gives on Normal and on Very easy, its reeling part halved on Very easy; a bite 0.8 s old can no longer be
     /// hooked on Very hard, where one 2.2 s old still can on Very easy. Needs a world of the
     /// player's own, since a server's level wins, and a level, not Custom, whose numbers would be
     /// written over; for the fishing, water at least 3 m deep beside the character. The setting,
@@ -35,7 +35,7 @@ namespace Rodnarok
         private const string NoBait = "Stone";
 
         /// <summary>How long the line is held through the fish's rests at each level, in seconds.</summary>
-        private const float RestHeld = 2.5f;
+        private const float RestHeld = 3f;
 
         /// <summary>How long a fish is worked at most for its rests, in seconds.</summary>
         private const float WorkedAtMost = 40f;
@@ -136,8 +136,10 @@ namespace Rodnarok
                 foreach (var frame in SelfTestArrival.UntilNoSchoolLeaves()) yield return frame;
                 PlayRules.ForTest = null;
 
-                // Held through its rests, a Perch costs the level's share of the game's stamina.
-                var spentAt = new Dictionary<Difficulty, float>();
+                // Held through its rests, a Perch costs what the game's own drain gives for the level's
+                // figure: the hooked drain every hooked fish costs, which no level changes, and the
+                // reeling drain, the fish's figure by its stars, which the level's share lowers.
+                var reelAt = new Dictionary<Difficulty, float>();
                 foreach (var level in new[] { Difficulty.Normal, Difficulty.VeryEasy })
                 {
                     if (!Play(check, level)) yield break;
@@ -145,7 +147,9 @@ namespace Rodnarok
                     check.That(hooked.Fish != null && hooked.Float != null && hooked.Float.GetCatch() == hooked.Fish, "on " + level + " the Perch put beside the float is hooked");
                     if (hooked.Fish == null || hooked.Float == null || hooked.Float.GetCatch() != hooked.Fish) continue;
 
-                    float held = 0f, spent = 0f, figureOff = 0f;
+                    float held = 0f, spent = 0f, expected = 0f, hookedPart = 0f, reelPart = 0f, figureOff = 0f;
+                    var quality = 1;
+                    var skill = 0f;
                     for (var worked = 0f; worked < WorkedAtMost && held < RestHeld; worked += Time.deltaTime)
                     {
                         var ff = hooked.Float;
@@ -159,21 +163,41 @@ namespace Rodnarok
                         yield return null;
                         if (hooked.Float == null || hooked.Fish == null || hooked.Float.GetCatch() != hooked.Fish) break;
                         if (!resting || hooked.Fish.IsEscaping()) continue;
+                        ff = hooked.Float;
+                        fish = hooked.Fish;
+                        skill = player.GetSkillFactor(Skills.SkillType.Fishing);
+                        var item = fish.GetComponent<ItemDrop>();
+                        quality = item == null ? 1 : item.m_itemData.m_quality;
+                        // The game's drain while the line is held, as FishingFloat charges it a step.
+                        var hookedDrain = Mathf.Lerp(ff.m_hookedStaminaPerSec, ff.m_hookedStaminaPerSecMaxSkill, skill);
+                        var pull = ff.m_pullStaminaUse + fish.GetStaminaUse() * quality;
+                        var reelDrain = Mathf.Lerp(pull, pull * ff.m_pullStaminaUseMaxSkillMultiplier, skill);
                         held += Time.deltaTime;
                         spent += stamina - player.GetStamina();
-                        figureOff = Mathf.Max(figureOff, Mathf.Abs(hooked.Fish.GetStaminaUse() - hooked.Fish.m_staminaUse * PlayRules.Now.ReelStaminaShare));
+                        expected += (hookedDrain + reelDrain) * Time.deltaTime;
+                        hookedPart += hookedDrain * Time.deltaTime;
+                        reelPart += reelDrain * Time.deltaTime;
+                        figureOff = Mathf.Max(figureOff, Mathf.Abs(fish.GetStaminaUse() - fish.m_staminaUse * PlayRules.Now.ReelStaminaShare));
                     }
                     SelfTestHold.Holding = false;
                     check.That(held >= 1f, "on " + level + " the line was held through the Perch's rests at least 1 s, " + F(held, "0.0") + " s");
                     check.That(figureOff < 0.01f, "on " + level + " the game is told the Perch's own reeling stamina by the level's share, off by at most " + F(figureOff));
-                    if (held >= 1f) spentAt[level] = spent / held;
+                    if (held >= 1f)
+                    {
+                        var rate = spent / held;
+                        var due = expected / held;
+                        check.That(due > 0f && rate > due * 0.8f && rate < due * 1.25f, "on " + level + " holding a resting Perch costs what the game's drain gives: " + F(rate) + " a second spent, "
+                            + F(due) + " due (" + F(hookedPart / held) + " hooked + " + F(reelPart / held) + " reeling, " + quality.ToString(CultureInfo.InvariantCulture) + " star, Fishing "
+                            + F(skill * 100f, "0") + ") over " + F(held, "0.0") + " s");
+                        reelAt[level] = reelPart / held;
+                    }
                     hooked.LetGo();
                     yield return null;
                 }
-                if (spentAt.TryGetValue(Difficulty.Normal, out var normal) && spentAt.TryGetValue(Difficulty.VeryEasy, out var easiest))
+                if (reelAt.TryGetValue(Difficulty.Normal, out var normal) && reelAt.TryGetValue(Difficulty.VeryEasy, out var easiest))
                 {
                     var share = normal > 0f ? easiest / normal : 0f;
-                    check.That(share > 0.35f && share < 0.65f, "reeling in a resting Perch costs half the stamina on Very easy that it costs on Normal: "
+                    check.That(share > 0.4f && share < 0.6f, "the reeling drain of a resting Perch is half on Very easy what it is on Normal, the hooked drain aside: "
                         + F(easiest) + " against " + F(normal) + " a second, " + F(share * 100f, "0") + "%");
                 }
 
