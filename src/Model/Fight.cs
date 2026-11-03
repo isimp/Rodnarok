@@ -53,6 +53,12 @@ namespace Rodnarok
         public static float StaminaFigureWhileResting(FishingRules rules, float restStamina) => restStamina * rules.ReelStaminaShare;
 
         /// <summary>
+        /// The stamina a second the game's float drains for any hooked fish, held or not, struggling or
+        /// resting: its own figure, by the level's share.
+        /// </summary>
+        public static float HookedStaminaPerSecond(FishingRules rules, float gameFigure) => gameFigure * rules.ReelStaminaShare;
+
+        /// <summary>
         /// The stamina figure a struggling fish gives the game, which charges that figure times the
         /// fish's quality a second (then lowers it with skill), so that the charge is the stall cost.
         /// </summary>

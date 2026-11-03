@@ -173,6 +173,26 @@ namespace Rodnarok
             if (fish != null && fish.IsEscaping() && LineLength(ff) < before) LineLength(ff) = before;
         }
 
+        /// <summary>The float prefab's own drain for a hooked fish, at Fishing 0 and at 100; null until read.</summary>
+        private static (float AtZero, float AtMax)? _gameHookedDrain;
+
+        /// <summary>
+        /// Before the float's step: the game's drain for a hooked fish is the prefab's own figure by
+        /// the level's share, set afresh each step so a change of level counts at once.
+        /// </summary>
+        public static void ScaleHookedDrain(FishingFloat ff)
+        {
+            if (_gameHookedDrain == null)
+            {
+                var prefab = ZNetScene.instance != null ? ZNetScene.instance.GetPrefab("FishingRodFloat")?.GetComponent<FishingFloat>() : null;
+                if (prefab == null) return;
+                _gameHookedDrain = (prefab.m_hookedStaminaPerSec, prefab.m_hookedStaminaPerSecMaxSkill);
+            }
+            var rules = PlayRules.Now;
+            ff.m_hookedStaminaPerSec = Fight.HookedStaminaPerSecond(rules, _gameHookedDrain.Value.AtZero);
+            ff.m_hookedStaminaPerSecMaxSkill = Fight.HookedStaminaPerSecond(rules, _gameHookedDrain.Value.AtMax);
+        }
+
         /// <summary>
         /// The stamina figure a hooked fish gives the game: struggling, so holding through costs the
         /// stall cost; resting, its own figure by the level's reeling share. Null where the game's own

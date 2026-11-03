@@ -42,6 +42,13 @@ namespace Rodnarok
         }
     }
 
+    /// <summary>The game's stamina drain for any hooked fish, by the level's share, set from the float prefab's own figures before each step.</summary>
+    [HarmonyPatch(typeof(FishingFloat), "FixedUpdate")]
+    internal static class HookedDrainByLevel
+    {
+        private static void Prefix(FishingFloat __instance) => Bites.ScaleHookedDrain(__instance);
+    }
+
     /// <summary>A float whose bait was taken takes no bite, nor one from a fish that missed it before, nor a second while the last can still be hooked, at the game that owns it.</summary>
     [HarmonyPatch(typeof(FishingFloat), "RPC_Nibble")]
     internal static class BareFloatTakesNoBite

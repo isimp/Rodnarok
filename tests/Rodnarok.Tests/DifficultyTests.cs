@@ -124,6 +124,21 @@ namespace Rodnarok.Tests
         }
 
         [Fact]
+        public void OnVeryEasyAHookedFishDrainsHalfTheGamesStaminaAndOnEasyThreeQuarters()
+        {
+            // The game's float drains 1 stamina a second for any hooked fish, 0.2 at Fishing 100.
+            Assert.Equal(0.5f, Fight.HookedStaminaPerSecond(At(Difficulty.VeryEasy), gameFigure: 1f), 4);
+            Assert.Equal(0.15f, Fight.HookedStaminaPerSecond(At(Difficulty.Easy), gameFigure: 0.2f), 4);
+        }
+
+        [Fact]
+        public void FromNormalOnAHookedFishDrainsTheGamesOwnStamina()
+        {
+            Assert.Equal(1f, Fight.HookedStaminaPerSecond(At(Difficulty.Normal), gameFigure: 1f), 4);
+            Assert.Equal(1f, Fight.HookedStaminaPerSecond(At(Difficulty.VeryHard), gameFigure: 1f), 4);
+        }
+
+        [Fact]
         public void VeryEasyFishAreNotWaryTakeNoBaitAndNeverBump()
         {
             var easiest = At(Difficulty.VeryEasy);

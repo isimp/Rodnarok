@@ -13,7 +13,7 @@ namespace Rodnarok
     /// float, and the fields it sets show its numbers; on Hard an edited HookWindow switches the
     /// level to Custom, which plays it and keeps Hard's other numbers. Then the game itself is
     /// fished at the levels: a Perch hooked beside a float and held through its rests costs what
-    /// the game's own drain gives on Normal and on Very easy, its reeling part halved on Very easy; a bite 0.8 s old can no longer be
+    /// the game's own drain gives on Normal and on Very easy, both its parts halved on Very easy; a bite 0.8 s old can no longer be
     /// hooked on Very hard, where one 2.2 s old still can on Very easy. Needs a world of the
     /// player's own, since a server's level wins, and a level, not Custom, whose numbers would be
     /// written over; for the fishing, water at least 3 m deep beside the character. The setting,
@@ -137,9 +137,11 @@ namespace Rodnarok
                 PlayRules.ForTest = null;
 
                 // Held through its rests, a Perch costs what the game's own drain gives for the level's
-                // figure: the hooked drain every hooked fish costs, which no level changes, and the
-                // reeling drain, the fish's figure by its stars, which the level's share lowers.
+                // figures: the hooked drain every hooked fish costs and the reeling drain, the fish's
+                // figure by its stars, both lowered by the level's share.
                 var reelAt = new Dictionary<Difficulty, float>();
+                var hookedAt = new Dictionary<Difficulty, float>();
+                var spentAt = new Dictionary<Difficulty, float>();
                 foreach (var level in new[] { Difficulty.Normal, Difficulty.VeryEasy })
                 {
                     if (!Play(check, level)) yield break;
@@ -190,14 +192,19 @@ namespace Rodnarok
                             + F(due) + " due (" + F(hookedPart / held) + " hooked + " + F(reelPart / held) + " reeling, " + quality.ToString(CultureInfo.InvariantCulture) + " star, Fishing "
                             + F(skill * 100f, "0") + ") over " + F(held, "0.0") + " s");
                         reelAt[level] = reelPart / held;
+                        hookedAt[level] = hookedPart / held;
+                        spentAt[level] = rate;
                     }
                     hooked.LetGo();
                     yield return null;
                 }
-                if (reelAt.TryGetValue(Difficulty.Normal, out var normal) && reelAt.TryGetValue(Difficulty.VeryEasy, out var easiest))
+                foreach (var (part, at) in new[] { ("reeling drain", reelAt), ("hooked drain", hookedAt), ("whole stamina spent", spentAt) })
                 {
+                    if (!at.TryGetValue(Difficulty.Normal, out var normal) || !at.TryGetValue(Difficulty.VeryEasy, out var easiest)) continue;
                     var share = normal > 0f ? easiest / normal : 0f;
-                    check.That(share > 0.4f && share < 0.6f, "the reeling drain of a resting Perch is half on Very easy what it is on Normal, the hooked drain aside: "
+                    // The parts come from the game's own figures, so they halve closely; the stamina spent is measured over a few seconds.
+                    var (low, high) = part == "whole stamina spent" ? (0.35f, 0.65f) : (0.45f, 0.55f);
+                    check.That(share > low && share < high, "the " + part + " of a resting Perch is half on Very easy what it is on Normal: "
                         + F(easiest) + " against " + F(normal) + " a second, " + F(share * 100f, "0") + "%");
                 }
 
