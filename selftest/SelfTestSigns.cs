@@ -249,7 +249,17 @@ namespace Rodnarok
                     for (var waited = 0f; waited < 0.3f; waited += Time.deltaTime) yield return null;
                 }
                 check.That(wrong.Count == 0, "each fish of the game coming to a float shows its own sign: " + string.Join("; ", wrong));
-                check.Note("sign pictures taken at " + (EnvMan.instance != null ? (EnvMan.instance.GetDayFraction() * 24f).ToString("00.0", CultureInfo.InvariantCulture) : "?") + " o'clock in game");
+                // The signs are lit by the game's own light this frame, readable however dark.
+                var light = ArrivalSigns.LightForTest();
+                var expect = SignLight.Crest(new Shade(light.Sun.r, light.Sun.g, light.Sun.b), light.Intensity, light.SunUp, new Shade(light.Ambient.r, light.Ambient.g, light.Ambient.b));
+                var crest = new Shade(light.Crest.r, light.Crest.g, light.Crest.b);
+                var trough = new Shade(light.Trough.r, light.Trough.g, light.Trough.b);
+                check.That(Mathf.Abs(crest.R - expect.R) < 0.01f && Mathf.Abs(crest.G - expect.G) < 0.01f && Mathf.Abs(crest.B - expect.B) < 0.01f
+                    && crest.Luminance >= SignLight.MinLight - 0.01f && trough.Luminance < crest.Luminance,
+                    "the signs take the game's light: crest " + crest + " (wanted " + expect + "), trough " + trough);
+                check.Note("the game's light: sun " + new Shade(light.Sun.r, light.Sun.g, light.Sun.b) + " x " + F(light.Intensity) + ", " + F(light.SunUp) + " up, ambient "
+                    + new Shade(light.Ambient.r, light.Ambient.g, light.Ambient.b) + ", fog " + light.Fog + " density " + light.FogDensity.ToString("0.0000", CultureInfo.InvariantCulture));
+                check.Note("sign pictures taken at " +(EnvMan.instance != null ? (EnvMan.instance.GetDayFraction() * 24f).ToString("00.0", CultureInfo.InvariantCulture) : "?") + " o'clock in game");
             }
             finally
             {

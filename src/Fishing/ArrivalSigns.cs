@@ -12,8 +12,9 @@ namespace Rodnarok
     /// every player at the water sees what comes. A float's coming fish show one sign together, on
     /// one path (<see cref="SignPath"/>): the school's way in, quiet while it mills about at the
     /// float, then the fish going for the bait, more often and stronger as they near the float.
-    /// The signs are drawn on the water's surface without the scene's
-    /// light, white by day and dimmer and moonlit by night as the game's night light weighs.
+    /// The signs are drawn on the water's surface as crests over darker troughs, coloured by the
+    /// game's own sun or moon, ambient light and fog each frame (<see cref="SignLight"/>), the
+    /// crest of a ring brightest on the side facing the light.
     /// </summary>
     internal static class ArrivalSigns
     {
@@ -56,6 +57,24 @@ namespace Rodnarok
         private static Sprite _dot;
         private static Mesh _fin;
         private static float _darkness;
+        private static Color _crest = Color.white;
+        private static Color _trough = new Color(0.1f, 0.12f, 0.14f);
+        private static Vector3 _toSun = Vector3.up;
+        private static Vector3 _camera;
+        private static Color _fogColour = Color.grey;
+        private static SignFog _fogMode;
+        private static float _fogDensity;
+        private static float _fogStart;
+        private static float _fogEnd;
+
+        /// <summary>The light the signs are drawn in now, for the self-test: the crest and trough colours, the game's light they come from, and its fog.</summary>
+        [ForTest]
+        public static (Color Crest, Color Trough, Color Sun, float Intensity, float SunUp, Color Ambient, SignFog Fog, float FogDensity) LightForTest()
+        {
+            var env = EnvMan.instance;
+            var sun = env != null && env.m_dirLight != null ? env.m_dirLight : null;
+            return (_crest, _trough, sun != null ? sun.color : Color.black, sun != null ? sun.intensity : 0f, _toSun.y, RenderSettings.ambientLight, _fogMode, _fogDensity);
+        }
 
         /// <summary>The sign a float's coming fish show and how many times it showed, for the self-test; Rings and 0 for none.</summary>
         [ForTest]
@@ -80,6 +99,7 @@ namespace Rodnarok
         {
             var env = EnvMan.instance;
             _darkness = env != null ? ArrivalSign.Darkness(env.GetDayFraction()) : 0f;
+            ReadLight(env);
             foreach (var coming in Floats.Values) coming.Fish.Clear();
             Seen.Clear();
             foreach (var any in Fish.Instances)
@@ -190,7 +210,7 @@ namespace Rodnarok
                     var by2 = Vector3.MoveTowards(new Vector3(floatAt.x, at.y, floatAt.z), at, 0.6f);
                     Ring(by2, 1.4f, 1.6f, 1f, 0f, 0.1f);
                     Ring(by2, 0.7f, 1.6f, 1f, 0.1f, 0.08f);
-                    Blob(by2, new Vector3(1.3f, 0.5f, 1f), new Color(0.05f, 0.1f, 0.15f), 0.5f, 1.6f, true);
+                    Blob(by2, new Vector3(1.3f, 0.5f, 1f), 0.5f, 1.6f);
                     break;
                 case ArrivalSignKind.Bloop:
                     var bloop = at;
@@ -243,6 +263,14 @@ namespace Rodnarok
                     blob.transform.SetParent(go.transform, false);
                     blob.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
                     blob.transform.localScale = new Vector3(2.6f, 1f, 1f);
+                    var rim = new GameObject("Rim").AddComponent<SpriteRenderer>();
+                    rim.sprite = DotSprite();
+                    rim.transform.SetParent(go.transform, false);
+                    rim.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                    rim.transform.localScale = new Vector3(1.8f, 0.45f, 1f);
+                    rim.sortingOrder = 1;
+                    Wake(go, "WakeLeftTrough");
+                    Wake(go, "WakeRightTrough");
                     Wake(go, "WakeLeft");
                     Wake(go, "WakeRight");
                     break;
@@ -288,8 +316,14 @@ namespace Rodnarok
             switch (coming.Kind)
             {
                 case ArrivalSignKind.Bulge:
+                    // A dark hump pushing the water up, its rim lit on the side facing the light.
                     var blob = go.transform.Find("Bulge").GetComponent<SpriteRenderer>();
-                    blob.color = Tint(Color.white, 0.5f * strength * (0.4f + 0.6f * moving));
+                    blob.color = Dark(at, 0.55f * strength * (0.4f + 0.6f * moving));
+                    var rim = go.transform.Find("Rim");
+                    rim.position = at + Flat(_toSun) * 0.15f + Vector3.up * 0.005f;
+                    rim.GetComponent<SpriteRenderer>().color = Lit(at, 0.5f * strength * (0.4f + 0.6f * moving));
+                    SetWake(go.transform.Find("WakeLeftTrough"), coming, surface + 0.025f, -1f, 0.45f * strength * moving, dark: true);
+                    SetWake(go.transform.Find("WakeRightTrough"), coming, surface + 0.025f, 1f, 0.45f * strength * moving, dark: true);
                     SetWake(go.transform.Find("WakeLeft"), coming, surface + 0.03f, -1f, 0.7f * strength * moving);
                     SetWake(go.transform.Find("WakeRight"), coming, surface + 0.03f, 1f, 0.7f * strength * moving);
                     break;
@@ -300,7 +334,7 @@ namespace Rodnarok
                     light.intensity = (0.6f + 1.4f * nearness) * pulse;
                     light.range = 2f + 2f * nearness;
                     var halo = go.transform.Find("Halo").GetComponent<SpriteRenderer>();
-                    halo.color = new Color(0.82f, 1f, 0.67f, (0.15f + 0.4f * nearness) * pulse);
+                    halo.color = new Color(0.82f, 1f, 0.67f, (0.15f + 0.4f * nearness) * pulse * (1f - FogAt(at)));
                     halo.transform.localScale = Vector3.one * (0.8f + 0.8f * nearness);
                     break;
                 case ArrivalSignKind.Fin:
@@ -308,8 +342,9 @@ namespace Rodnarok
                     var up = Mathf.Sin(Time.time * 1.7f + 1f) > -0.2f && showing > 0.02f;
                     var fin = go.transform.Find("Fin");
                     fin.gameObject.SetActive(up);
-                    // Dark against the day's water, by night a moonlit edge, so it shows on dark water too.
-                    fin.GetComponent<MeshRenderer>().material.color = Tint(Color.Lerp(new Color(0.12f, 0.16f, 0.2f), new Color(0.5f, 0.6f, 0.7f), _darkness), 0.9f * showing, false);
+                    // Dark against the day's water, by night edged in the night's own light, so it shows on dark water too.
+                    var finColour = Color.Lerp(new Color(0.12f, 0.16f, 0.2f), _crest * 0.75f, _darkness);
+                    fin.GetComponent<MeshRenderer>().material.color = Fogged(at, new Color(finColour.r, finColour.g, finColour.b, 0.9f * showing));
                     SetWake(go.transform.Find("Wake"), coming, surface + 0.03f, 0f, up ? 0.6f * strength * moving : 0f);
                     break;
             }
@@ -322,14 +357,16 @@ namespace Rodnarok
             line.useWorldSpace = true;
             line.positionCount = 0;
             line.widthMultiplier = 0.07f;
+            line.widthCurve = AnimationCurve.Linear(0f, 1f, 1f, SignLight.Taper(1f));
             line.sharedMaterial = SignMaterial();
         }
 
         /// <summary>
         /// A wake along where the path has been, newest point first: on one side of it, spreading as
-        /// the point ages, or on the path itself for a side of 0.
+        /// the point ages, or on the path itself for a side of 0; a crest lit by the light, or its
+        /// dark trough a little further out.
         /// </summary>
-        private static void SetWake(Transform wake, Coming coming, float y, float side, float alpha)
+        private static void SetWake(Transform wake, Coming coming, float y, float side, float alpha, bool dark = false)
         {
             var line = wake.GetComponent<LineRenderer>();
             var trail = coming.Path.Trail;
@@ -349,12 +386,13 @@ namespace Rodnarok
                     dz = coming.Path.HeadZ;
                     length = 1f;
                 }
-                var off = side * SignPath.WakeSide(trail[i].Age);
+                var off = side * (SignPath.WakeSide(trail[i].Age) + (dark ? 0.09f : 0f));
                 coming.Wake[i] = new Vector3(point.X - dz / length * off, y, point.Z + dx / length * off);
             }
             line.positionCount = n;
             if (n > 0) line.SetPositions(coming.Wake);
-            var colour = Tint(Color.white, alpha);
+            var head = new Vector3(coming.Path.At.X, y, coming.Path.At.Z);
+            var colour = dark ? Dark(head, alpha) : Lit(head, alpha);
             line.startColor = colour;
             line.endColor = new Color(colour.r, colour.g, colour.b, 0f);
         }
@@ -371,20 +409,50 @@ namespace Rodnarok
             line.widthMultiplier = width;
             line.sharedMaterial = SignMaterial();
             line.enabled = false;
+            var trough = new GameObject("Trough").AddComponent<LineRenderer>();
+            trough.transform.SetParent(line.transform, false);
+            trough.transform.localPosition = Vector3.down * 0.005f;
+            trough.useWorldSpace = false;
+            trough.loop = true;
+            trough.positionCount = RingPoints;
+            trough.sharedMaterial = SignMaterial();
+            trough.enabled = false;
+            var gradient = new Gradient();
+            var colours = new GradientColorKey[GradientKeys];
+            var alphas = new GradientAlphaKey[2];
             Add(line.gameObject, life, delay, (p, q) =>
             {
-                // Thin against its size from the start, so a young ring is a ring and not a disc.
+                // Thin against its size from the start, so a young ring is a ring and not a disc, and thinner as it spreads.
                 var r = radius * (0.25f + 0.75f * q);
-                line.widthMultiplier = Mathf.Min(width, r * 0.12f);
+                var w = Mathf.Min(width, r * 0.12f) * SignLight.Taper(q);
+                line.widthMultiplier = w;
+                trough.widthMultiplier = w * 1.4f;
                 for (var i = 0; i < RingPoints; i++)
                 {
                     var a = i * Mathf.PI * 2f / RingPoints;
                     line.SetPosition(i, new Vector3(Mathf.Cos(a) * r, 0f, Mathf.Sin(a) * r));
+                    trough.SetPosition(i, new Vector3(Mathf.Cos(a) * r * 0.93f, 0f, Mathf.Sin(a) * r * 0.93f));
                 }
-                var c = Tint(Color.white, 0.6f * strength * Mathf.Min(1f, q * 6f) * (1f - q));
-                line.startColor = c;
-                line.endColor = c;
+                var alpha = 0.6f * strength * Mathf.Min(1f, q * 6f) * (1f - q);
+                var crest = Lit(at, alpha);
+                // Brightest where the ring faces the light across the water.
+                var toSun = Flat(_toSun);
+                for (var k = 0; k < GradientKeys; k++)
+                {
+                    var t = k / (float)(GradientKeys - 1);
+                    var a = t * Mathf.PI * 2f;
+                    var facing = Mathf.Cos(a) * toSun.x + Mathf.Sin(a) * toSun.z;
+                    colours[k] = new GradientColorKey(crest * SignLight.SunSide(facing), t);
+                }
+                alphas[0] = new GradientAlphaKey(crest.a, 0f);
+                alphas[1] = new GradientAlphaKey(crest.a, 1f);
+                gradient.SetKeys(colours, alphas);
+                line.colorGradient = gradient;
+                var dark = Dark(at, alpha * 0.5f);
+                trough.startColor = dark;
+                trough.endColor = dark;
                 line.enabled = true;
+                trough.enabled = true;
             });
         }
 
@@ -399,7 +467,7 @@ namespace Rodnarok
                 dot.transform.position = start + Vector3.up * rise * q;
                 dot.transform.localScale = Vector3.one * size;
                 Face(dot.transform);
-                dot.color = Tint(colour, 0.85f * strength * (1f - q));
+                dot.color = Lit(dot.transform.position, 0.85f * strength * (1f - q), colour);
                 dot.enabled = true;
             });
         }
@@ -413,7 +481,7 @@ namespace Rodnarok
                 puff.transform.position = at + new Vector3(0.1f * q, 1.2f * q, 0f);
                 puff.transform.localScale = Vector3.one * (0.5f + 1.2f * q);
                 Face(puff.transform);
-                puff.color = Tint(new Color(0.92f, 0.92f, 0.92f), 0.65f * strength * (1f - q));
+                puff.color = Lit(puff.transform.position, 0.65f * strength * (1f - q), new Color(0.92f, 0.92f, 0.92f));
             });
         }
 
@@ -430,7 +498,7 @@ namespace Rodnarok
             {
                 line.SetPosition(0, at);
                 line.SetPosition(1, at + lean + Vector3.up * height * Mathf.Sin(q * Mathf.PI));
-                var c = Tint(Color.white, 0.9f * strength * (1f - q));
+                var c = Lit(at, 0.9f * strength * (1f - q));
                 line.startColor = c;
                 line.endColor = c;
                 line.enabled = true;
@@ -455,13 +523,14 @@ namespace Rodnarok
                     var a = i * Mathf.PI / (RingPoints / 2);
                     line.SetPosition(i, at + right * Mathf.Cos(a) * r + Vector3.up * Mathf.Sin(a) * r * 0.8f);
                 }
-                var c = Tint(Color.white, 0.8f * strength);
+                var c = Lit(at, 0.8f * strength);
                 line.startColor = c;
                 line.endColor = c;
             });
         }
 
-        private static void Blob(Vector3 at, Vector3 scale, Color colour, float alpha, float life, bool dark)
+        /// <summary>A dark patch spreading on the water, in the trough's colour.</summary>
+        private static void Blob(Vector3 at, Vector3 scale, float alpha, float life)
         {
             var blob = new GameObject("RodnarokSignBlob").AddComponent<SpriteRenderer>();
             blob.sprite = DotSprite();
@@ -470,7 +539,7 @@ namespace Rodnarok
             Add(blob.gameObject, life, 0f, (p, q) =>
             {
                 blob.transform.localScale = scale * (1f + q);
-                blob.color = Tint(colour, alpha * (1f - q), !dark);
+                blob.color = Dark(at, alpha * (1f - q));
             });
         }
 
@@ -513,14 +582,57 @@ namespace Rodnarok
 
         // Helpers.
 
-        /// <summary>A colour as the water shows it now: by night dimmer and moonlit, unless it is a dark shape.</summary>
-        private static Color Tint(Color colour, float alpha, bool light = true)
+        private const int GradientKeys = 8;
+
+        /// <summary>
+        /// Reads the light the game puts on the world this frame: its sun, or the moon it turns that
+        /// light into at night, by colour, strength and height, its ambient light and its fog.
+        /// </summary>
+        private static void ReadLight(EnvMan env)
         {
-            if (!light) return new Color(colour.r, colour.g, colour.b, alpha);
-            var moon = new Color(0.67f, 0.82f, 0.94f);
-            var c = Color.Lerp(colour, moon * colour, _darkness);
-            return new Color(c.r, c.g, c.b, alpha * (1f - 0.35f * _darkness));
+            var sun = env != null ? env.m_dirLight : null;
+            var ambient = RenderSettings.ambientLight;
+            var air = new Shade(ambient.r, ambient.g, ambient.b);
+            if (sun != null)
+            {
+                _toSun = -sun.transform.forward;
+                var crest = SignLight.Crest(new Shade(sun.color.r, sun.color.g, sun.color.b), sun.intensity, _toSun.y, air);
+                _crest = new Color(crest.R, crest.G, crest.B);
+            }
+            var trough = SignLight.Trough(air);
+            _trough = new Color(trough.R, trough.G, trough.B);
+            _fogColour = RenderSettings.fogColor;
+            _fogMode = !RenderSettings.fog ? SignFog.Off
+                : RenderSettings.fogMode == FogMode.Linear ? SignFog.Linear
+                : RenderSettings.fogMode == FogMode.Exponential ? SignFog.Exponential
+                : SignFog.ExponentialSquared;
+            _fogDensity = RenderSettings.fogDensity;
+            _fogStart = RenderSettings.fogStartDistance;
+            _fogEnd = RenderSettings.fogEndDistance;
+            var camera = Utils.GetMainCamera();
+            if (camera != null) _camera = camera.transform.position;
         }
+
+        /// <summary>How much of the game's fog lies between the camera and a place.</summary>
+        private static float FogAt(Vector3 at) => SignLight.FogShare(_fogMode, _fogDensity, _fogStart, _fogEnd, Vector3.Distance(_camera, at));
+
+        /// <summary>A colour as it shows at a place through the game's fog: toward the fog's colour and fainter.</summary>
+        private static Color Fogged(Vector3 at, Color colour)
+        {
+            var share = FogAt(at);
+            var c = Color.Lerp(colour, _fogColour, share);
+            return new Color(c.r, c.g, c.b, colour.a * (1f - share));
+        }
+
+        /// <summary>A crest's colour at a place: foam, or a tint of it, lit by the game's light, through its fog.</summary>
+        private static Color Lit(Vector3 at, float alpha, Color? tint = null)
+        {
+            var c = tint.HasValue ? _crest * tint.Value : _crest;
+            return Fogged(at, new Color(c.r, c.g, c.b, alpha));
+        }
+
+        /// <summary>A trough's colour at a place: the air's hue, dark, through the game's fog.</summary>
+        private static Color Dark(Vector3 at, float alpha) => Fogged(at, new Color(_trough.r, _trough.g, _trough.b, alpha));
 
         private static float Surface(Vector3 at)
         {
