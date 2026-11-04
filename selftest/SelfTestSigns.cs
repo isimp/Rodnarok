@@ -24,7 +24,9 @@ namespace Rodnarok
     /// use their parts again rather than make new ones; a two-star Perch must show its hint coming
     /// and its size going for the bait, pictured; the server's contrast must reach the signs,
     /// pictured at twice as strong; the crest must be lit by the game's light; and
-    /// rings near the camera must lie on the waves, the water's roughness noted.
+    /// rings near the camera must lie on the waves, the water's roughness noted. While the school
+    /// comes the float is claimed, a world fish beside it leaving its bait alone, and once the
+    /// Perch is hooked the claim goes.
     /// A Wisplight's wisp stays with the character meanwhile, so it does not sit in the pictures.
     /// The rules, the setting, the rod, the floats and the fish are put back after.
     /// </summary>
@@ -38,6 +40,7 @@ namespace Rodnarok
         private static readonly AccessTools.FieldRef<Character, Quaternion> LookYaw = AccessTools.FieldRefAccess<Character, Quaternion>("m_lookYaw");
         private static readonly System.Reflection.MethodInfo TryToHook = AccessTools.Method(typeof(FishingFloat), "TryToHook");
         private static readonly System.Reflection.MethodInfo SetCatch = AccessTools.Method(typeof(FishingFloat), "SetCatch");
+        private static readonly System.Reflection.MethodInfo FindFloat = AccessTools.Method(typeof(Fish), "FindFloat");
 
         private static readonly (string Prefab, string Name)[] GameFish =
         {
@@ -120,6 +123,20 @@ namespace Rodnarok
                 if (school == null || school.Count == 0) yield break;
                 for (var waited = 0f; waited < 1f; waited += Time.deltaTime) yield return null;
                 check.That(school.Where(f => f != null).All(f => Schools.ComingTo(f) == floatId), "every fish of the school is marked for every game as coming to the float");
+
+                // The float is claimed: one of the world's other fish right beside it leaves its bait alone.
+                check.That(Schools.Claimed(ff), "the float is claimed while its school comes");
+                var wildPrefab = ZNetScene.instance.GetPrefab("Fish1");
+                if (wildPrefab != null)
+                {
+                    var wild = Object.Instantiate(wildPrefab, ff.transform.position + Vector3.down * 1.5f + Vector3.right * 1.5f, Quaternion.identity);
+                    placed.Add(wild);
+                    yield return null;
+                    var takes = FindFloat.Invoke(wild.GetComponent<Fish>(), null) as FishingFloat;
+                    check.That(takes == null, "one of the world's other fish beside the claimed float leaves its bait alone" + (takes != null ? ": it went for it" : ""));
+                    ZNetScene.instance.Destroy(wild);
+                    placed.Remove(wild);
+                }
 
                 var showsFar = new List<float>();
                 var showsNear = new List<float>();
@@ -229,6 +246,7 @@ namespace Rodnarok
                     check.That(hooked == bitBy, "reeling just after the bite hooks the Perch");
                     for (var waited = 0f; waited < 1.5f; waited += Time.deltaTime) yield return null;
                     var darted = ArrivalSigns.DartsForTest() - dartsBefore;
+                    if (hooked != null) check.That(!Schools.Claimed(ff), "once a fish is hooked the float is claimed no more");
                     if (hooked != null) check.That(darted >= others, "the rest of the school darted off when the Perch was hooked: " + darted + " darts for " + others + " fish");
                     var tilted = lookBefore.Where(l => l.T != null && (Quaternion.Angle(l.T.localRotation, l.Rot) > 0.5f || Vector3.Distance(l.T.localPosition, l.Pos) > 0.005f)).Select(l => l.T.name).ToList();
                     check.That(tilted.Count == 0, "after the bite the float's look stands as before" + (tilted.Count == 0 ? "" : ": still tilted " + string.Join(", ", tilted)));

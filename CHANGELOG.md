@@ -12,6 +12,8 @@ The signs ride the waves and drift with the wind. Calm water shows them clear an
 
 How strongly the signs show is a server setting, from half to twice as strong. Server setting `SignContrast`.
 
+Only the fish your float's sign follows takes your bait: other wild fish leave it alone until a fish is hooked, and the fish picked to bite stays by the float and bumps it only from there.
+
 ## 0.2.1
 
 Five difficulty levels from `VeryEasy` to `VeryHard`, `Normal` playing as before. Picking a level fills in the settings it sets, and changing one of them yourself makes it `Custom`. Server setting `Difficulty`.

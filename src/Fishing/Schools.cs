@@ -330,12 +330,40 @@ namespace Rodnarok
                 MarkComing(cast.Called, coming);
                 MarkGoing(cast.Called, coming);
             }
-            var going = GoingForBait(cast);
+            var going = Picked(cast);
             foreach (var fish in cast.Fish)
             {
                 MarkComing(fish, coming);
                 MarkGoing(fish, fish == going ? coming : ZDOID.None);
             }
+            if (cast.Float != null) MarkClaim(cast.Float, Arrival.Claimed(cast: true, hooked: cast.Hooked));
+        }
+
+        /// <summary>The school's fish picked to take the bait, from the moment it is picked, through its bumps, to the bite; none before or once the school is hooked.</summary>
+        private static Fish Picked(Cast cast) =>
+            !cast.Hooked && cast.Biter >= 0 && cast.Biter < cast.Fish.Count ? cast.Fish[cast.Biter] : null;
+
+        /// <summary>
+        /// The key on a float's networked data saying it is claimed (<see cref="Arrival.Claimed"/>):
+        /// from the cast until a fish is hooked, the world's other fish leave its bait alone in
+        /// every game, so no unannounced fish bites while a sign shows another coming.
+        /// </summary>
+        private static readonly int ClaimKey = "Rodnarok.claimed".GetStableHashCode();
+
+        /// <summary>Whether a float is claimed, as the game owning it marked it.</summary>
+        public static bool Claimed(FishingFloat ff)
+        {
+            var zdo = ff != null ? ff.GetComponent<ZNetView>()?.GetZDO() : null;
+            return zdo != null && zdo.GetBool(ClaimKey);
+        }
+
+        /// <summary>Marks a float this game owns as claimed or free, writing only a change.</summary>
+        private static void MarkClaim(FishingFloat ff, bool claimed)
+        {
+            var view = ff != null ? ff.GetComponent<ZNetView>() : null;
+            if (view == null || !view.IsValid() || !view.IsOwner()) return;
+            var zdo = view.GetZDO();
+            if (zdo.GetBool(ClaimKey) != claimed) zdo.Set(ClaimKey, claimed);
         }
 
         /// <summary>The school's fish let go for the bait now; none before one is, or once the school is hooked.</summary>
@@ -392,6 +420,7 @@ namespace Rodnarok
             Uncall(fish);
             if (ff == null || !CastOf.TryGetValue(fish, out var cast) || cast.Hooked) return;
             cast.Hooked = true;
+            MarkClaim(ff, Arrival.Claimed(cast: true, hooked: true));
             var hooked = cast.Fish.IndexOf(fish);
             foreach (var i in School.Scatter(cast.Fish.Count, hooked))
             {
@@ -530,6 +559,7 @@ namespace Rodnarok
                     DueAt = Time.time + Settle,
                     Wait = Arrival.Seconds(rules.WaitMin, rules.WaitMax, Random.value),
                 };
+                MarkClaim(ff, Arrival.Claimed(cast: true, hooked: false));
             }
 
             foreach (var pair in Casts.ToList())
@@ -576,17 +606,36 @@ namespace Rodnarok
             {
                 foreach (var fish in cast.Fish) MaybeLeap(fish, cast.Float.transform.position);
             }
-            if (cast.BumpsAt.Count > 0 && !cast.Hooked && Time.time >= cast.BumpsAt[0])
+            // The picked fish bumps the float only while it is by it; bumps still due as it may bite are dropped.
+            var picked = Picked(cast);
+            if (cast.BumpsAt.Count > 0 && !cast.Hooked)
             {
-                cast.BumpsAt.RemoveAt(0);
-                Bites.Bump(cast.Float);
+                if (picked == null || Bumps.Dropped(Time.time, cast.BiterFreeAt)) cast.BumpsAt.Clear();
+                else if (Bumps.Fires(Time.time, cast.BumpsAt[0], Across(picked.transform.position, cast.Float.transform.position), cast.BiterFreeAt))
+                {
+                    cast.BumpsAt.RemoveAt(0);
+                    Bites.Bump(cast.Float);
+                }
             }
-            // The fish let go for the bait slows near the hook; every other keeps its speed.
-            var approaching = GoingForBait(cast);
+            // The picked fish hovers by the float until it may go for the bait, and slows near the hook from
+            // the moment it is picked; every other keeps its speed and circles as wide as the school does.
             foreach (var fish in cast.Fish)
             {
-                if (fish == approaching) Approach(fish, cast.Float);
-                else Unslow(fish);
+                if (Fled.Contains(fish)) continue;
+                if (fish == picked)
+                {
+                    if (Time.time < cast.BiterFreeAt)
+                    {
+                        SpawnPoint(fish) = cast.Float.transform.position;
+                        fish.m_swimRange = Bumps.Hover;
+                    }
+                    Approach(fish, cast.Float);
+                }
+                else
+                {
+                    Unslow(fish);
+                    if (cast.In && Mathf.Approximately(fish.m_swimRange, Bumps.Hover)) fish.m_swimRange = CircleRange;
+                }
             }
             if (cast.Hooked || cast.Fish.Count == 0 || cast.BiterFreeAt < float.MaxValue) return;
             var near = cast.Fish.Count(f => Across(f.transform.position, cast.Float.transform.position) < Near);
