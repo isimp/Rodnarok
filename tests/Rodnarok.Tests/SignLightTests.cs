@@ -35,6 +35,45 @@ namespace Rodnarok.Tests
             Assert.Equal(SignLight.Crest(Noon, 0f, 0.9f, DayAir), under);
         }
 
+        private static readonly Shade DawnSun = new Shade(1f, 0.698f, 0.437f);
+        private static readonly Shade DawnAir = new Shade(0.385f, 0.423f, 0.544f);
+        private static readonly Shade DawnSky = new Shade(0.62f, 0.5f, 0.42f);
+
+        [Fact]
+        public void AtDawnTheCrestStaysBrighterThanTheSkyTheWaterReflects()
+        {
+            // A low, weak sun lights foam to about the water's own look; the crest must still read as foam on it.
+            var crest = SignLight.Crest(DawnSun, intensity: 0.5f, sunUp: 0.1f, ambient: DawnAir, sky: DawnSky);
+            Assert.True(crest.Luminance >= DawnSky.Luminance * SignLight.SkyMargin - 0.001f, "crest " + crest + " against sky " + DawnSky);
+            Assert.True(crest.Luminance > SignLight.Crest(DawnSun, 0.5f, 0.1f, DawnAir).Luminance);
+        }
+
+        [Fact]
+        public void BrightenedForTheSkyTheCrestKeepsTheHoursTint()
+        {
+            var lit = SignLight.Crest(DawnSun, 0.5f, 0.1f, DawnAir);
+            var crest = SignLight.Crest(DawnSun, 0.5f, 0.1f, DawnAir, DawnSky);
+            Assert.Equal(lit.R / lit.B, crest.R / crest.B, 2);
+            Assert.Equal(lit.G / lit.B, crest.G / crest.B, 2);
+        }
+
+        [Fact]
+        public void WhereFoamIsAlreadyBrighterThanTheSkyTheSkyChangesNothing()
+        {
+            var sky = new Shade(0.66f, 0.76f, 0.84f);
+            Assert.Equal(SignLight.Crest(Noon, 1.2f, 0.9f, DayAir), SignLight.Crest(Noon, 1.2f, 0.9f, DayAir, sky));
+            var night = new Shade(0.22f, 0.28f, 0.44f);
+            var nightSky = new Shade(0.03f, 0.04f, 0.07f);
+            Assert.Equal(SignLight.Crest(night, 0f, 0.5f, NightAir), SignLight.Crest(night, 0f, 0.5f, NightAir, nightSky));
+        }
+
+        [Fact]
+        public void ABrightSkyNeverPushesTheCrestPastWhite()
+        {
+            var crest = SignLight.Crest(DawnSun, 0.5f, 0.1f, DawnAir, new Shade(1f, 1f, 1f));
+            Assert.True(crest.R <= 1f && crest.G <= 1f && crest.B <= 1f);
+        }
+
         [Fact]
         public void TheCrestIsNeverBrighterThanWhite()
         {

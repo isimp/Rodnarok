@@ -112,11 +112,11 @@ namespace Rodnarok
 
         /// <summary>The light the signs are drawn in now, for the self-test: the crest and trough colours, the game's light they come from, and its fog.</summary>
         [ForTest]
-        public static (Color Crest, Color Trough, Color Sun, float Intensity, float SunUp, Color Ambient, SignFog Fog, float FogDensity) LightForTest()
+        public static (Color Crest, Color Trough, Color Sun, float Intensity, float SunUp, Color Ambient, SignFog Fog, float FogDensity, Color Sky) LightForTest()
         {
             var env = EnvMan.instance;
             var sun = env != null && env.m_dirLight != null ? env.m_dirLight : null;
-            return (_crest, _trough, sun != null ? sun.color : Color.black, sun != null ? sun.intensity : 0f, _toSun.y, RenderSettings.ambientLight, _fogMode, _fogDensity);
+            return (_crest, _trough, sun != null ? sun.color : Color.black, sun != null ? sun.intensity : 0f, _toSun.y, RenderSettings.ambientLight, _fogMode, _fogDensity, RenderSettings.fogColor);
         }
 
         /// <summary>The sign a float's coming fish show and how many times it showed, for the self-test; Rings and 0 for none.</summary>
@@ -1037,7 +1037,9 @@ namespace Rodnarok
             if (sun != null)
             {
                 _toSun = -sun.transform.forward;
-                var crest = SignLight.Crest(new Shade(sun.color.r, sun.color.g, sun.color.b), sun.intensity, _toSun.y, air);
+                // Never darker than the sky the water mirrors, which the game's fog colour stands for.
+                var sky = RenderSettings.fogColor;
+                var crest = SignLight.Crest(new Shade(sun.color.r, sun.color.g, sun.color.b), sun.intensity, _toSun.y, air, new Shade(sky.r, sky.g, sky.b));
                 _crest = new Color(crest.R, crest.G, crest.B);
             }
             var trough = SignLight.Trough(air);

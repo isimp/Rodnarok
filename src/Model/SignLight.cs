@@ -62,17 +62,26 @@ namespace Rodnarok
         /// <paramref name="sunUp"/> high (the up part of the direction toward it, 1 overhead, 0 or
         /// less at or under the horizon), and the ambient light.
         /// </summary>
-        public static Shade Crest(Shade sun, float intensity, float sunUp, Shade ambient)
+        /// <remarks>
+        /// Water mirrors the sky, so under a low or weak sun it looks about as bright as lit foam;
+        /// the crest is then raised, its hue kept, to <see cref="SkyMargin"/> times as bright as the
+        /// <paramref name="sky"/> the water reflects (the game's fog colour), so it still reads as foam.
+        /// </remarks>
+        public static Shade Crest(Shade sun, float intensity, float sunUp, Shade ambient, Shade sky = default)
         {
             var falls = Math.Max(0f, intensity) * Math.Max(0f, sunUp);
             var lit = new Shade(
                 Foam * (sun.R * falls + ambient.R),
                 Foam * (sun.G * falls + ambient.G),
                 Foam * (sun.B * falls + ambient.B));
+            var floor = Math.Max(MinLight, sky.Luminance * SkyMargin);
             var luminance = lit.Luminance;
-            if (luminance < MinLight) lit = luminance > 0.0001f ? lit.Times(MinLight / luminance) : new Shade(MinLight, MinLight, MinLight);
+            if (luminance < floor) lit = luminance > 0.0001f ? lit.Times(floor / luminance) : new Shade(floor, floor, floor);
             return new Shade(Math.Min(1f, lit.R), Math.Min(1f, lit.G), Math.Min(1f, lit.B));
         }
+
+        /// <summary>How much brighter than the sky the water reflects a crest stays.</summary>
+        public const float SkyMargin = 1.15f;
 
         /// <summary>The colour of the trough under a crest: the ambient light's hue, dark.</summary>
         public static Shade Trough(Shade ambient) => ambient.Times(TroughShare);
