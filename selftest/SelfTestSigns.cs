@@ -13,7 +13,7 @@ namespace Rodnarok
     /// float for every game; the float must show the Perch's rings on the way in, more often as the
     /// school nears, and once a fish bites the marks must be gone and no more signs show. Then one
     /// fish of each of the game's fish is put a few metres from a float and marked as coming: each
-    /// must show its own sign, and a picture of each is taken, 5 m short of the float toward the
+    /// must show its own sign, and a picture of each is taken, 5 m beyond the float, away from the
     /// character, the character looking down at it. On the way in the showings must follow one
     /// path, no further apart than the school can swim; at the float the signs go quiet, slow and by
     /// the float; and the fish marked for every game as going for the bait must be the one that
@@ -55,8 +55,8 @@ namespace Rodnarok
 
         private static string F(float value) => value.ToString("0.0", CultureInfo.InvariantCulture);
 
-        /// <summary>How far short of the float, toward the character, each fish of the pictures is put, in metres: near enough for the Pike's swirl.</summary>
-        private const float PictureShort = 5f;
+        /// <summary>How far beyond the float, away from the character, each fish of the pictures is put, in metres: near enough for the Pike's swirl, and out in front, as a fish short of a float landing close in sat behind the character.</summary>
+        private const float PictureBeyond = 5f;
 
         private static bool Travels(ArrivalSignKind kind) => kind == ArrivalSignKind.Bulge || kind == ArrivalSignKind.Glow || kind == ArrivalSignKind.Fin;
 
@@ -286,7 +286,7 @@ namespace Rodnarok
                         wrong.Add(prefab + " not in the game");
                         continue;
                     }
-                    var at = spot.Value - away * PictureShort + Vector3.down * 1.5f;
+                    var at = spot.Value + away * PictureBeyond + Vector3.down * 1.5f;
                     var go = Object.Instantiate(fishPrefab, at, Quaternion.LookRotation(-away));
                     placed.Add(go);
                     var fish = go.GetComponent<Fish>();
