@@ -9,9 +9,9 @@ namespace Rodnarok
     /// hesitates, the crosshair ring keeps the bite's size and fades in with the fish's distance across
     /// the water (<see cref="RingStrength"/>): whole within <see cref="Reach"/>, <see cref="Faint"/> at
     /// <see cref="Hover"/>. The waiting fish runs in steadily now and then and holds by the float
-    /// (<see cref="NoseAt"/>), so the ring fades in on a rhythm. The first jig of a wait with the fish in
+    /// (<see cref="NoseAt"/>), so the ring fades in on a rhythm. The first jig of a hold with the fish in
     /// reach draws it <see cref="Cut"/> sooner; any other is off cue, and a wary school near the float
-    /// flinches.
+    /// flinches. Each hold is its own window, so a longer wait can take more than one good jig.
     /// </summary>
     internal static class Jig
     {
@@ -54,9 +54,12 @@ namespace Rodnarok
             Hold,
         }
 
-        /// <summary>How long a good jig's flash and an off-cue jig's jolt show on the ring, in seconds.</summary>
-        public const float FlashSeconds = 0.3f;
-        public const float JoltSeconds = 0.6f;
+        /// <summary>How long a jig that took flashes white, and how long the ring then shows it took, in seconds.</summary>
+        public const float TookFlashSeconds = 0.15f;
+        public const float TookSeconds = 0.6f;
+
+        /// <summary>How long an off-cue jig blinks the ring red, in seconds.</summary>
+        public const float OffCueSeconds = 0.3f;
 
         /// <summary>How fast the float twitches, in metres a second.</summary>
         public static float Speed => Metres / Seconds;
@@ -71,8 +74,14 @@ namespace Rodnarok
         /// <summary>Whether a press jigs: a float on the water with nothing hooked, with jigging on.</summary>
         public static bool OnPress(bool on, bool onWater, bool hooked) => on && onWater && !hooked;
 
-        /// <summary>A jig is good only as the first of its wait with the fish in reach.</summary>
-        public static Judged Judge(bool usedThisWait, bool inReach) => !usedThisWait && inReach ? Judged.Good : Judged.OffCue;
+        /// <summary>A jig is good only as the first of its hold, in the window.</summary>
+        public static Judged Judge(bool usedThisHold, bool inWindow) => !usedThisHold && inWindow ? Judged.Good : Judged.OffCue;
+
+        /// <summary>Whether a jig now is in the window: the waiting fish holding by the float, in reach.</summary>
+        public static bool InWindow(Nose phase, float distance) => phase == Nose.Hold && InReach(distance);
+
+        /// <summary>Which of a wait's runs in, counted from 0, is under way this long into the wait; each hold is its own window.</summary>
+        public static int HoldIndex(float since) => since < FirstNose ? -1 : (int)((since - FirstNose) / NoseEvery);
 
         /// <summary>Whether a waiting fish this far from the float across the water is in reach.</summary>
         public static bool InReach(float distance) => distance <= Reach;

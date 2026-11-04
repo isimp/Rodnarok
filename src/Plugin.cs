@@ -54,6 +54,7 @@ namespace Rodnarok
                 FloatWisps.Tick();
                 ArrivalSigns.Tick();
                 StruggleTells.Tick();
+                Heaves.Tick();
             }
             SelfTestHost.Tick();
         }

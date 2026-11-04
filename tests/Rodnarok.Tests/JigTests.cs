@@ -58,12 +58,38 @@ namespace Rodnarok.Tests
         }
 
         [Fact]
-        public void OnlyTheFirstJigOfAWaitWithTheFishInReachIsGood()
+        public void TheFirstJigOfEachHoldWithTheFishInReachIsGood()
         {
-            Assert.Equal(Jig.Judged.Good, Jig.Judge(usedThisWait: false, inReach: true));
-            Assert.Equal(Jig.Judged.OffCue, Jig.Judge(usedThisWait: false, inReach: false));
-            Assert.Equal(Jig.Judged.OffCue, Jig.Judge(usedThisWait: true, inReach: true));
-            Assert.Equal(Jig.Judged.OffCue, Jig.Judge(usedThisWait: true, inReach: false));
+            Assert.Equal(Jig.Judged.Good, Jig.Judge(usedThisHold: false, inWindow: true));
+            Assert.Equal(Jig.Judged.OffCue, Jig.Judge(usedThisHold: false, inWindow: false));
+            Assert.Equal(Jig.Judged.OffCue, Jig.Judge(usedThisHold: true, inWindow: true));
+            Assert.Equal(Jig.Judged.OffCue, Jig.Judge(usedThisHold: true, inWindow: false));
+        }
+
+        [Fact]
+        public void TheWindowIsTheHoldWithTheFishInReachAndNothingElse()
+        {
+            Assert.True(Jig.InWindow(Jig.Nose.Hold, Jig.HoldAt));
+            Assert.False(Jig.InWindow(Jig.Nose.Hold, Jig.Reach + 0.1f));
+            Assert.False(Jig.InWindow(Jig.Nose.Run, Jig.HoldAt));
+            Assert.False(Jig.InWindow(Jig.Nose.Free, 0.1f));
+        }
+
+        [Fact]
+        public void ALongerWaitHoldsMoreThanOnceSoMoreThanOneJigCanCount()
+        {
+            // A picked fish hovers up to 4 s: two holds, each its own window.
+            var holds = 0;
+            var wasHold = false;
+            for (var t = 0f; t < 4f; t += 0.02f)
+            {
+                var hold = Jig.NoseAt(t, 4f - t).Phase == Jig.Nose.Hold;
+                if (hold && !wasHold) holds++;
+                wasHold = hold;
+            }
+            Assert.Equal(2, holds);
+            Assert.NotEqual(Jig.HoldIndex(Jig.FirstNose + Jig.RunSeconds + 0.1f), Jig.HoldIndex(Jig.FirstNose + Jig.NoseEvery + Jig.RunSeconds + 0.1f));
+            Assert.Equal(Jig.HoldIndex(Jig.FirstNose + Jig.RunSeconds + 0.1f), Jig.HoldIndex(Jig.FirstNose + Jig.RunSeconds + 0.4f));
         }
 
         [Fact]

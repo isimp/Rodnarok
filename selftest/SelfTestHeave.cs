@@ -38,6 +38,8 @@ namespace Rodnarok
         private static readonly AccessTools.FieldRef<FishingFloat, float> LineLength = AccessTools.FieldRefAccess<FishingFloat, float>("m_lineLength");
         private static readonly AccessTools.FieldRef<Character, Quaternion> LookYaw = AccessTools.FieldRefAccess<Character, Quaternion>("m_lookYaw");
         private static readonly AccessTools.FieldRef<Player, float> LookPitch = AccessTools.FieldRefAccess<Player, float>("m_lookPitch");
+        private static readonly AccessTools.FieldRef<Character, ZSyncAnimation> SyncedAnimation = AccessTools.FieldRefAccess<Character, ZSyncAnimation>("m_zanim");
+        private static readonly AccessTools.FieldRef<ZSyncAnimation, Animator> AnimatorOf = AccessTools.FieldRefAccess<ZSyncAnimation, Animator>("m_animator");
         private static readonly System.Reflection.MethodInfo TryToHook = AccessTools.Method(typeof(FishingFloat), "TryToHook");
         private static readonly System.Reflection.MethodInfo SetCatch = AccessTools.Method(typeof(FishingFloat), "SetCatch");
 
@@ -161,7 +163,10 @@ namespace Rodnarok
                 var line = LineLength(ff);
                 var stamina = player.GetStamina();
                 // The rod snaps up for the lift in the game's raised pose, which every game sees, and comes down after.
-                var animator = player.GetComponentInChildren<Animator>();
+                // The animator the game's synced flags drive, not any animator under the character.
+                var zanim = SyncedAnimation(player);
+                var animator = zanim != null ? AnimatorOf(zanim) : null;
+                var raisedBefore = Heaves.PoseRaisedForTest;
                 var posing = false;
                 var raisedFrames = 0;
                 var liftFrames = 0;
@@ -187,7 +192,8 @@ namespace Rodnarok
                 if (ff == null || ff.GetCatch() != fish) yield break;
                 var downAfter = animator != null && !animator.GetBool("blocking") && !Heaves.PosingForTest(player);
                 check.That(posing && liftFrames > 0 && raisedFrames >= liftFrames - 1 && downAfter, "the rod snaps up into the game's raised pose for the lift and comes down after: raised "
-                    + raisedFrames.ToString(CultureInfo.InvariantCulture) + " of " + liftFrames.ToString(CultureInfo.InvariantCulture) + " lift frames, down after " + downAfter);
+                    + raisedFrames.ToString(CultureInfo.InvariantCulture) + " of " + liftFrames.ToString(CultureInfo.InvariantCulture) + " lift frames, down after " + downAfter + "; posing seen " + posing + ", raised by the heave "
+                    + (Heaves.PoseRaisedForTest - raisedBefore).ToString(CultureInfo.InvariantCulture) + " times, animator " + (animator != null ? animator.name : "none"));
                 var spent = stamina - player.GetStamina();
                 var came = near - TipToFloat(player, ff);
                 var slack = LineLength(ff) - TipToFloat(player, ff);

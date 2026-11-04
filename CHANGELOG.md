@@ -18,7 +18,7 @@ A hooked fish shows its next struggle coming. Your float lies still while there 
 
 The rod's secondary attack heaves the fish. While it rests, a heave snaps your rod up, lifts the fish 3 m toward you in a moment and leaves the line slack, and holding winds slack in three times as fast and without the fish's weight. A heave costs the stamina of a weapon's secondary attack. A struggle that starts with slack still out jolts the line hard enough that a whole heave's slack nearly snaps it, and a heave into a struggle only strains it. Server setting `Heave`.
 
-Before a fish is hooked the same button jigs your float, a short twitch with a flick of the rod. While a fish waits at your float it makes a steady run in to it every few seconds, and the crosshair ring fades in with it, whole white while it holds by the float; jig then and it comes sooner, once a wait. A jig off cue makes a wary school flinch. Server setting `Jig`.
+Before a fish is hooked the same button jigs your float, a short twitch with a flick of the rod. While a fish waits at your float it makes a steady run in to it every few seconds, and the crosshair ring fades in with it. While it holds by the float the ring drains as a white arc, as after a bite: jig then and the ring turns yellow and the fish comes sooner, once each hold. A jig off cue blinks the ring red and makes a wary school flinch. Server setting `Jig`.
 
 ## 0.2.1
 

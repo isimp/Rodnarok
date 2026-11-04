@@ -22,6 +22,10 @@ namespace Rodnarok
         {
             public float Until;
             public Vector3 Way;
+
+            // Stopped where the lift ends, so neither coasts on past the lift's metres.
+            public bool FishStopped;
+            public bool FloatStopped;
         }
 
         private static readonly Dictionary<Fish, Lift> Lifts = new Dictionary<Fish, Lift>();
@@ -63,7 +67,20 @@ namespace Rodnarok
                 zanim.SetBool(RaisedHash, InternalBlocking(humanoid));
                 return;
             }
-            zanim.SetBool(RaisedHash, pose.Flick ? Jig.RodRaised(pose.Holding, since) : Heave.RodRaised(pose.Holding, since));
+            var raised = pose.Flick ? Jig.RodRaised(pose.Holding, since) : Heave.RodRaised(pose.Holding, since);
+            zanim.SetBool(RaisedHash, raised);
+            if (raised) PoseRaisedForTest++;
+        }
+
+        /// <summary>How many times a heave's or jig's rod motion showed the rod raised, for the self-test.</summary>
+        [ForTest]
+        public static int PoseRaisedForTest { get; private set; }
+
+        /// <summary>Each frame, the local player's rod motion as well, so it shows whatever order the game updates in.</summary>
+        public static void Tick()
+        {
+            var player = Player.m_localPlayer;
+            if (player != null) Pose(player);
         }
 
         /// <summary>Whether a character's rod is in a heave's motion now, for the self-test.</summary>
@@ -136,7 +153,7 @@ namespace Rodnarok
                 }
                 if (!rules.Heave) return;
                 var cost = CostFor(player);
-                switch (Heave.OnPress(rules.Heave, true, fish.IsEscaping(), Lifts.ContainsKey(fish), rules.Tension, player.HaveStamina(cost)))
+                switch (Heave.OnPress(rules.Heave, true, fish.IsEscaping(), IsLifting(fish), rules.Tension, player.HaveStamina(cost)))
                 {
                     case Heave.Pressed.Lifts:
                         var tip = Utils.FindChild(player.transform, "_RodTop");
@@ -174,7 +191,7 @@ namespace Rodnarok
         }
 
         /// <summary>Whether a hooked fish is being lifted now.</summary>
-        public static bool IsLifting(Fish fish) => fish != null && Lifts.ContainsKey(fish);
+        public static bool IsLifting(Fish fish) => fish != null && Lifts.TryGetValue(fish, out var lift) && Time.time < lift.Until;
 
         /// <summary>Whether a hooked fish's line hangs slack, so its weight is off the reel.</summary>
         public static bool OnSlack(Fish fish) => fish != null && Slack.Contains(fish);
@@ -183,12 +200,15 @@ namespace Rodnarok
         public static void MoveFish(Fish fish)
         {
             if (!Lifts.TryGetValue(fish, out var lift)) return;
+            var body = FishBody(fish);
             if (Time.time >= lift.Until || fish.IsEscaping() || !fish.IsHooked())
             {
-                Lifts.Remove(fish);
+                if (!lift.FishStopped && body != null) body.linearVelocity = new Vector3(0f, body.linearVelocity.y, 0f);
+                lift.FishStopped = true;
+                if (lift.FloatStopped || !fish.IsHooked()) Lifts.Remove(fish);
+                else Lifts[fish] = lift;
                 return;
             }
-            var body = FishBody(fish);
             if (body == null) return;
             var velocity = lift.Way * Heave.LiftSpeed;
             velocity.y = body.linearVelocity.y;
@@ -202,14 +222,24 @@ namespace Rodnarok
         /// </summary>
         public static float Step(FishingFloat ff, Fish fish, Character owner, float strain, bool struggleStarts, bool holding, FishingRules rules)
         {
-            if (Lifts.TryGetValue(fish, out var lift) && Time.time < lift.Until && !fish.IsEscaping())
+            if (Lifts.TryGetValue(fish, out var lift))
             {
                 var body = FloatBody(ff);
-                if (body != null)
+                if (Time.time < lift.Until && !fish.IsEscaping())
                 {
-                    var velocity = lift.Way * Heave.LiftSpeed;
-                    velocity.y = body.linearVelocity.y;
-                    body.linearVelocity = velocity;
+                    if (body != null)
+                    {
+                        var velocity = lift.Way * Heave.LiftSpeed;
+                        velocity.y = body.linearVelocity.y;
+                        body.linearVelocity = velocity;
+                    }
+                }
+                else if (!lift.FloatStopped)
+                {
+                    if (body != null) body.linearVelocity = new Vector3(0f, body.linearVelocity.y, 0f);
+                    lift.FloatStopped = true;
+                    if (lift.FishStopped) Lifts.Remove(fish);
+                    else Lifts[fish] = lift;
                 }
             }
             var tip = owner != null ? Utils.FindChild(owner.transform, "_RodTop") : null;
