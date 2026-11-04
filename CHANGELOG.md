@@ -12,6 +12,8 @@ The signs ride the waves and drift with the wind. Calm water shows them clear an
 
 How strongly the signs show is a server setting, from half to twice as strong. Server setting `SignContrast`.
 
+A hooked fish shows its next struggle coming. Your float lies still while there is time, grows restless in the last moments of a rest, and the line goes taut and quivers just before the fish bolts, later for a fast or starred fish. Through the struggle the line stays taut and shakes harder the closer it comes to snapping. Server setting `StruggleWarning`.
+
 ## 0.2.1
 
 Five difficulty levels from `VeryEasy` to `VeryHard`, `Normal` playing as before. Picking a level fills in the settings it sets, and changing one of them yourself makes it `Custom`. Server setting `Difficulty`.

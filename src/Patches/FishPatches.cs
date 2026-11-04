@@ -73,14 +73,29 @@ namespace Rodnarok
     [HarmonyPatch(typeof(Fish), nameof(Fish.CustomFixedUpdate))]
     internal static class StruggleShows
     {
-        private static void Postfix(Fish __instance) => Thrash.Step(__instance);
+        private static void Postfix(Fish __instance)
+        {
+            Thrash.Step(__instance);
+            StruggleTells.Share(__instance);
+        }
     }
 
-    /// <summary>A fish leaving the world is let go of by the thrashing.</summary>
+    /// <summary>A fish leaving the world is let go of by the thrashing and the struggle warning.</summary>
     [HarmonyPatch(typeof(Fish), "OnDisable")]
     internal static class StruggleForgets
     {
-        private static void Postfix(Fish __instance) => Thrash.Forget(__instance);
+        private static void Postfix(Fish __instance)
+        {
+            Thrash.Forget(__instance);
+            StruggleTells.Forget(__instance);
+        }
+    }
+
+    /// <summary>A rod line taut before or through a struggle is drawn straight and quivering over what the game drew.</summary>
+    [HarmonyPatch(typeof(LineConnect), "LateUpdate")]
+    internal static class TautLineDraws
+    {
+        private static void Postfix(LineConnect __instance) => StruggleTells.Draw(__instance);
     }
 
     /// <summary>When a school's fish is hooked, the rest of it scatters.</summary>

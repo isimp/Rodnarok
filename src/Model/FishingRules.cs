@@ -60,6 +60,9 @@ namespace Rodnarok
         /// <summary>How strongly the signs on the water show, for everyone: 1 as made, from half to twice as strong (<see cref="SignLight.Shown"/>).</summary>
         public float SignContrast { get; private set; } = 1f;
 
+        /// <summary>Whether a hooked fish shows its next struggle coming: a restless float, a taut and quivering line (<see cref="Rodnarok.StruggleWarning"/>).</summary>
+        public bool StruggleWarning { get; private set; } = true;
+
         /// <summary>Whether the bait draws a school; without, one fish comes.</summary>
         public bool Schools { get; private set; } = true;
 
@@ -105,6 +108,7 @@ namespace Rodnarok
             float? calmReach = null,
             float? calmKeep = null,
             float? signContrast = null,
+            bool? struggleWarning = null,
             bool? schools = null,
             bool? bumps = null,
             float? leaveBackstop = null,
@@ -148,6 +152,7 @@ namespace Rodnarok
             copy.CalmReach = calmReach ?? CalmReach;
             copy.CalmKeep = calmKeep ?? CalmKeep;
             copy.SignContrast = signContrast ?? SignContrast;
+            copy.StruggleWarning = struggleWarning ?? StruggleWarning;
             return copy;
         }
     }

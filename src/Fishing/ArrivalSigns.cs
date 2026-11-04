@@ -805,7 +805,7 @@ namespace Rodnarok
         }
 
         /// <summary>The float's look: each child of the float holding something drawn, but no line, with where it sits.</summary>
-        private static List<(Transform T, Vector3 Pos, Quaternion Rot)> LookOf(GameObject floatObject)
+        internal static List<(Transform T, Vector3 Pos, Quaternion Rot)> LookOf(GameObject floatObject)
         {
             var look = new List<(Transform T, Vector3 Pos, Quaternion Rot)>();
             var root = floatObject.transform;

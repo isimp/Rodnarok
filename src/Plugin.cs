@@ -45,6 +45,7 @@ namespace Rodnarok
                 SeatedBodies.Forget();
                 FloatWisps.Forget();
                 ArrivalSigns.Forget();
+                StruggleTells.ForgetAll();
             }
             else
             {
@@ -52,6 +53,7 @@ namespace Rodnarok
                 CalmWaters.Tick();
                 FloatWisps.Tick();
                 ArrivalSigns.Tick();
+                StruggleTells.Tick();
             }
             SelfTestHost.Tick();
         }
