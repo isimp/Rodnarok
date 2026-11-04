@@ -20,7 +20,7 @@ namespace Rodnarok
     /// bites. A Trollfish, Anglerfish and salmon are pictured swimming across the view, their sign
     /// facing that way, and the Trollfish's bulge must fade at the float, leaving a slow ring there.
     /// The float must tremble toward the Perch going for the bait in its last 1.5 m; hooked, the
-    /// rest of the school must dart off and the float's look stand upright again; the signs must
+    /// rest of the school must dart off, the float's look upright again from the bite; the signs must
     /// use their parts again rather than make new ones; a two-star Perch must show its hint coming
     /// and its size going for the bait, pictured; the server's contrast must reach the signs,
     /// pictured at twice as strong; the crest must be lit by the game's light; and
@@ -234,9 +234,13 @@ namespace Rodnarok
                 check.That(going != null && going == Nibbler(ff), "the fish marked as going for the bait is the one that bit" + (going == null ? ": none was marked" : ""));
                 check.That(lookParts > 0 && tiltMost >= 3f && tiltToward > 0.8f, "the float trembled toward the fish closing in: up to " + F(tiltMost) + " degrees, toward it " + F(tiltToward) + ", " + lookParts + " parts of its look tilting");
 
-                // Hooked, the rest of the school darts off, and the float's look stands upright again.
+                // At the bite the float's look stands upright again, before the hook, after which the
+                // struggle warning may tilt it in its own right; hooked, the rest of the school darts off.
                 if (bitBy != null)
                 {
+                    for (var waited = 0f; waited < 0.3f; waited += Time.deltaTime) yield return null;
+                    var tilted = lookBefore.Where(l => l.T != null && (Quaternion.Angle(l.T.localRotation, l.Rot) > 0.5f || Vector3.Distance(l.T.localPosition, l.Pos) > 0.005f)).Select(l => l.T.name).ToList();
+                    check.That(tilted.Count == 0, "at the bite the float's look stands as before" + (tilted.Count == 0 ? "" : ": still tilted " + string.Join(", ", tilted)));
                     var dartsBefore = ArrivalSigns.DartsForTest();
                     var others = school.Count(f => f != null && f != bitBy);
                     Nibbler(ff) = bitBy;
@@ -248,8 +252,6 @@ namespace Rodnarok
                     var darted = ArrivalSigns.DartsForTest() - dartsBefore;
                     if (hooked != null) check.That(!Schools.Claimed(ff), "once a fish is hooked the float is claimed no more");
                     if (hooked != null) check.That(darted >= others, "the rest of the school darted off when the Perch was hooked: " + darted + " darts for " + others + " fish");
-                    var tilted = lookBefore.Where(l => l.T != null && (Quaternion.Angle(l.T.localRotation, l.Rot) > 0.5f || Vector3.Distance(l.T.localPosition, l.Pos) > 0.005f)).Select(l => l.T.name).ToList();
-                    check.That(tilted.Count == 0, "after the bite the float's look stands as before" + (tilted.Count == 0 ? "" : ": still tilted " + string.Join(", ", tilted)));
                     if (hooked != null)
                     {
                         SetCatch.Invoke(ff, new object[] { null });
