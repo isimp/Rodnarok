@@ -24,6 +24,9 @@ namespace Rodnarok
         public static bool Fires(float now, float due, float metresFromFloat, float freeAt) =>
             now >= due && metresFromFloat <= Reach && !Dropped(now, freeAt);
 
+        /// <summary>Whether the sign follows the picked fish in: only once it may bite; while it hovers and bumps the sign stays quiet by the float, where it is.</summary>
+        public static bool FollowedIn(bool picked, bool mayBite) => picked && mayBite;
+
         /// <summary>Whether bumps still due are dropped: in the last moment before the picked fish may bite, as no bump comes right before a bite.</summary>
         public static bool Dropped(float now, float freeAt) => now > freeAt - LastBefore;
 

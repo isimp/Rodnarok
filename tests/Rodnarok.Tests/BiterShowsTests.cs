@@ -6,13 +6,28 @@ namespace Rodnarok.Tests
     /// The fish whose sign is followed in is the fish that touches the bait. While a school or a
     /// called fish is coming to a float, the float is claimed: the world's other fish leave its bait
     /// alone, so no unannounced fish bites while the sign is elsewhere; once the fish is hooked the
-    /// float is free again. The fish picked to take the bait is followed by the sign from the moment
-    /// it is picked, hovers by the float until it may go for the hook, and bumps the float only
-    /// while it is there; a bump still due when it may bite is dropped, as no bump comes right
-    /// before a bite.
+    /// float is free again. The fish picked to take the bait hovers by the float until it may go
+    /// for the hook, and bumps the float only while it is there; a bump still due when it may bite
+    /// is dropped, as no bump comes right before a bite. Meanwhile the sign stays quiet, its slow
+    /// showing by the float where the picked fish hovers, and follows that fish in once it may bite.
     /// </summary>
     public class BiterShowsTests
     {
+        [Fact]
+        public void TheSignStaysQuietWhileThePickedFishHoversAndFollowsItInOnceItMayBite()
+        {
+            Assert.False(Bumps.FollowedIn(picked: true, mayBite: false));
+            Assert.True(Bumps.FollowedIn(picked: true, mayBite: true));
+            Assert.False(Bumps.FollowedIn(picked: false, mayBite: true));
+        }
+
+        [Fact]
+        public void ThePickedFishHoversWhereTheSignIsQuiet()
+        {
+            // The sign goes quiet with the school within There of the float; the picked fish hovers well inside that.
+            Assert.True(Bumps.Hover < ArrivalSign.There / 2f);
+        }
+
         [Fact]
         public void TheWorldsOtherFishLeaveAClaimedFloatAlone()
         {

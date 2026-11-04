@@ -330,7 +330,9 @@ namespace Rodnarok
                 MarkComing(cast.Called, coming);
                 MarkGoing(cast.Called, coming);
             }
-            var going = Picked(cast);
+            // The picked fish is followed in once it may bite; while it hovers and bumps the sign stays quiet by the float.
+            var picked = Picked(cast);
+            var going = picked != null && Bumps.FollowedIn(picked: true, mayBite: Time.time >= cast.BiterFreeAt) ? picked : null;
             foreach (var fish in cast.Fish)
             {
                 MarkComing(fish, coming);
@@ -339,7 +341,7 @@ namespace Rodnarok
             if (cast.Float != null) MarkClaim(cast.Float, Arrival.Claimed(cast: true, hooked: cast.Hooked));
         }
 
-        /// <summary>The school's fish picked to take the bait, from the moment it is picked, through its bumps, to the bite; none before or once the school is hooked.</summary>
+        /// <summary>The school's fish picked to take the bait, from the moment it is picked, through its hover and bumps, to the bite; none before or once the school is hooked.</summary>
         private static Fish Picked(Cast cast) =>
             !cast.Hooked && cast.Biter >= 0 && cast.Biter < cast.Fish.Count ? cast.Fish[cast.Biter] : null;
 
