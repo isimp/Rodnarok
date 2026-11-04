@@ -278,12 +278,24 @@ namespace Rodnarok
                     Schools.MarkComingForTest(fish, floatId);
                     var expected = ArrivalSign.Of(prefab);
                     var shownBy = 0;
+                    var humpLow = float.MaxValue;
+                    var humpHigh = 0f;
+                    var humpSpray = 0f;
+                    var humpLength = 0f;
                     var kindSeen = ArrivalSignKind.Rings;
                     // The picture is taken just after a showing, a travelling sign after 2 s of its fish swimming.
                     var shownAt = -1f;
                     for (var waited = 0f; waited < 4f; waited += Time.deltaTime)
                     {
                         if (swims) Swim(go, at + across * (-2f + 2f * waited));
+                        if (swims && waited > 0.5f)
+                        {
+                            var hump = ArrivalSigns.HumpForTest(floatId);
+                            humpLow = Mathf.Min(humpLow, hump.Height);
+                            humpHigh = Mathf.Max(humpHigh, hump.Height);
+                            humpSpray = Mathf.Max(humpSpray, hump.Spray);
+                            humpLength = Mathf.Max(humpLength, hump.Length);
+                        }
                         // The camera follows a swimming fish, so its travelling sign stays in the picture.
                         Aim(player, (swims ? go.transform.position : at) + Vector3.up * 1.5f);
                         var seen = ArrivalSigns.ForTest(floatId);
@@ -294,6 +306,9 @@ namespace Rodnarok
                         yield return null;
                     }
                     if (kindSeen != expected || shownBy == 0) wrong.Add(name + " showed " + kindSeen + " " + shownBy + " times, " + expected + " wanted");
+                    // The Trollfish's hump surges as it swims across the view, long across it, throwing spray off its front.
+                    if (expected == ArrivalSignKind.Bulge && (humpHigh - humpLow < 0.08f || humpSpray < 0.3f || humpLength < 1.2f))
+                        wrong.Add("the " + name + "'s hump swimming across stood " + F(humpLow) + " to " + F(humpHigh) + " m high, " + F(humpLength) + " m long, spray " + F(humpSpray) + "; it should surge, stretch across and spray");
                     if (expected == ArrivalSignKind.Rings)
                     {
                         // A starred fish: a hint while it only comes, clearly bigger once it goes for the bait.

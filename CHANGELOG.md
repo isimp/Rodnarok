@@ -2,7 +2,7 @@
 
 ## 0.2.2
 
-The signs of a fish coming to your float follow the school's way in instead of jumping between its fish, and the *Trollfish*'s wake trails where it swam. At the float they go quiet until one fish goes for the bait, which the sign then follows in.
+The signs of a fish coming to your float follow the school's way in instead of jumping between its fish, and the *Trollfish* shows as a hump of water surging up with spray, its wake trailing where it swam. At the float they go quiet until one fish goes for the bait, which the sign then follows in.
 
 The signs take the light of the hour and the weather, warm at dusk and dull in rain, with a bright crest over a darker trough, and far ones fade into the fog.
 
