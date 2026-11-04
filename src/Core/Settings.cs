@@ -24,6 +24,7 @@ namespace Rodnarok
         private static ConfigEntry<float> _calmKeep;
         private static ConfigEntry<float> _signContrast;
         private static ConfigEntry<bool> _struggleWarning;
+        private static ConfigEntry<bool> _heave;
         private static ConfigEntry<bool> _schools;
         private static ConfigEntry<bool> _bumps;
         private static ConfigEntry<bool> _tension;
@@ -112,6 +113,7 @@ namespace Rodnarok
                     calmKeep: _calmKeep.Value,
                     signContrast: _signContrast.Value,
                     struggleWarning: _struggleWarning.Value,
+                    heave: _heave.Value,
                     schools: _schools.Value,
                     bumps: _bumps.Value,
                     tension: _tension.Value,
@@ -196,6 +198,8 @@ namespace Rodnarok
                 new ConfigDescription("How strongly the signs of fish coming to a float show on the water, for everyone: 1 as made, 0.5 half as strong, 2 twice as strong with lines half again as wide. Rough water still shows them fainter than calm water.", new AcceptableValueRange<float>(SignLight.MinContrast, SignLight.MaxContrast))));
             _struggleWarning = Sync(config.Bind(Section, "StruggleWarning", rules.StruggleWarning,
                 "Whether a hooked fish shows its next struggle coming, for everyone: the float lies still while there is time, grows restless in the last 1.5 s before the struggle, and the line goes taut and quivers a moment before the fish bolts, sooner for a slow fish and later for a fast or starred one. Through the struggle the line stays taut and quivers harder the closer it is to snapping."));
+            _heave = Sync(config.Bind(Section, "Heave", rules.Heave,
+                "Whether the rod's secondary attack heaves a hooked fish, for everyone. While the fish rests, a heave lifts it and the float 3 m toward you in 0.3 s for what the game charges for pulling that fish while it struggles, for that long; the line hangs slack, and holding to reel winds slack in three times as fast with none of the fish's weight. If the fish starts to struggle with slack still out, the line is jolted by the slack. A heave while the fish struggles lifts nothing and strains the line a quarter of the way to snapping."));
             _schools = Sync(config.Bind(Section, "Schools", rules.Schools,
                 "Whether the bait draws a school of its fish, as many as the world spawns together, of which one takes the bait. Off, a single fish comes."));
             _bumps = Sync(config.Bind(Section, "Bumps", rules.Bumps,

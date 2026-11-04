@@ -201,6 +201,8 @@ namespace Rodnarok
         public static float? StaminaFigure(Fish fish)
         {
             var rules = PlayRules.Now;
+            // A slack line after a heave carries none of the fish's weight, so winding it in costs none of the fish's stamina.
+            if (!fish.IsEscaping() && Heaves.OnSlack(fish)) return 0f;
             if (!fish.IsEscaping())
                 return rules.ReelStaminaShare == 1f ? (float?)null : Fight.StaminaFigureWhileResting(rules, fish.m_staminaUse);
             var item = fish.GetComponent<ItemDrop>();

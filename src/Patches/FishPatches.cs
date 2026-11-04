@@ -76,6 +76,7 @@ namespace Rodnarok
         private static void Postfix(Fish __instance)
         {
             Thrash.Step(__instance);
+            Heaves.MoveFish(__instance);
             StruggleTells.Share(__instance);
         }
     }
@@ -88,6 +89,21 @@ namespace Rodnarok
         {
             Thrash.Forget(__instance);
             StruggleTells.Forget(__instance);
+            Heaves.Forget(__instance);
+        }
+    }
+
+    /// <summary>
+    /// A press of the secondary attack heaves the fish on the local player's line. The game reads the
+    /// press from the keyboard or a gamepad and passes it here once per press; for a rod, which draws
+    /// as a bow, the game does nothing else with it.
+    /// </summary>
+    [HarmonyPatch(typeof(Player), nameof(Player.SetControls))]
+    internal static class HeavePressed
+    {
+        private static void Prefix(Player __instance, bool secondaryAttack)
+        {
+            if (secondaryAttack) Heaves.Pressed(__instance);
         }
     }
 

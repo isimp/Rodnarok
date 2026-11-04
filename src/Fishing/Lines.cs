@@ -48,6 +48,15 @@ namespace Rodnarok
         /// <summary>How strained the line of this float is, from 0 to 1 snapped; 0 with nothing on it.</summary>
         public static float StrainOf(FishingFloat ff) => ff != null && Strains.TryGetValue(ff, out var line) ? line.Strain : 0f;
 
+        /// <summary>The character a float belongs to, by the game's own reading.</summary>
+        public static Character OwnerOf(FishingFloat ff) => ff != null ? Owner(ff) : null;
+
+        /// <summary>Sets the strain on a float's line in the game that cast it, as a heave into a struggle does; the next step snaps it if whole.</summary>
+        public static void Strain(FishingFloat ff, float strain)
+        {
+            if (ff != null && Strains.TryGetValue(ff, out var line)) line.Strain = Mathf.Clamp01(strain);
+        }
+
         /// <summary>Whether a hooked fish is taking line out, the line eased off while it struggles.</summary>
         public static bool IsRunning(Fish fish) => fish != null && Running.ContainsKey(fish);
 
@@ -82,7 +91,9 @@ namespace Rodnarok
             var holding = owner.IsBlocking() && owner.HaveStamina();
             var seconds = Time.fixedDeltaTime;
             if (line.Struggling && !struggling) TellStruggle(ff, line, "it rests");
-            if (struggling && !line.Struggling) StartStruggle(line);
+            var starts = struggling && !line.Struggling;
+            if (starts) StartStruggle(line);
+            line.Strain = Heaves.Step(ff, fish, owner, line.Strain, starts, holding, rules);
             line.Strain = Tension.Step(line.Strain, struggling, holding, seconds, line.FishSpeed, rules);
             if (Tension.Snaps(line.Strain))
             {
@@ -204,6 +215,7 @@ namespace Rodnarok
             if (ff == null || !Strains.TryGetValue(ff, out var line)) return;
             if (line.Struggling) TellStruggle(ff, line, "the line is gone");
             if (line.Fish != null) Running.Remove(line.Fish);
+            Heaves.Forget(line.Fish);
             Strains.Remove(ff);
         }
 
@@ -212,6 +224,7 @@ namespace Rodnarok
         {
             Strains.Clear();
             Running.Clear();
+            Heaves.Clear();
         }
     }
 }

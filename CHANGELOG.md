@@ -14,6 +14,8 @@ How strongly the signs show is a server setting, from half to twice as strong. S
 
 A hooked fish shows its next struggle coming. Your float lies still while there is time, grows restless in the last moments of a rest, and the line goes taut and quivers just before the fish bolts, later for a fast or starred fish. Through the struggle the line stays taut and shakes harder the closer it comes to snapping. Server setting `StruggleWarning`.
 
+The rod's secondary attack heaves the fish. While it rests, a heave lifts it 3 m toward you in a moment and leaves the line slack, and holding winds slack in three times as fast and without the fish's weight. A struggle that starts with slack still out jolts the line, and a heave into a struggle only strains it. Server setting `Heave`.
+
 ## 0.2.1
 
 Five difficulty levels from `VeryEasy` to `VeryHard`, `Normal` playing as before. Picking a level fills in the settings it sets, and changing one of them yourself makes it `Custom`. Server setting `Difficulty`.

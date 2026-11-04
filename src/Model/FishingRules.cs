@@ -63,6 +63,9 @@ namespace Rodnarok
         /// <summary>Whether a hooked fish shows its next struggle coming: a restless float, a taut and quivering line (<see cref="Rodnarok.StruggleWarning"/>).</summary>
         public bool StruggleWarning { get; private set; } = true;
 
+        /// <summary>Whether the rod's secondary attack heaves the hooked fish in a rest, leaving slack to wind in (<see cref="Rodnarok.Heave"/>).</summary>
+        public bool Heave { get; private set; } = true;
+
         /// <summary>Whether the bait draws a school; without, one fish comes.</summary>
         public bool Schools { get; private set; } = true;
 
@@ -109,6 +112,7 @@ namespace Rodnarok
             float? calmKeep = null,
             float? signContrast = null,
             bool? struggleWarning = null,
+            bool? heave = null,
             bool? schools = null,
             bool? bumps = null,
             float? leaveBackstop = null,
@@ -153,6 +157,7 @@ namespace Rodnarok
             copy.CalmKeep = calmKeep ?? CalmKeep;
             copy.SignContrast = signContrast ?? SignContrast;
             copy.StruggleWarning = struggleWarning ?? StruggleWarning;
+            copy.Heave = heave ?? Heave;
             return copy;
         }
     }
