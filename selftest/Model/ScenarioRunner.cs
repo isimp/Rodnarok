@@ -55,6 +55,14 @@ namespace Rodnarok
     /// line starting PASS, FAIL or SKIP, the last for a scenario the place could not hold. A
     /// scenario that throws fails with what it threw, and the run goes on to the next.
     /// </summary>
+    /// <summary>How a scenario ended: passed, failed, or skipped for the place.</summary>
+    internal enum ScenarioOutcome
+    {
+        Passed,
+        Failed,
+        Skipped,
+    }
+
     internal sealed class ScenarioRunner
     {
         private readonly Queue<Scenario> _waiting;
@@ -74,9 +82,16 @@ namespace Rodnarok
         public int Failed { get; private set; }
         public int Skipped { get; private set; }
 
-        /// <summary>The scenarios whose names hold the words, ignoring case; all of them for no words.</summary>
+        /// <summary>Each scenario ended so far, with how it ended, in the order run.</summary>
+        public List<(string Name, ScenarioOutcome Outcome)> Outcomes { get; } = new List<(string Name, ScenarioOutcome Outcome)>();
+
+        /// <summary>The scenarios whose names hold every one of the words, in any order, ignoring case; all of them for no words.</summary>
         public static IEnumerable<Scenario> Pick(IEnumerable<Scenario> all, string words) =>
-            string.IsNullOrWhiteSpace(words) ? all : all.Where(s => s.Name.IndexOf(words.Trim(), StringComparison.OrdinalIgnoreCase) >= 0);
+            string.IsNullOrWhiteSpace(words) ? all : all.Where(s => HoldsAll(s.Name, words));
+
+        /// <summary>Whether a name holds every one of the words, in any order, ignoring case.</summary>
+        public static bool HoldsAll(string name, string words) =>
+            (words ?? "").Split((char[])null, StringSplitOptions.RemoveEmptyEntries).All(w => name.IndexOf(w, StringComparison.OrdinalIgnoreCase) >= 0);
 
         /// <summary>One frame's step of the scenario going on, starting the next when one ends.</summary>
         public void Step()
@@ -129,16 +144,19 @@ namespace Rodnarok
             if (failures.Count > 0)
             {
                 Failed++;
+                Outcomes.Add((_current.Name, ScenarioOutcome.Failed));
                 _write("FAIL " + _current.Name + ": " + string.Join("; ", failures) + (needs.Length > 0 ? " (needs " + needs + ")" : "") + notes);
             }
             else if (needs.Length > 0)
             {
                 Skipped++;
+                Outcomes.Add((_current.Name, ScenarioOutcome.Skipped));
                 _write("SKIP " + _current.Name + ": needs " + needs + notes);
             }
             else
             {
                 Passed++;
+                Outcomes.Add((_current.Name, ScenarioOutcome.Passed));
                 _write("PASS " + _current.Name + notes);
             }
             Close();
