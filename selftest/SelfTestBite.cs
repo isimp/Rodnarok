@@ -44,6 +44,9 @@ namespace Rodnarok
 
         /// <summary>How long a struggling fish is given to rise to the surface before its depth counts, in seconds.</summary>
         private const float RiseSeconds = 0.5f;
+
+        /// <summary>How long beyond the splash code's longest wait a stretch without a splash may run, in seconds: a frame or two, a picture's frame among them.</summary>
+        private const float SplashGapFrames = 0.15f;
         private const float HoldAgainAt = 0.05f;
 
         /// <summary>How long a run goes before its pace is checked, in seconds: a few physics steps.</summary>
@@ -404,7 +407,10 @@ namespace Rodnarok
                     var high = settledTime > 0.2f ? settledDepth / settledTime : struggleDepth / struggleTime;
                     check.That(Mathf.Abs(high) < 0.3f, "a struggling fish thrashes at the surface once risen, " + high.ToString("0.00", CultureInfo.InvariantCulture) + " m under it on average past the first "
                         + RiseSeconds.ToString("0.0", CultureInfo.InvariantCulture) + " s of each struggle, " + (struggleDepth / struggleTime).ToString("0.00", CultureInfo.InvariantCulture) + " m over the whole");
-                    check.That(struggleSplashes / struggleTime >= 2f, "a struggling fish splashes at least twice a second, " + (struggleSplashes / struggleTime).ToString("0.00", CultureInfo.InvariantCulture)
+                    // Judged by the longest stretch without a splash: a struggle's first splash comes in the frame it
+                    // starts, before the frame is counted as struggling, so a rate over a few short struggles reads low.
+                    check.That(struggleSplashes > 0 && longestSplashGap <= Thrash.SplashEveryMax + SplashGapFrames, "a struggling fish splashes again within "
+                        + Thrash.SplashEveryMax.ToString("0.00", CultureInfo.InvariantCulture) + " s, a frame or two allowed: " + (struggleSplashes / struggleTime).ToString("0.00", CultureInfo.InvariantCulture)
                         + " a second: " + struggleSplashes.ToString(CultureInfo.InvariantCulture) + " splashes in " + struggleTime.ToString("0.00", CultureInfo.InvariantCulture) + " s of "
                         + struggles.ToString(CultureInfo.InvariantCulture) + " struggles, the longest stretch without one " + longestSplashGap.ToString("0.00", CultureInfo.InvariantCulture)
                         + " s, " + splashes.ToString(CultureInfo.InvariantCulture) + " splashes in the whole fight");

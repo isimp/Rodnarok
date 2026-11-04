@@ -24,7 +24,7 @@ namespace Rodnarok
 
         /// <summary>Seconds between a struggling fish's splashes, varied a little.</summary>
         private const float SplashEveryMin = 0.25f;
-        private const float SplashEveryMax = 0.45f;
+        internal const float SplashEveryMax = 0.45f;
 
         private static readonly AccessTools.FieldRef<Fish, float> WaterLevel = AccessTools.FieldRefAccess<Fish, float>("m_inWater");
         private static readonly AccessTools.FieldRef<Fish, Rigidbody> Body = AccessTools.FieldRefAccess<Fish, Rigidbody>("m_body");

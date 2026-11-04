@@ -238,12 +238,18 @@ namespace Rodnarok
                 foreach (var frame in WaitFor(player, ff, fish, () => Until(fish) > 1f && Until(fish) < 6f, moment)) yield return frame;
                 if (moment.Came && ff != null)
                 {
+                    // The float drifts on its own as the game's line pulls it, so what is held against the press is the
+                    // heave's own doing: a lift counted, the fish being lifted, and the heave's stamina.
+                    player.AddStamina(player.GetMaxStamina());
                     var liftedOff = Heaves.LiftedForTest;
-                    var nearOff = TipToFloat(player, ff);
+                    var staminaOff = player.GetStamina();
                     Press(player);
-                    for (var waited = 0f; waited < Heave.LiftSeconds + 0.1f; waited += Time.deltaTime) yield return null;
-                    check.That(ff != null && Heaves.LiftedForTest == liftedOff && TipToFloat(player, ff) > nearOff - 1f, "switched off, a press in a rest heaves nothing, the float "
-                        + F(ff != null ? nearOff - TipToFloat(player, ff) : 0f) + " m nearer");
+                    var liftingOff = Heaves.IsLifting(fish);
+                    var waitedOff = 0f;
+                    for (; waitedOff < Heave.LiftSeconds + 0.1f; waitedOff += Time.deltaTime) yield return null;
+                    var spentOff = staminaOff - player.GetStamina();
+                    check.That(Heaves.LiftedForTest == liftedOff && !liftingOff && spentOff < cost * 0.5f + drain * waitedOff + 0.5f, "switched off, a press in a rest heaves nothing: "
+                        + (Heaves.LiftedForTest - liftedOff).ToString(CultureInfo.InvariantCulture) + " heaves, lifting " + liftingOff + ", " + F(spentOff, "0.0") + " stamina spent against a heave's " + F(cost, "0.0"));
                 }
 
                 if (ff != null && ff.GetCatch() != null) SetCatch.Invoke(ff, new object[] { null });
