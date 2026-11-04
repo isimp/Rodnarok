@@ -16,7 +16,9 @@ Only the fish your float's sign follows takes your bait: other wild fish leave i
 
 A hooked fish shows its next struggle coming. Your float lies still while there is time, grows restless in the last moments of a rest, and the line goes taut and quivers just before the fish bolts, later for a fast or starred fish. Through the struggle the line stays taut and shakes harder the closer it comes to snapping. Server setting `StruggleWarning`.
 
-The rod's secondary attack heaves the fish. While it rests, a heave lifts it 3 m toward you in a moment and leaves the line slack, and holding winds slack in three times as fast and without the fish's weight. A struggle that starts with slack still out jolts the line, and a heave into a struggle only strains it. Server setting `Heave`.
+The rod's secondary attack heaves the fish. While it rests, a heave snaps your rod up, lifts the fish 3 m toward you in a moment and leaves the line slack, and holding winds slack in three times as fast and without the fish's weight. A struggle that starts with slack still out jolts the line, and a heave into a struggle only strains it. Server setting `Heave`.
+
+Before a fish is hooked the same button jigs your float, a short twitch toward you. A fish waiting at the float comes sooner for each jig, but jigging again too quickly makes a wary school flinch. Server setting `Jig`.
 
 ## 0.2.1
 

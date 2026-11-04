@@ -103,6 +103,7 @@ namespace Rodnarok
             public int Fright;
             public bool Flinched;
             public float FastSince = -1f;
+            public float JiggedAt = -1f;
             public float ReadyAt = -1f;
             public float Shyness;
             public Vector3 FloatSeen;
@@ -805,6 +806,50 @@ namespace Rodnarok
         /// first ready, it may give up and swim off; otherwise it hesitates the longer the shyer it is.
         /// True while it hesitates or once it gave up.
         /// </summary>
+        /// <summary>
+        /// A float of this game was jigged: a fish waiting at it comes sooner, the one picked to bite as it
+        /// hovers or a shy school as it hesitates (<see cref="Jig"/>). How fast the twitch moved the float is
+        /// left to the wary school's own measuring, so jigging too quickly makes it flinch.
+        /// </summary>
+        public static void Jigged(FishingFloat ff)
+        {
+            if (ff == null || !Casts.TryGetValue(ff, out var cast) || cast.Hooked || cast.Spooked) return;
+            var now = Time.time;
+            var tooSoon = Jig.TooSoon(cast.JiggedAt < 0f ? float.PositiveInfinity : now - cast.JiggedAt);
+            cast.JiggedAt = now;
+            if (tooSoon)
+            {
+                // Jigged again too soon: a wary school near the float flinches as at a quickly moved float, and no fish comes sooner.
+                var at = cast.Float.transform.position;
+                var near = cast.Fish.Any(f => f != null && Across(f.transform.position, at) < Near);
+                if (Rules.Wary && near && !cast.Away)
+                {
+                    cast.QuietSince = now;
+                    Fright(cast, at, null);
+                    JigStartlesForTest++;
+                }
+                return;
+            }
+            if (cast.Biter >= 0 && cast.BiterFreeAt < float.MaxValue && cast.BiterFreeAt > now)
+            {
+                cast.BiterFreeAt = Jig.SoonerFree(cast.BiterFreeAt, now);
+                JigCutsForTest++;
+            }
+            else if (cast.ReadyAt >= 0f && cast.BiterFreeAt >= float.MaxValue)
+            {
+                cast.ReadyAt = Jig.SoonerReady(cast.ReadyAt);
+                JigCutsForTest++;
+            }
+        }
+
+        /// <summary>How many jigs drew a waiting fish sooner in this game, for the self-test.</summary>
+        [ForTest]
+        public static int JigCutsForTest { get; private set; }
+
+        /// <summary>How many jigs that came too soon startled a wary school in this game, for the self-test.</summary>
+        [ForTest]
+        public static int JigStartlesForTest { get; private set; }
+
         private static bool Hesitates(Cast cast)
         {
             if (cast.ReadyAt < 0f)

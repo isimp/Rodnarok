@@ -98,6 +98,25 @@ namespace Rodnarok.Tests
         }
 
         [Fact]
+        public void TheRodSnapsUpForTheLiftAndComesDownAfter()
+        {
+            Assert.True(Heave.RodRaised(holding: false, since: 0f));
+            Assert.True(Heave.RodRaised(false, Heave.LiftSeconds - 0.01f));
+            Assert.False(Heave.PoseOver(false, Heave.LiftSeconds - 0.01f));
+            Assert.True(Heave.PoseOver(false, Heave.LiftSeconds));
+        }
+
+        [Fact]
+        public void HeldUpAlreadyTheRodDipsAndComesBackUp()
+        {
+            Assert.False(Heave.RodRaised(holding: true, since: 0f));
+            Assert.False(Heave.RodRaised(true, Heave.DipSeconds - 0.01f));
+            Assert.True(Heave.RodRaised(true, Heave.DipSeconds));
+            Assert.True(Heave.PoseOver(true, Heave.DipSeconds));
+            Assert.True(Heave.DipSeconds < Heave.LiftSeconds);
+        }
+
+        [Fact]
         public void TheHeaveIsOnUnlessTheServerSwitchesItOff()
         {
             Assert.True(FishingRules.Default.Heave);

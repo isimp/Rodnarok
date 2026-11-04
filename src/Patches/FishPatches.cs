@@ -114,6 +114,13 @@ namespace Rodnarok
         }
     }
 
+    /// <summary>A heaving player's rod snaps up, or dips, over the raised pose the game draws for blocking, which every game sees.</summary>
+    [HarmonyPatch(typeof(Humanoid), "UpdateBlock")]
+    internal static class HeaveRodPose
+    {
+        private static void Postfix(Humanoid __instance) => Heaves.Pose(__instance);
+    }
+
     /// <summary>A rod line taut before or through a struggle is drawn straight and quivering over what the game drew.</summary>
     [HarmonyPatch(typeof(LineConnect), "LateUpdate")]
     internal static class TautLineDraws

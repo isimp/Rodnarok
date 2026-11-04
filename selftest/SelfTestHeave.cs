@@ -160,13 +160,34 @@ namespace Rodnarok
                 var near = TipToFloat(player, ff);
                 var line = LineLength(ff);
                 var stamina = player.GetStamina();
+                // The rod snaps up for the lift in the game's raised pose, which every game sees, and comes down after.
+                var animator = player.GetComponentInChildren<Animator>();
+                var posing = false;
+                var raisedFrames = 0;
+                var liftFrames = 0;
+                var pictured = false;
                 Press(player);
                 for (var waited = 0f; waited < Heave.LiftSeconds + 0.15f; waited += Time.deltaTime)
                 {
                     Aim(player, ff);
                     yield return null;
+                    posing |= Heaves.PosingForTest(player);
+                    if (waited > 0.05f && waited < Heave.LiftSeconds - 0.05f)
+                    {
+                        liftFrames++;
+                        if (animator != null && animator.GetBool("blocking")) raisedFrames++;
+                        if (daylight && !pictured && waited > 0.1f)
+                        {
+                            pictured = true;
+                            if (SelfTestPictures.Take("heave-rod-up") is string troubleUp) check.That(false, "a picture of the rod up in the heave is taken: " + troubleUp);
+                        }
+                    }
                 }
+                for (var waited = 0f; waited < 0.1f; waited += Time.deltaTime) yield return null;
                 if (ff == null || ff.GetCatch() != fish) yield break;
+                var downAfter = animator != null && !animator.GetBool("blocking") && !Heaves.PosingForTest(player);
+                check.That(posing && liftFrames > 0 && raisedFrames >= liftFrames - 1 && downAfter, "the rod snaps up into the game's raised pose for the lift and comes down after: raised "
+                    + raisedFrames.ToString(CultureInfo.InvariantCulture) + " of " + liftFrames.ToString(CultureInfo.InvariantCulture) + " lift frames, down after " + downAfter);
                 var spent = stamina - player.GetStamina();
                 var came = near - TipToFloat(player, ff);
                 var slack = LineLength(ff) - TipToFloat(player, ff);

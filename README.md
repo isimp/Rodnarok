@@ -12,7 +12,7 @@ Most of Rodnarök was written by Claude Code (Anthropic), which did the heavy li
 
 Each bait brings its own fish anywhere, and plain *Fishing Bait* also brings the fish that live where the float lands. A school swims in from out of sight, each kind showing its own sign on the water.
 
-When a fish bites, the float goes under and the crosshair ring drains: hold the line to hook it. While the fish struggles the ring is red, and holding strains the line until it snaps, so ease off. While it rests the ring is yellow: hold to reel it in. A still float means the fish rests a while yet; a restless float and a line going taut tell you it is about to bolt. In a rest the secondary attack heaves the fish nearer and leaves slack to wind in quickly, but slack still out when the fish bolts jolts the line. A missed bite may cost your bait.
+When a fish bites, the float goes under and the crosshair ring drains: hold the line to hook it. While the fish struggles the ring is red, and holding strains the line until it snaps, so ease off. While it rests the ring is yellow: hold to reel it in. A still float means the fish rests a while yet; a restless float and a line going taut tell you it is about to bolt. In a rest the secondary attack heaves the fish nearer and leaves slack to wind in quickly, but slack still out when the fish bolts jolts the line. Before the bite the same button jigs the float to hurry a waiting fish, but jig too quickly and a wary school flinches. A missed bite may cost your bait.
 
 Noise and quick reels scare the fish, and a line at the top left says why a school left. Cast out over deep water and keep still.
 

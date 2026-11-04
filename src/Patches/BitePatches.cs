@@ -36,6 +36,7 @@ namespace Rodnarok
         private static void Postfix(FishingFloat __instance, float __state)
         {
             Bites.StallLine(__instance, __state);
+            Heaves.JigStep(__instance);
             Lines.Step(__instance);
             Bites.Pull(__instance);
             Bites.WatchBait(__instance);
@@ -75,6 +76,7 @@ namespace Rodnarok
         {
             Lines.Forget(__instance);
             Bites.Forget(__instance);
+            Heaves.Forget(__instance);
         }
     }
 

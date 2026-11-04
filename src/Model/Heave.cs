@@ -31,6 +31,15 @@ namespace Rodnarok
         /// <summary>How much strain a heave into a struggle puts on the line.</summary>
         public const float StruggleStrain = 0.25f;
 
+        /// <summary>How long a rod already held up dips before it comes back up, in seconds.</summary>
+        public const float DipSeconds = 0.15f;
+
+        /// <summary>Whether the rod shows raised this long into a heave: snapped up for the lift, or, held up already, dipped first.</summary>
+        public static bool RodRaised(bool holding, float since) => holding ? since >= DipSeconds : since < LiftSeconds;
+
+        /// <summary>Whether the heave's rod motion is over and the rod shows as the game has it again.</summary>
+        public static bool PoseOver(bool holding, float since) => since >= (holding ? DipSeconds : LiftSeconds);
+
         /// <summary>How fast the lift brings the fish in, in metres a second.</summary>
         public static float LiftSpeed => Metres / LiftSeconds;
 
