@@ -412,6 +412,17 @@ namespace Rodnarok
         [ForTest]
         public static bool AwayForTest(FishingFloat ff) => ff != null && Casts.TryGetValue(ff, out var cast) && cast.Away;
 
+        /// <summary>
+        /// What a wary school of a float this game cast makes of the float now, for the self-test: the
+        /// float's speed as last measured, how long it has been dragged through the school (0 when not),
+        /// how frightened the school is and whether it was driven off.
+        /// </summary>
+        [ForTest]
+        public static (float FloatSpeed, float DraggedFor, int Fright, bool Spooked) WaryForTest(FishingFloat ff) =>
+            ff != null && Casts.TryGetValue(ff, out var cast)
+                ? (cast.FloatSpeed, cast.FastSince < 0f ? 0f : Time.time - cast.FastSince, cast.Fright, cast.Spooked)
+                : (0f, 0f, 0, false);
+
         /// <summary>A missed bite took the bait of a float this game cast: its school, or the fish called to it, moves on.</summary>
         public static void BaitTaken(FishingFloat ff)
         {

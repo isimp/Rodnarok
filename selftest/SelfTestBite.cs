@@ -282,6 +282,10 @@ namespace Rodnarok
                 var splashesThen = Thrash.SplashesForTest;
                 var splashesBefore = Thrash.SplashesForTest;
                 var restSplashes = 0;
+                // Splashes are counted only in the frames counted as struggling, with the longest
+                // stretch of such frames that had none and how many struggles they came from.
+                int struggleSplashes = 0, struggles = 0;
+                float splashGap = 0f, longestSplashGap = 0f;
                 var picturedStruggle = false;
                 var picturedRest = false;
                 var holding = true;
@@ -322,7 +326,16 @@ namespace Rodnarok
                     {
                         struggleDepth += depth * Time.deltaTime;
                         struggleTime += Time.deltaTime;
-                        if (struggleFrom < 0f) struggleFrom = Time.time;
+                        if (struggleFrom < 0f)
+                        {
+                            struggleFrom = Time.time;
+                            struggles++;
+                            splashGap = 0f;
+                        }
+                        var splashedNow = Thrash.SplashesForTest - splashesAtStep;
+                        struggleSplashes += splashedNow;
+                        splashGap = splashedNow > 0 ? 0f : splashGap + Time.deltaTime;
+                        longestSplashGap = Mathf.Max(longestSplashGap, splashGap);
                         if (Time.time - struggleFrom >= RiseSeconds)
                         {
                             settledDepth += depth * Time.deltaTime;
@@ -391,7 +404,10 @@ namespace Rodnarok
                     var high = settledTime > 0.2f ? settledDepth / settledTime : struggleDepth / struggleTime;
                     check.That(Mathf.Abs(high) < 0.3f, "a struggling fish thrashes at the surface once risen, " + high.ToString("0.00", CultureInfo.InvariantCulture) + " m under it on average past the first "
                         + RiseSeconds.ToString("0.0", CultureInfo.InvariantCulture) + " s of each struggle, " + (struggleDepth / struggleTime).ToString("0.00", CultureInfo.InvariantCulture) + " m over the whole");
-                    check.That(splashes / struggleTime >= 2f, "a struggling fish splashes at least twice a second, " + (splashes / struggleTime).ToString("0.0", CultureInfo.InvariantCulture) + " a second");
+                    check.That(struggleSplashes / struggleTime >= 2f, "a struggling fish splashes at least twice a second, " + (struggleSplashes / struggleTime).ToString("0.00", CultureInfo.InvariantCulture)
+                        + " a second: " + struggleSplashes.ToString(CultureInfo.InvariantCulture) + " splashes in " + struggleTime.ToString("0.00", CultureInfo.InvariantCulture) + " s of "
+                        + struggles.ToString(CultureInfo.InvariantCulture) + " struggles, the longest stretch without one " + longestSplashGap.ToString("0.00", CultureInfo.InvariantCulture)
+                        + " s, " + splashes.ToString(CultureInfo.InvariantCulture) + " splashes in the whole fight");
                 }
                 if (restTime > 0.5f) check.That(restSplashes == 0, "a resting fish splashes no more than the game has it, " + restSplashes.ToString(CultureInfo.InvariantCulture) + " extra splashes at rest");
                 check.That(ringWrong <= 3, ringWrong.ToString(CultureInfo.InvariantCulture) + " frames of the fight showed the ring wrong: red in a struggle, yellow at rest, its arc the line's strain over a faint track, at the bite's size; the last " + ringSeen);

@@ -110,13 +110,33 @@ namespace Rodnarok
                     + (Time.time - stillFrom).ToString("0.0", CultureInfo.InvariantCulture) + " s of the float lying still, and none of it left");
 
                 // Reeled in through the school a while, the float drives it off.
+                // The drag only counts with the school near the float or already off it, so how near it
+                // came is checked, and what the school made of the reel is told with the result.
                 for (var waited = 0f; waited < 40f && Nearest(SelfTestArrival.SchoolOf(floatId), ff) >= 6f; waited += Time.deltaTime) yield return null;
+                var nearDrag = Nearest(SelfTestArrival.SchoolOf(floatId), ff);
+                var awayDrag = Schools.AwayForTest(ff);
+                check.That(nearDrag < 6f, "before the long reel, a fish of the school comes within 6 m of the float within 40 s, the nearest " + nearDrag.ToString("0.0", CultureInfo.InvariantCulture) + " m");
+                var dragFrom = ff.transform.position;
                 SelfTestDraw.Reeling = true;
-                for (var waited = 0f; waited < Wary.DraggedSeconds + 2f && Schools.LeftForTest == leavingBefore; waited += Time.deltaTime) yield return null;
+                float dragReeled = 0f, fastest = 0f, longestDrag = 0f;
+                for (; dragReeled < Wary.DraggedSeconds + 2f && Schools.LeftForTest == leavingBefore && ff != null; dragReeled += Time.deltaTime)
+                {
+                    var wary = Schools.WaryForTest(ff);
+                    fastest = Mathf.Max(fastest, wary.FloatSpeed);
+                    longestDrag = Mathf.Max(longestDrag, wary.DraggedFor);
+                    yield return null;
+                }
                 SelfTestDraw.Reeling = false;
+                var dragMoved = ff != null ? Across(ff.transform.position, dragFrom) : 0f;
+                var afterDrag = Schools.WaryForTest(ff);
                 for (var waited = 0f; waited < 1f; waited += Time.deltaTime) yield return null;
                 check.That(Schools.LeftForTest > leavingBefore, "the float reeled in through the school a while drives it off; "
-                    + (Schools.LeftForTest - leavingBefore).ToString(CultureInfo.InvariantCulture) + " fish leaving");
+                    + (Schools.LeftForTest - leavingBefore).ToString(CultureInfo.InvariantCulture) + " fish leaving; before the reel the nearest fish "
+                    + nearDrag.ToString("0.0", CultureInfo.InvariantCulture) + " m off, the school " + (awayDrag ? "off the float" : "at it")
+                    + "; reeled " + dragReeled.ToString("0.0", CultureInfo.InvariantCulture) + " s over " + dragMoved.ToString("0.0", CultureInfo.InvariantCulture)
+                    + " m, the float measured at most " + fastest.ToString("0.0", CultureInfo.InvariantCulture) + " m/s (over " + Wary.FloatSpeed.ToString("0.0", CultureInfo.InvariantCulture)
+                    + " drags), dragged through it at most " + longestDrag.ToString("0.0", CultureInfo.InvariantCulture) + " s of " + Wary.DraggedSeconds.ToString("0", CultureInfo.InvariantCulture)
+                    + ", fright " + afterDrag.Fright.ToString(CultureInfo.InvariantCulture) + (ff == null ? ", the float gone" : ""));
                 var reeledOff = SchoolGone.Text(GoneWhy.Reeled, null);
                 check.That(Schools.LastGoneForTest == reeledOff, "driven off, the one fishing is told \"" + reeledOff + "\"; told \"" + Schools.LastGoneForTest + "\"");
             }
