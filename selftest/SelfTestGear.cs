@@ -24,6 +24,7 @@ namespace Rodnarok
         private static readonly AccessTools.FieldRef<Player, HashSet<string>> KnownMaterial = AccessTools.FieldRefAccess<Player, HashSet<string>>("m_knownMaterial");
         private static readonly AccessTools.FieldRef<Player, HashSet<string>> KnownRecipes = AccessTools.FieldRefAccess<Player, HashSet<string>>("m_knownRecipes");
         private static readonly System.Reflection.MethodInfo SetupLooks = AccessTools.Method(typeof(Humanoid), "SetupVisEquipment");
+        private static readonly System.Reflection.MethodInfo InventoryChanged = AccessTools.Method(typeof(Inventory), "Changed");
 
         private readonly Player _player;
         private readonly ItemDrop.ItemData _right;
@@ -32,7 +33,6 @@ namespace Rodnarok
         private readonly ItemDrop.ItemData _hiddenLeft;
         private readonly ItemDrop.ItemData _ammo;
         private readonly List<(ItemDrop.ItemData Item, int Stack)> _items;
-        private readonly int _bait;
         private readonly HashSet<string> _knownMaterial;
         private readonly HashSet<string> _knownRecipes;
         private readonly List<ItemDrop.ItemData> _equipped;
@@ -48,7 +48,6 @@ namespace Rodnarok
             _hiddenLeft = HiddenLeft(player);
             _ammo = Ammo(player);
             _items = player.GetInventory().GetAllItems().Select(i => (i, i.m_stack)).ToList();
-            _bait = BaitCount(player);
             _knownMaterial = new HashSet<string>(KnownMaterial(player));
             _knownRecipes = new HashSet<string>(KnownRecipes(player));
             _equipped = player.GetInventory().GetEquippedItems().ToList();
@@ -161,11 +160,19 @@ namespace Rodnarok
             SetupLooks?.Invoke(_player, new object[] { Looks(_player), false });
             if (_addedRod != null && inventory.ContainsItem(_addedRod)) inventory.RemoveItem(_addedRod);
 
-            // The bait count as before: what the run added taken out, what a cast spent of the character's given back.
-            var bait = BaitCount(_player);
-            var name = BaitName();
-            if (bait > _bait) inventory.RemoveItem(name, bait - _bait);
-            else if (bait < _bait) inventory.AddItem(BaitPrefab, _bait - bait, 1, 0, 0L, "", false);
+            // Every bait stack as before, of any bait: a cast spends from whichever stack the game picks, and
+            // the run's own bait lands in a stack of its own when the character's is full. The run's stacks go,
+            // the character's hold what they held, one spent to nothing put back.
+            var ammoType = BaitAmmoType();
+            foreach (var item in inventory.GetAllItems().ToList())
+                if (IsBait(item, ammoType) && !_items.Any(e => e.Item == item)) inventory.RemoveItem(item);
+            foreach (var (item, stack) in _items)
+            {
+                if (!IsBait(item, ammoType) || item.m_stack == stack && inventory.ContainsItem(item)) continue;
+                item.m_stack = stack;
+                if (!inventory.ContainsItem(item)) inventory.AddItem(item);
+            }
+            InventoryChanged?.Invoke(inventory, new object[] { false, false });
             var current = Ammo(_player);
             if (current != _ammo)
             {
@@ -215,8 +222,10 @@ namespace Rodnarok
 
         private static string Named(ItemDrop.ItemData item) => item.m_dropPrefab != null ? item.m_dropPrefab.name : item.m_shared.m_name;
 
-        private static string BaitName() => ObjectDB.instance.GetItemPrefab(BaitPrefab)?.GetComponent<ItemDrop>()?.m_itemData.m_shared.m_name ?? "$item_fishingbait";
+        /// <summary>The ammo kind every fishing bait shares, the rod's.</summary>
+        private static string BaitAmmoType() => ObjectDB.instance.GetItemPrefab(BaitPrefab)?.GetComponent<ItemDrop>()?.m_itemData.m_shared.m_ammoType ?? "$item_fishingbait";
 
-        private static int BaitCount(Player player) => player.GetInventory().CountItems(BaitName());
+        private static bool IsBait(ItemDrop.ItemData item, string ammoType) =>
+            item != null && item.m_shared.m_itemType == ItemDrop.ItemData.ItemType.Ammo && item.m_shared.m_ammoType == ammoType;
     }
 }

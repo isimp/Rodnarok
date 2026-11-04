@@ -56,6 +56,18 @@ namespace Rodnarok
 
         private static bool Travels(ArrivalSignKind kind) => kind == ArrivalSignKind.Bulge || kind == ArrivalSignKind.Glow || kind == ArrivalSignKind.Fin;
 
+        /// <summary>Moves a test fish to a place through its physics body, which the game steers a fish by; setting its position alone is undone by the body.</summary>
+        private static void Swim(GameObject go, Vector3 to)
+        {
+            var body = go.GetComponent<Rigidbody>();
+            if (body != null)
+            {
+                body.position = to;
+                body.linearVelocity = Vector3.zero;
+            }
+            go.transform.position = to;
+        }
+
         /// <summary>The character looks down at a place a little to its side, so the third-person camera shows it past the character.</summary>
         private static void Aim(Player player, Vector3 at)
         {
@@ -177,6 +189,7 @@ namespace Rodnarok
                 if (ringFit >= 0f) check.That(ringFit <= 0.08f, "the rings lie on the waves, at worst " + ringFit.ToString("0.000", CultureInfo.InvariantCulture) + " m off the water");
                 else check.Note("no ring showed near enough to the camera to check it lies on the waves");
                 var water = ArrivalSigns.WaterForTest(spot.Value);
+                check.Note("the water at the float: depth " + F(water.Depth) + ", wind " + F(water.Wind) + ", roughness " + F(water.Roughness) + ", signs shown " + (water.Clarity * 100f).ToString("0", CultureInfo.InvariantCulture) + "% clear");
                 check.That(water.Depth >= 0f && Mathf.Abs(water.Clarity - WaterMood.Clarity(water.Roughness)) < 0.001f, "the signs read the water at the float: depth " + F(water.Depth) + ", wind " + F(water.Wind) + ", roughness " + F(water.Roughness) + ", shown " + (water.Clarity * 100f).ToString("0", CultureInfo.InvariantCulture) + "% clear");
                 var made = ArrivalSigns.PartsMadeForTest() - madeBefore;
                 check.That(made <= 8 || made * 2 <= lastShown, "the signs use their parts again: " + made + " parts made for " + lastShown + " showings");
@@ -269,7 +282,7 @@ namespace Rodnarok
                     var shownAt = -1f;
                     for (var waited = 0f; waited < 4f; waited += Time.deltaTime)
                     {
-                        if (swims) go.transform.position = at + across * (-2f + 2f * waited);
+                        if (swims) Swim(go, at + across * (-2f + 2f * waited));
                         Aim(player, at + Vector3.up * 1.5f);
                         var seen = ArrivalSigns.ForTest(floatId);
                         kindSeen = seen.Kind;
@@ -295,6 +308,8 @@ namespace Rodnarok
                             yield return null;
                         }
                         var starredPicture = SelfTestPictures.Take("sign-" + name + "-two-stars-going");
+                        // The game keeps one screen capture a frame: the next picture waits for the next frame.
+                        yield return null;
                         if (starredPicture != null) wrong.Add("no picture of the starred " + name + ": " + starredPicture);
                         Schools.MarkGoingForTest(fish, ZDOID.None);
                         zdo.Set(ZDOVars.s_quality, 1);
@@ -315,7 +330,7 @@ namespace Rodnarok
                         var by = spot.Value + across * 1.5f + Vector3.down * 1.5f;
                         for (var waited = 0f; waited < 2.5f; waited += Time.deltaTime)
                         {
-                            go.transform.position = by;
+                            Swim(go, by);
                             Aim(player, spot.Value + Vector3.up * 1.5f);
                             yield return null;
                         }
