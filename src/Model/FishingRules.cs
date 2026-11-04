@@ -66,9 +66,6 @@ namespace Rodnarok
         /// <summary>Whether the rod's secondary attack heaves the hooked fish in a rest, leaving slack to wind in (<see cref="Rodnarok.Heave"/>).</summary>
         public bool Heave { get; private set; } = true;
 
-        /// <summary>Whether the rod's secondary attack jigs the float before the hook, drawing a waiting fish sooner (<see cref="Rodnarok.Jig"/>).</summary>
-        public bool Jig { get; private set; } = true;
-
         /// <summary>Whether the bait draws a school; without, one fish comes.</summary>
         public bool Schools { get; private set; } = true;
 
@@ -116,7 +113,6 @@ namespace Rodnarok
             float? signContrast = null,
             bool? struggleWarning = null,
             bool? heave = null,
-            bool? jig = null,
             bool? schools = null,
             bool? bumps = null,
             float? leaveBackstop = null,
@@ -162,7 +158,6 @@ namespace Rodnarok
             copy.SignContrast = signContrast ?? SignContrast;
             copy.StruggleWarning = struggleWarning ?? StruggleWarning;
             copy.Heave = heave ?? Heave;
-            copy.Jig = jig ?? Jig;
             return copy;
         }
     }

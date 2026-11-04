@@ -29,6 +29,16 @@ namespace Rodnarok.Tests
         }
 
         [Fact]
+        public void WhenTheSchoolLeavesTheFloatTheWispComesBackToThePlayer()
+        {
+            Assert.False(FloatWisp.Guards(floatOut: true, schoolLeft: true, hooked: false));
+            Assert.True(FloatWisp.Guards(floatOut: true, schoolLeft: false, hooked: false));
+            // A school scatters as its fish is hooked; the wisp stays with the fight.
+            Assert.True(FloatWisp.Guards(floatOut: true, schoolLeft: true, hooked: true));
+            Assert.False(FloatWisp.Guards(floatOut: false, schoolLeft: false, hooked: false));
+        }
+
+        [Fact]
         public void WhileTheFloatWaitsTheWispSearchesRoundItOnEverySide()
         {
             Assert.Equal(WispTask.Search, FloatWisp.Task(floatOut: true, biting: false, hooked: false));

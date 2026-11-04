@@ -76,6 +76,12 @@ namespace Rodnarok
         /// <summary>How wide the wisp's own clearing round the float is, in metres: the game's clearing where wisps gather.</summary>
         public const float PocketRange = 6f;
 
+        /// <summary>
+        /// Whether the wisp guards the float: while it is out and a school is at it or a fish is on the
+        /// line; once the school has left with nothing hooked, the wisp comes back to the player.
+        /// </summary>
+        public static bool Guards(bool floatOut, bool schoolLeft, bool hooked) => floatOut && (hooked || !schoolLeft);
+
         public static WispTask Task(bool floatOut, bool biting, bool hooked)
         {
             if (!floatOut) return WispTask.Home;

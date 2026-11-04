@@ -51,20 +51,9 @@ namespace Rodnarok
                 case RingLook.Rest:
                     return Fight(ring, 1f, YellowG, YellowB);
                 case RingLook.Waiting:
-                    // White as at the bite and its size, fading in with the waiting fish's distance over a faint track.
-                    var strength = Jig.RingStrength(ring.Open);
+                    // White as at the bite and its size, growing stronger as the fish comes closer, over a faint track.
+                    var strength = ApproachRing.Strength(ring.Open);
                     return new RingDraw(true, Size, 1f, 1f, 1f, 1f, strength, Track * strength);
-                case RingLook.Window:
-                    // The bite window's look: a whole-strength white arc draining clockwise over the hold.
-                    return new RingDraw(true, Size, 1f - Clamp01(ring.Open), 1f, 1f, 1f, 1f, Track);
-                case RingLook.Took:
-                    // A white flash, then faint yellow, the colour of a ring at rest.
-                    return ring.Open < Jig.TookFlashSeconds
-                        ? new RingDraw(true, Size, 1f, 1f, 1f, 1f, 1f, 0.4f)
-                        : new RingDraw(true, Size, 1f, 1f, YellowG, YellowB, 0.35f, 0.1f);
-                case RingLook.OffCue:
-                    // The struggle's red, blinked.
-                    return new RingDraw(true, Size, 1f, 1f, RedG, RedB, 0.9f, 0.2f);
                 default:
                     return default;
             }

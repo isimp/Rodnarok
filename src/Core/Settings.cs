@@ -25,7 +25,6 @@ namespace Rodnarok
         private static ConfigEntry<float> _signContrast;
         private static ConfigEntry<bool> _struggleWarning;
         private static ConfigEntry<bool> _heave;
-        private static ConfigEntry<bool> _jig;
         private static ConfigEntry<bool> _schools;
         private static ConfigEntry<bool> _bumps;
         private static ConfigEntry<bool> _tension;
@@ -115,7 +114,6 @@ namespace Rodnarok
                     signContrast: _signContrast.Value,
                     struggleWarning: _struggleWarning.Value,
                     heave: _heave.Value,
-                    jig: _jig.Value,
                     schools: _schools.Value,
                     bumps: _bumps.Value,
                     tension: _tension.Value,
@@ -202,8 +200,6 @@ namespace Rodnarok
                 "Whether a hooked fish shows its next struggle coming, for everyone: the float lies still while there is time, grows restless in the last 1.5 s before the struggle, and the line goes taut and quivers a moment before the fish bolts, sooner for a slow fish and later for a fast or starred one. Through the struggle the line stays taut and quivers harder the closer it is to snapping."));
             _heave = Sync(config.Bind(Section, "Heave", rules.Heave,
                 "Whether the rod's secondary attack heaves a hooked fish, for everyone. While the fish rests, a heave lifts it and the float 3 m toward you in 0.3 s for the rod's own secondary attack stamina, charged as the game charges an attack (20 on the game's rod at Fishing 0); the line hangs slack, and holding to reel winds slack in three times as fast with none of the fish's weight. If the fish starts to struggle with slack still out, the line is jolted by the slack, a whole heave's slack nearly snapping it. A heave while the fish struggles lifts nothing and strains the line a quarter of the way to snapping. The rod snaps up for the lift, or dips and comes back up if held up already."));
-            _jig = Sync(config.Bind(Section, "Jig", rules.Jig,
-                "Whether the rod's secondary attack jigs the float before a fish is hooked, for everyone. While a fish waits at your float, the one picked to bite as it hovers or a shy school as it hesitates, the crosshair ring fades in with it at the bite's size: faint with the fish 1.5 m from the float across the water, whole white within 0.6 m. Every 2 s the waiting fish makes a steady run in to the float and holds there a moment, the ring draining as a white arc meanwhile. The first jig of each hold draws the fish 1.5 s sooner and turns the ring yellow; any other jig is off cue, blinking the ring red, and a wary school near the float flinches. Every jig twitches the float 0.25 m toward you and flicks the rod up."));
             _schools = Sync(config.Bind(Section, "Schools", rules.Schools,
                 "Whether the bait draws a school of its fish, as many as the world spawns together, of which one takes the bait. Off, a single fish comes."));
             _bumps = Sync(config.Bind(Section, "Bumps", rules.Bumps,

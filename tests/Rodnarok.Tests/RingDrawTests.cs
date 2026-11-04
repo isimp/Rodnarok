@@ -32,59 +32,19 @@ namespace Rodnarok.Tests
         }
 
         [Fact]
-        public void WhileAFishWaitsTheRingKeepsTheBitesSizeAndFadesInWithItsDistance()
+        public void WhileASchoolIsAtTheFloatTheRingGrowsStrongerAsTheFishComesCloser()
         {
             var bite = RingDraw.For(Ring.ForBite(0f, 1.5f));
-            var near = RingDraw.For(Ring.ForWaiting(Jig.Reach));
-            var far = RingDraw.For(Ring.ForWaiting(Jig.Hover));
+            var near = RingDraw.For(Ring.ForWaiting(ApproachRing.Reach));
+            var far = RingDraw.For(Ring.ForWaiting(ApproachRing.Hover));
             Assert.True(near.Shown && far.Shown);
             Assert.Equal(bite.Scale, near.Scale, 3);
             Assert.Equal(bite.Scale, far.Scale, 3);
             Assert.True(near.R > 0.95f && near.G > 0.95f && near.B > 0.95f, "white as at the bite");
             Assert.Equal(1f, near.Fill, 3);
             Assert.Equal(1f, near.A, 3);
-            Assert.Equal(Jig.Faint, far.A, 3);
+            Assert.Equal(ApproachRing.Faint, far.A, 3);
             Assert.True(near.TrackA > 0f && near.TrackA < near.A, "a faint track behind it");
-        }
-
-        [Fact]
-        public void WhileTheFishHoldsTheRingIsAWhiteArcDrainingAsAfterABite()
-        {
-            var bite = RingDraw.For(Ring.ForBite(0f, 1.5f));
-            var start = RingDraw.For(Ring.ForWindow(0f));
-            var half = RingDraw.For(Ring.ForWindow(0.5f));
-            Assert.True(start.Shown && start.Scale == bite.Scale);
-            Assert.Equal(1f, start.Fill, 3);
-            Assert.Equal(0.5f, half.Fill, 3);
-            Assert.Equal(1f, half.A, 3);
-            Assert.True(half.R > 0.95f && half.G > 0.95f && half.B > 0.95f, "white");
-            Assert.True(half.TrackA > 0f, "the emptied part shows as a faint track");
-        }
-
-        [Fact]
-        public void AJigThatTookFlashesWhiteThenShowsFaintYellow()
-        {
-            var bite = RingDraw.For(Ring.ForBite(0f, 1.5f));
-            var flash = RingDraw.For(Ring.ForTook(0f));
-            var after = RingDraw.For(Ring.ForTook(Jig.TookFlashSeconds + 0.05f));
-            Assert.True(flash.Shown && flash.A >= 0.99f && flash.R > 0.95f && flash.B > 0.95f, "a white flash");
-            Assert.True(after.Shown && after.Scale == bite.Scale);
-            Assert.True(after.R > 0.95f && after.G > 0.9f && after.B < 0.1f, "yellow, as the ring at rest");
-            Assert.True(after.A > 0.2f && after.A < 0.6f, "faint, " + after.A);
-        }
-
-        [Fact]
-        public void AJigOffCueBlinksTheRingRedAtItsSize()
-        {
-            var bite = RingDraw.For(Ring.ForBite(0f, 1.5f));
-            var struggle = RingDraw.For(Ring.ForFight(struggling: true));
-            var off = RingDraw.For(Ring.ForOffCue());
-            Assert.True(off.Shown && off.Scale == bite.Scale && off.Fill == 1f);
-            Assert.Equal(struggle.R, off.R, 3);
-            Assert.Equal(struggle.G, off.G, 3);
-            Assert.Equal(struggle.B, off.B, 3);
-            Assert.True(off.A > 0.8f);
-            Assert.True(Jig.OffCueSeconds > 0.2f && Jig.OffCueSeconds <= 0.4f);
         }
 
         [Fact]

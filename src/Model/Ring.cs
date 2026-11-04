@@ -15,17 +15,8 @@ namespace Rodnarok
         /// <summary>The hooked fish rests: holding the line reels it in.</summary>
         Rest,
 
-        /// <summary>A school is at the float: the ring fades in with the waiting or nearest fish's distance across the water (<see cref="Jig"/>).</summary>
+        /// <summary>A school is at the float: the ring grows stronger as the waiting or nearest fish comes closer across the water (<see cref="ApproachRing"/>).</summary>
         Waiting,
-
-        /// <summary>The waiting fish holds by the float: the window for a jig, an arc draining over the hold.</summary>
-        Window,
-
-        /// <summary>A jig took: a white flash, then faint yellow.</summary>
-        Took,
-
-        /// <summary>A jig off cue: a short red blink.</summary>
-        OffCue,
     }
 
     /// <summary>
@@ -65,16 +56,7 @@ namespace Rodnarok
         /// <summary>The ring while a fish is hooked on a line this strained.</summary>
         public static Ring ForFight(bool struggling, float strain) => new Ring(struggling ? RingLook.Struggle : RingLook.Rest, 1f, strain);
 
-        /// <summary>The ring while a fish waits this far from the hook, in metres; <see cref="Open"/> carries the distance.</summary>
+        /// <summary>The ring while a school is at the float with its fish this far from it across the water, in metres; <see cref="Open"/> carries the distance.</summary>
         public static Ring ForWaiting(float distance) => new Ring(RingLook.Waiting, distance, null);
-
-        /// <summary>The ring while the waiting fish holds by the float, this share through the hold; <see cref="Open"/> carries the share.</summary>
-        public static Ring ForWindow(float share) => new Ring(RingLook.Window, share, null);
-
-        /// <summary>The ring this long after a jig took, in seconds; <see cref="Open"/> carries the time.</summary>
-        public static Ring ForTook(float since) => new Ring(RingLook.Took, since, null);
-
-        /// <summary>The ring blinking after a jig off cue.</summary>
-        public static Ring ForOffCue() => new Ring(RingLook.OffCue, 0f, null);
     }
 }

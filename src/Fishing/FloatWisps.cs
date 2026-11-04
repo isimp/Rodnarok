@@ -79,6 +79,8 @@ namespace Rodnarok
                 return;
             }
             var ff = Settings.FloatWisp ? CrosshairRing.OwnFloat() : null;
+            // A school gone from the float with nothing hooked leaves the wisp nothing to guard: it comes back.
+            if (ff != null && !FloatWisp.Guards(true, Schools.LeftFloat(ff), ff.GetCatch() != null)) ff = null;
             Guards.TryGetValue(wisplight, out var guard);
             if (ff == null)
             {
