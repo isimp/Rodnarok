@@ -28,8 +28,8 @@ namespace Rodnarok
         private static readonly HashSet<Fish> Slack = new HashSet<Fish>();
         private static readonly Dictionary<FishingFloat, Lift> Jigs = new Dictionary<FishingFloat, Lift>();
 
-        /// <summary>Each heaving player's rod motion: when the heave began and whether the rod was held up then.</summary>
-        private static readonly Dictionary<Humanoid, (float Since, bool Holding)> Poses = new Dictionary<Humanoid, (float, bool)>();
+        /// <summary>Each player's rod motion for a heave or a jig: when it began, whether the rod was held up then, and whether it is a jig's flick.</summary>
+        private static readonly Dictionary<Humanoid, (float Since, bool Holding, bool Flick)> Poses = new Dictionary<Humanoid, (float, bool, bool)>();
 
         private static readonly AccessTools.FieldRef<Character, ZSyncAnimation> Animation = AccessTools.FieldRefAccess<Character, ZSyncAnimation>("m_zanim");
         private static readonly AccessTools.FieldRef<Humanoid, bool> BlockingShown = AccessTools.FieldRefAccess<Humanoid, bool>("m_internalBlockingState");
@@ -44,8 +44,8 @@ namespace Rodnarok
 
         /// <summary>
         /// After the game drew a character's block pose, which with a rod is the raised reeling pose that
-        /// every game sees: through a heave the rod snaps up for the lift, or, held up already, dips and
-        /// comes back up; then it shows as the game has it again.
+        /// every game sees: through a heave the rod snaps up for the lift, through a jig it flicks up a
+        /// moment, or, held up already, it dips and comes back up; then it shows as the game has it again.
         /// </summary>
         public static void Pose(Humanoid humanoid)
         {
@@ -57,13 +57,13 @@ namespace Rodnarok
                 return;
             }
             var since = Time.time - pose.Since;
-            if (Heave.PoseOver(pose.Holding, since))
+            if (pose.Flick ? Jig.PoseOver(pose.Holding, since) : Heave.PoseOver(pose.Holding, since))
             {
                 Poses.Remove(humanoid);
                 zanim.SetBool(RaisedHash, InternalBlocking(humanoid));
                 return;
             }
-            zanim.SetBool(RaisedHash, Heave.RodRaised(pose.Holding, since));
+            zanim.SetBool(RaisedHash, pose.Flick ? Jig.RodRaised(pose.Holding, since) : Heave.RodRaised(pose.Holding, since));
         }
 
         /// <summary>Whether a character's rod is in a heave's motion now, for the self-test.</summary>
@@ -124,6 +124,7 @@ namespace Rodnarok
                 {
                     var floating = ff.GetComponent<Floating>();
                     if (!Jig.OnPress(rules.Jig, floating != null && floating.HaveLiquidLevel(), false)) return;
+                    Poses[player] = (Time.time, InternalBlocking(player), true);
                     var tipNow = Utils.FindChild(player.transform, "_RodTop");
                     var toward = (tipNow != null ? tipNow.position : player.transform.position) - ff.transform.position;
                     toward.y = 0f;
@@ -146,7 +147,7 @@ namespace Rodnarok
                         if (way.sqrMagnitude < 0.01f) return;
                         player.UseStamina(cost);
                         Lifts[fish] = new Lift { Until = Time.time + Heave.LiftSeconds, Way = way.normalized };
-                        Poses[player] = (Time.time, InternalBlocking(player));
+                        Poses[player] = (Time.time, InternalBlocking(player), false);
                         LiftedForTest++;
                         return;
                     case Heave.Pressed.Strains:

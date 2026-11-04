@@ -14,6 +14,15 @@ namespace Rodnarok
 
         /// <summary>The hooked fish rests: holding the line reels it in.</summary>
         Rest,
+
+        /// <summary>A fish waits at the float: the ring breathes with its distance from the hook (<see cref="Jig"/>).</summary>
+        Waiting,
+
+        /// <summary>A good jig: the ring flashes and closes.</summary>
+        Jigged,
+
+        /// <summary>A jig off cue with a wary school near: the ring jolts wide and fades.</summary>
+        Flinch,
     }
 
     /// <summary>
@@ -52,5 +61,14 @@ namespace Rodnarok
 
         /// <summary>The ring while a fish is hooked on a line this strained.</summary>
         public static Ring ForFight(bool struggling, float strain) => new Ring(struggling ? RingLook.Struggle : RingLook.Rest, 1f, strain);
+
+        /// <summary>The ring while a fish waits this far from the hook, in metres; <see cref="Open"/> carries the distance.</summary>
+        public static Ring ForWaiting(float distance) => new Ring(RingLook.Waiting, distance, null);
+
+        /// <summary>The ring through a good jig's flash, 0 at the jig to 1 at its end; <see cref="Open"/> carries the share.</summary>
+        public static Ring ForJigged(float share) => new Ring(RingLook.Jigged, share, null);
+
+        /// <summary>The ring through an off-cue jig's jolt, 0 at the jig to 1 at its end; <see cref="Open"/> carries the share.</summary>
+        public static Ring ForFlinch(float share) => new Ring(RingLook.Flinch, share, null);
     }
 }

@@ -7,50 +7,44 @@ using UnityEngine;
 namespace Rodnarok
 {
     /// <summary>
-    /// Before the hook the rod's secondary attack jigs the float. Pressed through the game's own controls
-    /// (<c>Player.SetControls</c>) as a key or gamepad press reaches it: with a school drawn by real bait
-    /// and its picked fish hovering by the float, a jig must bring the moment that fish may bite 1.5 s
-    /// sooner and twitch the float about a quarter metre toward the rod tip, hooking nothing. With a wary
-    /// school near the float, one jig must not startle it, and a second within 0.6 s must make it flinch.
-    /// Each float is taken away again with its school.
+    /// Before the hook the rod's secondary attack jigs the float, timed by the crosshair ring. Pressed
+    /// through the game's own controls (<c>Player.SetControls</c>) as a key or gamepad press reaches it.
+    /// With a school drawn by real bait and its picked fish hovering by the float: the ring must breathe
+    /// with the fish's distance from the hook as the rule has it, the fish must nose into reach during its
+    /// wait, a jig out of reach must draw nothing, the first jig in reach must bring the bite 1.5 s sooner
+    /// and flick the rod, and a second one that wait must draw nothing more. With a wary school, a jig off
+    /// cue must make it flinch. Pictures: the ring wide and the ring in reach. Each float is taken away
+    /// again with its school.
     /// </summary>
     internal static class SelfTestJig
     {
         private const string Bait = "FishingBait";
+
+        /// <summary>How far the drawn ring's size may stray from the rule for the fish's distance, the fish moving between frames.</summary>
+        private const float ScaleWithin = 0.08f;
 
         private static readonly AccessTools.FieldRef<Character, Quaternion> LookYaw = AccessTools.FieldRefAccess<Character, Quaternion>("m_lookYaw");
         private static readonly AccessTools.FieldRef<Player, float> LookPitch = AccessTools.FieldRefAccess<Player, float>("m_lookPitch");
 
         public static IEnumerable<Scenario> All()
         {
-            yield return new Scenario("AJigDrawsAHoveringFishSoonerAndJiggingAgainTooSoonStartlesAWarySchool", Jigging);
+            yield return new Scenario("TheRingBreathesWithAWaitingFishAndAJigInReachDrawsItSoonerOncePerWait", Jigging);
         }
 
         private static string F(float value, string format = "0.00") => value.ToString(format, CultureInfo.InvariantCulture);
 
+        private static string N(int value) => value.ToString(CultureInfo.InvariantCulture);
+
         private static void Press(Player player) =>
             player.SetControls(Vector3.zero, attack: false, attackHold: false, secondaryAttack: true, secondaryAttackHold: false, block: false, blockHold: false, jump: false, crouch: false, run: false, autoRun: false);
 
-        private static float TipToFloat(Player player, FishingFloat ff)
+        private static void Aim(Player player, FishingFloat ff)
         {
-            var tip = Utils.FindChild(player.transform, "_RodTop");
-            if (tip == null || ff == null) return 0f;
-            var a = tip.position;
-            var b = ff.transform.position;
-            return new Vector2(a.x - b.x, a.z - b.z).magnitude;
-        }
-
-        private static float Nearest(List<Fish> school, FishingFloat ff)
-        {
-            if (school == null || ff == null) return float.MaxValue;
-            var nearest = float.MaxValue;
-            foreach (var fish in school)
-            {
-                if (fish == null) continue;
-                var d = new Vector2(fish.transform.position.x - ff.transform.position.x, fish.transform.position.z - ff.transform.position.z).magnitude;
-                nearest = Mathf.Min(nearest, d);
-            }
-            return nearest;
+            if (ff == null) return;
+            var dir = ff.transform.position + Vector3.up * 1.2f - player.m_eye.position;
+            if (dir.sqrMagnitude < 0.01f) return;
+            player.SetLookDir(dir);
+            LookPitch(player) = -Mathf.Asin(Mathf.Clamp(dir.normalized.y, -1f, 1f)) * Mathf.Rad2Deg;
         }
 
         private static FishingFloat Cast(GameObject floatPrefab, GameObject baitPrefab, Player player, Vector3 at)
@@ -60,6 +54,14 @@ namespace Rodnarok
             var ff = Object.Instantiate(floatPrefab, at, Quaternion.identity).GetComponent<FishingFloat>();
             ff.Setup(player, Vector3.zero, 0f, null, null, bait);
             return ff;
+        }
+
+        /// <summary>The ring as drawn now: shown, its size and strength.</summary>
+        private static (bool Shown, float Scale, float A) Drawn()
+        {
+            var ring = CrosshairRing.ImageForTest;
+            if (ring == null || !ring.gameObject.activeInHierarchy) return (false, 0f, 0f);
+            return (true, ring.transform.localScale.x, ring.color.a);
         }
 
         private static IEnumerable Jigging(ScenarioCheck check)
@@ -72,6 +74,7 @@ namespace Rodnarok
             var baitPrefab = ObjectDB.instance.GetItemPrefab(Bait);
             check.That(floatPrefab != null && baitPrefab != null, "the float and the " + Bait + " prefabs are there");
             if (floatPrefab == null || baitPrefab == null) yield break;
+            check.That(Mathf.Approximately(Jig.Reach, Bites.Reach), "the ring's reach is the bite's, " + F(Jig.Reach) + " m against " + F(Bites.Reach) + " m");
 
             var gear = SelfTestGear.RodInHand(player);
             var yaw = LookYaw(player);
@@ -83,72 +86,125 @@ namespace Rodnarok
                 if (gear.Rod == null) yield break;
                 for (var waited = 0f; waited < 3f && Utils.FindChild(player.transform, "_RodTop") == null; waited += Time.deltaTime) yield return null;
                 foreach (var frame in SelfTestArrival.UntilNoSchoolLeaves()) yield return frame;
+                var daylight = EnvMan.IsDaylight();
 
-                // 1. A picked fish hovering by the float comes sooner for a jig.
+                // 1. A picked fish hovering by the float, the school not wary.
                 PlayRules.ForTest = SelfTestRules.Normal.With(waitMin: 1f, waitMax: 1f, schools: true, callWorldFish: false, wary: false, bumps: false, jig: true);
                 ff = Cast(floatPrefab, baitPrefab, player, spot.Value);
                 Fish picked = null;
-                var freeIn = 0f;
                 for (var waited = 0f; waited < 60f && picked == null; waited += Time.deltaTime)
                 {
                     var (biter, free) = Schools.BiterForTest(ff);
-                    if (biter != null && free > Jig.Cut + 0.3f)
-                    {
-                        picked = biter;
-                        freeIn = free;
-                        break;
-                    }
+                    if (biter != null && free > 2f) picked = biter;
+                    Aim(player, ff);
                     yield return null;
                 }
-                check.That(picked != null, "a school comes to the baited float and picks a fish to bite, hovering more than " + F(Jig.Cut + 0.3f, "0.0") + " s before it may, within 60 s");
+                check.That(picked != null, "a school comes to the baited float and picks a fish to bite, hovering more than 2 s before it may, within 60 s");
                 if (picked == null || ff == null) yield break;
-                var jigged = Heaves.JiggedForTest;
+
+                // The ring breathes with the fish's distance; out of reach a jig draws nothing; the fish noses into reach.
+                int frames = 0, wrong = 0;
+                var wrongSeen = "";
+                var nearest = float.MaxValue;
+                var offCueTried = false;
+                var offCueDrew = false;
+                bool picturedFar = false, picturedNear = false;
+                var inReach = false;
+                for (var waited = 0f; waited < 4f && !inReach; waited += Time.deltaTime)
+                {
+                    Aim(player, ff);
+                    yield return null;
+                    if (ff == null) yield break;
+                    var (fish, distance, used) = Schools.WaitingForTest(ff);
+                    if (fish == null) break;
+                    nearest = Mathf.Min(nearest, distance);
+                    var drawn = Drawn();
+                    frames++;
+                    var scale = RingDraw.For(Ring.ForWaiting(distance)).Scale;
+                    if (!drawn.Shown || Mathf.Abs(drawn.Scale - scale) > ScaleWithin)
+                    {
+                        wrong++;
+                        wrongSeen = (drawn.Shown ? "size " + F(drawn.Scale) : "hidden") + " for the rule's " + F(scale) + " at " + F(distance) + " m";
+                    }
+                    if (daylight && !picturedFar && distance > Jig.Hover - 0.3f)
+                    {
+                        picturedFar = true;
+                        if (SelfTestPictures.Take("jig-ring-far") is string trouble) check.That(false, "a picture of the wide ring is taken: " + trouble);
+                    }
+                    if (!offCueTried && distance > Jig.Reach + 0.3f)
+                    {
+                        offCueTried = true;
+                        var before = Schools.JigCutsForTest;
+                        var freeBefore = Schools.BiterForTest(ff).FreeIn;
+                        Press(player);
+                        offCueDrew = Schools.JigCutsForTest != before || Schools.BiterForTest(ff).FreeIn < freeBefore - 0.2f;
+                    }
+                    inReach = Jig.InReach(distance);
+                    if (inReach && daylight && !picturedNear)
+                    {
+                        picturedNear = true;
+                        if (SelfTestPictures.Take("jig-ring-near") is string trouble) check.That(false, "a picture of the ring in reach is taken: " + trouble);
+                    }
+                }
+                check.That(frames > 0 && wrong <= frames / 10 + 1, "while the picked fish hovers the ring breathes with its distance from the hook, at the bite's size in reach and twice that at the hover's edge: "
+                    + N(wrong) + " of " + N(frames) + " frames off" + (wrong > 0 ? ", the last " + wrongSeen : ""));
+                check.That(offCueTried && !offCueDrew, "a jig with the fish out of reach draws it no sooner" + (offCueTried ? "" : " (the fish was never out of reach to try)"));
+                check.That(inReach, "the hovering fish noses into reach of the hook within 4 s, nearest " + F(nearest) + " m");
+                if (!inReach || ff == null) yield break;
+
+                // In reach: the first jig of the wait draws it 1.5 s sooner and flicks the rod; a second draws nothing more.
                 var cuts = Schools.JigCutsForTest;
-                var near = TipToFloat(player, ff);
+                var freeIn = Schools.BiterForTest(ff).FreeIn;
                 var pressedAt = Time.time;
                 Press(player);
-                var (after, freeAfter) = Schools.BiterForTest(ff);
+                var freeAfter = Schools.BiterForTest(ff).FreeIn;
+                var flicking = Heaves.PosingForTest(player);
                 var expected = freeIn - Jig.Cut - (Time.time - pressedAt);
-                check.That(Heaves.JiggedForTest == jigged + 1 && Schools.JigCutsForTest == cuts + 1 && after == picked && Mathf.Abs(freeAfter - expected) < 0.1f,
-                    "a jig brings the hovering fish's bite " + F(Jig.Cut, "0.0") + " s sooner: " + F(freeIn) + " s to wait before, " + F(freeAfter) + " s after");
-                for (var waited = 0f; waited < Jig.Seconds + 0.15f; waited += Time.deltaTime) yield return null;
-                var twitched = ff != null ? near - TipToFloat(player, ff) : 0f;
-                check.That(twitched > Jig.Metres * 0.4f && twitched < Jig.Metres * 2f, "the jig twitches the float about " + F(Jig.Metres) + " m toward the rod tip, " + F(twitched) + " m");
-                check.That(ff != null && ff.GetCatch() == null, "a jig hooks nothing");
+                check.That(Schools.JigCutsForTest == cuts + 1 && Mathf.Abs(freeAfter - Mathf.Max(0f, expected)) < 0.15f,
+                    "the first jig with the fish in reach brings its bite " + F(Jig.Cut, "0.0") + " s sooner: " + F(freeIn) + " s to wait before, " + F(freeAfter) + " s after");
+                check.That(flicking, "the jig flicks the rod up");
+                yield return null;
+                var flash = Drawn();
+                check.That(flash.Shown && flash.Scale <= RingDraw.For(Ring.ForWaiting(0f)).Scale + 0.01f, "the ring flashes closed at the good jig, size " + F(flash.Scale));
+                for (var waited = 0f; waited < Jig.FlickSeconds + 0.1f; waited += Time.deltaTime) yield return null;
+                check.That(!Heaves.PosingForTest(player), "the rod's flick is over within " + F(Jig.FlickSeconds) + " s");
+                var cutsAfter = Schools.JigCutsForTest;
+                if (ff != null && Schools.WaitingForTest(ff).Fish != null)
+                {
+                    Press(player);
+                    check.That(Schools.JigCutsForTest == cutsAfter, "a second jig in the same wait draws the fish no sooner");
+                }
                 if (ff != null) ZNetScene.instance.Destroy(ff.gameObject);
                 ff = null;
                 foreach (var frame in SelfTestArrival.UntilNoSchoolLeaves()) yield return frame;
 
-                // 2. A wary school near the float: one jig leaves it be, a second too soon makes it flinch.
+                // 2. A wary school: a jig off cue makes it flinch, and the ring jolts.
                 PlayRules.ForTest = SelfTestRules.Normal.With(waitMin: 1f, waitMax: 1f, schools: true, callWorldFish: false, wary: true, bumps: false, jig: true);
                 ff = Cast(floatPrefab, baitPrefab, player, spot.Value);
-                var floatId = ff.GetComponent<ZNetView>().GetZDO().m_uid;
-                var schoolNear = false;
-                for (var waited = 0f; waited < 60f && !schoolNear; waited += Time.deltaTime)
+                var ready = false;
+                for (var waited = 0f; waited < 60f && !ready; waited += Time.deltaTime)
                 {
-                    schoolNear = ff != null && Nearest(SelfTestArrival.SchoolOf(floatId), ff) < 5f && !Schools.AwayForTest(ff) && Schools.BiterForTest(ff).Fish == null;
+                    var (fish, distance, _) = Schools.WaitingForTest(ff);
+                    ready = fish != null && distance > Jig.Reach + 0.3f && !Schools.AwayForTest(ff);
+                    Aim(player, ff);
                     yield return null;
                 }
-                check.That(schoolNear, "a wary school comes within 5 m of the float within 60 s");
-                if (!schoolNear || ff == null) yield break;
-                var startled = Schools.StartledForTest;
+                check.That(ready, "a wary school waits at the float with its fish out of reach within 60 s");
+                if (!ready || ff == null) yield break;
                 var startles = Schools.JigStartlesForTest;
                 Press(player);
-                for (var waited = 0f; waited < Jig.TooSoonSeconds + 0.2f; waited += Time.deltaTime) yield return null;
-                check.That(Schools.StartledForTest == startled && Schools.JigStartlesForTest == startles && ff != null && !Schools.AwayForTest(ff),
-                    "one jig leaves a wary school near the float be: startled " + (Schools.StartledForTest - startled).ToString(CultureInfo.InvariantCulture) + " times");
-                Press(player);
-                for (var waited = 0f; waited < 0.2f; waited += Time.deltaTime) yield return null;
-                Press(player);
                 yield return null;
-                check.That(Schools.JigStartlesForTest == startles + 1 && ff != null && Schools.AwayForTest(ff),
-                    "jigging again within " + F(Jig.TooSoonSeconds, "0.0") + " s makes the wary school flinch off the float: " + (Schools.JigStartlesForTest - startles).ToString(CultureInfo.InvariantCulture) + " startles by jigging");
+                var jolt = Drawn();
+                check.That(Schools.JigStartlesForTest == startles + 1 && Schools.AwayForTest(ff), "a jig off cue makes the wary school flinch off the float, "
+                    + N(Schools.JigStartlesForTest - startles) + " startles by jigging");
+                check.That(jolt.Shown && jolt.Scale >= RingDraw.For(Ring.ForWaiting(Jig.Hover)).Scale - 0.01f, "the ring jolts wide as it flinches, size " + F(jolt.Scale));
             }
             finally
             {
                 PlayRules.ForTest = null;
                 if (ff != null) ZNetScene.instance.Destroy(ff.gameObject);
                 gear.PutBack();
+                SelfTestPictures.Forget();
                 if (player != null)
                 {
                     LookYaw(player) = yaw;

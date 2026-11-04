@@ -103,7 +103,12 @@ namespace Rodnarok
             public int Fright;
             public bool Flinched;
             public float FastSince = -1f;
-            public float JiggedAt = -1f;
+            // The jig (Jig): when the wait under way began, the wait a good jig was spent on, and when the
+            // last good jig and off-cue jig came, for the ring.
+            public float WaitStart = -1f;
+            public float JigUsedFor = -2f;
+            public float GoodJigAt = -10f;
+            public float OffCueAt = -10f;
             public float ReadyAt = -1f;
             public float Shyness;
             public Vector3 FloatSeen;
@@ -648,6 +653,7 @@ namespace Rodnarok
                     if (cast.In && Mathf.Approximately(fish.m_swimRange, Bumps.Hover)) fish.m_swimRange = CircleRange;
                 }
             }
+            NoseIn(cast);
             if (cast.Hooked || cast.Fish.Count == 0 || cast.BiterFreeAt < float.MaxValue) return;
             var near = cast.Fish.Count(f => Across(f.transform.position, cast.Float.transform.position) < Near);
             if (School.ReadyToBite(Time.time - cast.CameAt, cast.SwimSeconds, near, cast.Fish.Count, cast.Spooked))
@@ -658,6 +664,7 @@ namespace Rodnarok
                 if (keen.Count == 0) return;
                 cast.Biter = keen[School.Biter(keen.Count, Random.value)];
                 cast.BiterFreeAt = Time.time + Random.Range(2f, 4f);
+                cast.WaitStart = Time.time;
                 cast.BumpsAt.Clear();
                 foreach (var after in Bumps.Times(Rules.Bumps, cast.BiterFreeAt - Time.time, Random.value, Random.value, Random.value)) cast.BumpsAt.Add(Time.time + after);
             }
@@ -802,59 +809,125 @@ namespace Rodnarok
         }
 
         /// <summary>
-        /// A school ready to bite close to the one fishing or in shallow water is shy: once, as it is
-        /// first ready, it may give up and swim off; otherwise it hesitates the longer the shyer it is.
-        /// True while it hesitates or once it gave up.
+        /// The fish waiting at a cast's float, and how far it is from the hook: the one picked to bite while
+        /// it hovers, or the nearest of a wary school while it hesitates; none otherwise.
         /// </summary>
+        private static (Fish Fish, float Distance) Waiting(Cast cast)
+        {
+            if (cast.Hooked || cast.Spooked || cast.Away || cast.Float == null) return (null, 0f);
+            var hook = Bites.Hook(cast.Float);
+            var now = Time.time;
+            if (cast.Biter >= 0 && cast.Biter < cast.Fish.Count && cast.BiterFreeAt < float.MaxValue && now < cast.BiterFreeAt)
+            {
+                var picked = cast.Fish[cast.Biter];
+                return picked != null ? (picked, Vector3.Distance(picked.transform.position, hook)) : (null, 0f);
+            }
+            if (Rules.Wary && cast.ReadyAt >= 0f && cast.BiterFreeAt >= float.MaxValue && now - cast.ReadyAt < Wary.Hesitation(cast.Shyness))
+            {
+                Fish nearest = null;
+                var best = float.MaxValue;
+                foreach (var fish in cast.Fish)
+                {
+                    if (fish == null) continue;
+                    var d = Vector3.Distance(fish.transform.position, hook);
+                    if (d < best)
+                    {
+                        best = d;
+                        nearest = fish;
+                    }
+                }
+                return (nearest, best);
+            }
+            return (null, 0f);
+        }
+
+        /// <summary>How long the cast's wait has left before its fish may bite or its hesitation ends, in seconds.</summary>
+        private static float WaitLeft(Cast cast) =>
+            cast.BiterFreeAt < float.MaxValue ? cast.BiterFreeAt - Time.time : cast.ReadyAt + Wary.Hesitation(cast.Shyness) - Time.time;
+
+        /// <summary>The waiting fish noses in toward the hook now and then (<see cref="Jig.Nosing"/>), so every wait has its moments for a jig.</summary>
+        private static void NoseIn(Cast cast)
+        {
+            if (!Rules.Jig || cast.WaitStart < 0f) return;
+            var (fish, _) = Waiting(cast);
+            if (fish == null || !Jig.Nosing(Time.time - cast.WaitStart, WaitLeft(cast))) return;
+            var view = fish.GetComponent<ZNetView>();
+            if (view == null || !view.IsValid() || !view.IsOwner()) return;
+            FishWaypoint(fish) = Bites.Hook(cast.Float);
+        }
+
         /// <summary>
-        /// A float of this game was jigged: a fish waiting at it comes sooner, the one picked to bite as it
-        /// hovers or a shy school as it hesitates (<see cref="Jig"/>). How fast the twitch moved the float is
-        /// left to the wary school's own measuring, so jigging too quickly makes it flinch.
+        /// A float of this game was jigged (<see cref="Jig"/>): the first jig of a wait with the waiting fish
+        /// in reach of the hook draws it sooner, the one picked to bite as it hovers or a shy school as it
+        /// hesitates; any other is off cue, and a wary school near the float flinches as at a quickly moved
+        /// float, counting toward driving it off.
         /// </summary>
         public static void Jigged(FishingFloat ff)
         {
             if (ff == null || !Casts.TryGetValue(ff, out var cast) || cast.Hooked || cast.Spooked) return;
             var now = Time.time;
-            var tooSoon = Jig.TooSoon(cast.JiggedAt < 0f ? float.PositiveInfinity : now - cast.JiggedAt);
-            cast.JiggedAt = now;
-            if (tooSoon)
+            var (fish, distance) = Waiting(cast);
+            var used = cast.WaitStart >= 0f && Mathf.Approximately(cast.JigUsedFor, cast.WaitStart);
+            if (Jig.Judge(used, fish != null && Jig.InReach(distance)) == Jig.Judged.Good)
             {
-                // Jigged again too soon: a wary school near the float flinches as at a quickly moved float, and no fish comes sooner.
-                var at = cast.Float.transform.position;
-                var near = cast.Fish.Any(f => f != null && Across(f.transform.position, at) < Near);
-                if (Rules.Wary && near && !cast.Away)
-                {
-                    cast.QuietSince = now;
-                    Fright(cast, at, null);
-                    JigStartlesForTest++;
-                }
+                cast.JigUsedFor = cast.WaitStart;
+                cast.GoodJigAt = now;
+                if (cast.BiterFreeAt < float.MaxValue) cast.BiterFreeAt = Jig.SoonerFree(cast.BiterFreeAt, now);
+                else cast.ReadyAt = Jig.SoonerReady(cast.ReadyAt);
+                JigCutsForTest++;
                 return;
             }
-            if (cast.Biter >= 0 && cast.BiterFreeAt < float.MaxValue && cast.BiterFreeAt > now)
+            var at = cast.Float.transform.position;
+            var near = cast.Fish.Any(f => f != null && Across(f.transform.position, at) < Near);
+            if (Rules.Wary && near && !cast.Away)
             {
-                cast.BiterFreeAt = Jig.SoonerFree(cast.BiterFreeAt, now);
-                JigCutsForTest++;
+                cast.OffCueAt = now;
+                cast.QuietSince = now;
+                Fright(cast, at, null);
+                JigStartlesForTest++;
             }
-            else if (cast.ReadyAt >= 0f && cast.BiterFreeAt >= float.MaxValue)
-            {
-                cast.ReadyAt = Jig.SoonerReady(cast.ReadyAt);
-                JigCutsForTest++;
-            }
+        }
+
+        /// <summary>The crosshair ring for a float of this game while no fish bites or is hooked: the waiting fish's breathing ring, a good jig's flash or an off-cue jig's jolt.</summary>
+        public static Ring JigRing(FishingFloat ff)
+        {
+            if (!Rules.Jig || ff == null || !Casts.TryGetValue(ff, out var cast) || cast.Hooked) return Ring.Hidden;
+            var now = Time.time;
+            if (now - cast.GoodJigAt < Jig.FlashSeconds) return Ring.ForJigged((now - cast.GoodJigAt) / Jig.FlashSeconds);
+            if (now - cast.OffCueAt < Jig.JoltSeconds) return Ring.ForFlinch((now - cast.OffCueAt) / Jig.JoltSeconds);
+            var (fish, distance) = Waiting(cast);
+            var used = cast.WaitStart >= 0f && Mathf.Approximately(cast.JigUsedFor, cast.WaitStart);
+            return fish != null && !used ? Ring.ForWaiting(distance) : Ring.Hidden;
+        }
+
+        /// <summary>The waiting fish of a float of this game and its distance from the hook, and whether this wait's good jig is spent, for the self-test.</summary>
+        [ForTest]
+        public static (Fish Fish, float Distance, bool Used) WaitingForTest(FishingFloat ff)
+        {
+            if (ff == null || !Casts.TryGetValue(ff, out var cast)) return (null, 0f, false);
+            var (fish, distance) = Waiting(cast);
+            return (fish, distance, cast.WaitStart >= 0f && Mathf.Approximately(cast.JigUsedFor, cast.WaitStart));
         }
 
         /// <summary>How many jigs drew a waiting fish sooner in this game, for the self-test.</summary>
         [ForTest]
         public static int JigCutsForTest { get; private set; }
 
-        /// <summary>How many jigs that came too soon startled a wary school in this game, for the self-test.</summary>
+        /// <summary>How many off-cue jigs startled a wary school in this game, for the self-test.</summary>
         [ForTest]
         public static int JigStartlesForTest { get; private set; }
 
+        /// <summary>
+        /// A school ready to bite close to the one fishing or in shallow water is shy: once, as it is
+        /// first ready, it may give up and swim off; otherwise it hesitates the longer the shyer it is.
+        /// True while it hesitates or once it gave up.
+        /// </summary>
         private static bool Hesitates(Cast cast)
         {
             if (cast.ReadyAt < 0f)
             {
                 cast.ReadyAt = Time.time;
+                cast.WaitStart = Time.time;
                 var at = cast.Float.transform.position;
                 var angler = Player.m_localPlayer;
                 var anglerDistance = angler != null ? Across(angler.transform.position, at) : Wary.FarOut;

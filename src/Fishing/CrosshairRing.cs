@@ -89,15 +89,22 @@ namespace Rodnarok
             return image;
         }
 
-        /// <summary>The ring a float calls for: the fight while a fish is on the line, else the bite while its window lasts.</summary>
+        /// <summary>
+        /// The ring a float calls for: the fight while a fish is on the line, else the bite while its
+        /// window lasts, else a waiting fish's breathing ring for the jig.
+        /// </summary>
         private static Ring RingFor(FishingFloat ff)
         {
             if (ff == null) return Ring.Hidden;
             var fish = ff.GetCatch();
             if (fish != null)
                 return PlayRules.Now.Tension ? Ring.ForFight(fish.IsEscaping(), Lines.StrainOf(ff)) : Ring.ForFight(fish.IsEscaping());
-            if (Nibbler(ff) == null) return Ring.Hidden;
-            return Ring.ForBite(Time.time - NibbleTime(ff), PlayRules.Now.HookWindow);
+            if (Nibbler(ff) != null)
+            {
+                var bite = Ring.ForBite(Time.time - NibbleTime(ff), PlayRules.Now.HookWindow);
+                if (bite.Look != RingLook.Hidden) return bite;
+            }
+            return Schools.JigRing(ff);
         }
 
         /// <summary>The float this game cast, if one is out.</summary>

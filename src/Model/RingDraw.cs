@@ -50,6 +50,16 @@ namespace Rodnarok
                     return Fight(ring, 1f, RedG, RedB);
                 case RingLook.Rest:
                     return Fight(ring, 1f, YellowG, YellowB);
+                case RingLook.Waiting:
+                    // White as at the bite, breathing with the waiting fish's distance over a faint track.
+                    var strength = Jig.RingStrength(ring.Open);
+                    return new RingDraw(true, Size * Jig.RingScale(ring.Open), 1f, 1f, 1f, 1f, strength, Track * strength);
+                case RingLook.Jigged:
+                    var flash = Clamp01(ring.Open);
+                    return new RingDraw(true, Size * (1f - 0.3f * flash), 1f, 1f, 1f, 1f, 1f - flash, 0f);
+                case RingLook.Flinch:
+                    var jolt = Clamp01(ring.Open);
+                    return new RingDraw(true, Size * (2f + 1.2f * jolt), 1f, 1f, 1f, 1f, 0.5f * (1f - jolt), 0f);
                 default:
                     return default;
             }
