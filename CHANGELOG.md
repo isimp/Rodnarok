@@ -2,7 +2,7 @@
 
 ## 0.2.2
 
-The signs of a fish coming to your float follow the school's way in instead of jumping between its fish, and the *Trollfish*'s wake trails where it swam. At the float they go quiet until one fish goes for the bait, which the sign then follows in.
+The signs of a fish coming to your float follow the school's way in instead of jumping between its fish, and the *Trollfish* shows as a hump of water surging up with spray, its wake trailing where it swam. At the float they go quiet until one fish goes for the bait, which the sign then follows in.
 
 The signs take the light of the hour and the weather, warm at dusk and dull in rain, with a bright crest over a darker trough, and far ones fade into the fog.
 
@@ -11,6 +11,8 @@ Your float twitches toward the fish going for the bait in its last moments, and 
 The signs ride the waves and drift with the wind. Calm water shows them clear and whole, rough water fainter and broken, so a *Serpent trophy*'s calm water reads best.
 
 How strongly the signs show is a server setting, from half to twice as strong. Server setting `SignContrast`.
+
+Only the fish your float's sign follows takes your bait: other wild fish leave it alone until a fish is hooked, and the fish picked to bite stays by the float and bumps it only from there.
 
 A hooked fish shows its next struggle coming. Your float lies still while there is time, grows restless in the last moments of a rest, and the line goes taut and quivers just before the fish bolts, later for a fast or starred fish. Through the struggle the line stays taut and shakes harder the closer it comes to snapping. Server setting `StruggleWarning`.
 

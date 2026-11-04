@@ -53,6 +53,14 @@ namespace Rodnarok
             public Vector3 Axis;
             public List<(Transform T, Vector3 Pos, Quaternion Rot)> Look;
             public WaterVolume Water;
+            public float Surge;
+            public float HumpHeight;
+            public float HumpLength;
+            public float HumpSpray;
+            public Mesh HumpMesh;
+            public readonly Vector3[] HumpTop = new Vector3[HumpPoints + 1];
+            public readonly Vector3[] HumpVerts = new Vector3[(HumpPoints + 1) * 2];
+            public readonly Color[] HumpColours = new Color[(HumpPoints + 1) * 2];
             public readonly float[] WakeY = new float[WakePoints];
             public readonly float[] WakeSamples = new float[WakePoints / WakeEvery + 2];
             public readonly int[] WakeIndex = new int[WakePoints / WakeEvery + 2];
@@ -104,11 +112,11 @@ namespace Rodnarok
 
         /// <summary>The light the signs are drawn in now, for the self-test: the crest and trough colours, the game's light they come from, and its fog.</summary>
         [ForTest]
-        public static (Color Crest, Color Trough, Color Sun, float Intensity, float SunUp, Color Ambient, SignFog Fog, float FogDensity) LightForTest()
+        public static (Color Crest, Color Trough, Color Sun, float Intensity, float SunUp, Color Ambient, SignFog Fog, float FogDensity, Color Sky) LightForTest()
         {
             var env = EnvMan.instance;
             var sun = env != null && env.m_dirLight != null ? env.m_dirLight : null;
-            return (_crest, _trough, sun != null ? sun.color : Color.black, sun != null ? sun.intensity : 0f, _toSun.y, RenderSettings.ambientLight, _fogMode, _fogDensity);
+            return (_crest, _trough, sun != null ? sun.color : Color.black, sun != null ? sun.intensity : 0f, _toSun.y, RenderSettings.ambientLight, _fogMode, _fogDensity, RenderSettings.fogColor);
         }
 
         /// <summary>The sign a float's coming fish show and how many times it showed, for the self-test; Rings and 0 for none.</summary>
@@ -330,15 +338,24 @@ namespace Rodnarok
             switch (kind)
             {
                 case ArrivalSignKind.Bulge:
-                    var blob = new GameObject("Bulge").AddComponent<SpriteRenderer>();
-                    blob.sprite = DotSprite();
-                    blob.transform.SetParent(go.transform, false);
-                    blob.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-                    var rim = new GameObject("Rim").AddComponent<SpriteRenderer>();
-                    rim.sprite = DotSprite();
-                    rim.transform.SetParent(go.transform, false);
-                    rim.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-                    rim.sortingOrder = 1;
+                    // A hump of water standing up from the surface, facing the one looking: a crest over a darker band, spray off its front.
+                    var band = new GameObject("Band");
+                    band.transform.SetParent(go.transform, false);
+                    band.AddComponent<MeshFilter>().sharedMesh = new Mesh { name = "RodnarokHump" };
+                    band.AddComponent<MeshRenderer>().sharedMaterial = SignMaterial();
+                    var crest = new GameObject("Crest").AddComponent<LineRenderer>();
+                    crest.transform.SetParent(go.transform, false);
+                    crest.useWorldSpace = true;
+                    crest.positionCount = HumpPoints + 1;
+                    crest.sharedMaterial = SignMaterial();
+                    for (var i = 0; i < SprayTicks; i++)
+                    {
+                        var spray = new GameObject("Spray" + i).AddComponent<LineRenderer>();
+                        spray.transform.SetParent(go.transform, false);
+                        spray.useWorldSpace = true;
+                        spray.positionCount = 2;
+                        spray.sharedMaterial = SignMaterial();
+                    }
                     Wake(go, "WakeLeftTrough");
                     Wake(go, "WakeRightTrough");
                     Wake(go, "WakeLeft");
@@ -388,14 +405,7 @@ namespace Rodnarok
             switch (coming.Kind)
             {
                 case ArrivalSignKind.Bulge:
-                    // A dark hump pushing the water up, its rim lit on the side facing the light.
-                    var blob = go.transform.Find("Bulge").GetComponent<SpriteRenderer>();
-                    blob.transform.localScale = new Vector3(2.6f, 1f, 1f) * _size;
-                    blob.color = Dark(at, 0.55f * strength * (0.4f + 0.6f * moving));
-                    var rim = go.transform.Find("Rim");
-                    rim.localScale = new Vector3(1.8f, 0.45f, 1f) * _size;
-                    rim.position = at + Flat(_toSun) * 0.15f + Vector3.up * 0.005f;
-                    rim.GetComponent<SpriteRenderer>().color = Lit(at, 0.5f * strength * (0.4f + 0.6f * moving));
+                    Hump(coming, go, at, heading, strength, moving);
                     SetWake(go.transform.Find("WakeLeftTrough"), coming, 0.025f, -1f, 0.45f * strength * moving, dark: true);
                     SetWake(go.transform.Find("WakeRightTrough"), coming, 0.025f, 1f, 0.45f * strength * moving, dark: true);
                     SetWake(go.transform.Find("WakeLeft"), coming, 0.03f, -1f, 0.7f * strength * moving);
@@ -424,6 +434,104 @@ namespace Rodnarok
                     break;
             }
         }
+
+        /// <summary>How many pieces the Trollfish's hump is drawn in along its length, and how many spray ticks fly off its front.</summary>
+        private const int HumpPoints = 14;
+        private const int SprayTicks = 3;
+
+        /// <summary>The triangles of the hump's dark band, a strip between its crest and the water, the same for every hump.</summary>
+        private static readonly int[] HumpTriangles = BandTriangles();
+
+        private static int[] BandTriangles()
+        {
+            var triangles = new int[HumpPoints * 6];
+            for (var i = 0; i < HumpPoints; i++)
+            {
+                var t = i * 6;
+                var top = i * 2;
+                triangles[t] = top;
+                triangles[t + 1] = top + 2;
+                triangles[t + 2] = top + 1;
+                triangles[t + 3] = top + 1;
+                triangles[t + 4] = top + 2;
+                triangles[t + 5] = top + 3;
+            }
+            return triangles;
+        }
+
+        /// <summary>
+        /// The Trollfish's hump (<see cref="TrollHump"/>): standing up from the water across the view
+        /// of the one looking, as long as the fish swims across it and higher toward its front, riding
+        /// the waves near the camera; a crest lit by the game's light over a dark band of the water it
+        /// pushes up, surging and throwing spray off its front, all as strongly as the sign shows.
+        /// </summary>
+        private static void Hump(Coming coming, GameObject go, Vector3 at, Vector3 heading, float strength, float moving)
+        {
+            coming.Surge += Time.deltaTime / TrollHump.SurgeSeconds;
+            var camera = Utils.GetMainCamera();
+            var right = camera != null ? Flat(camera.transform.right) : Vector3.right;
+            var across = Vector3.Dot(heading, right);
+            var front = across >= 0f ? 1f : -1f;
+            var length = TrollHump.Length(across) * _size;
+            var height = TrollHump.Height(coming.Surge, moving) * _size;
+            var spray = TrollHump.Spray(coming.Surge) * moving;
+            coming.HumpHeight = height;
+            coming.HumpLength = length;
+            coming.HumpSpray = spray;
+            var near = Near(at);
+            var shown = strength * (0.4f + 0.6f * moving);
+            var dark = Dark(at, 0.5f * shown);
+            var under = new Color(dark.r, dark.g, dark.b, dark.a * 0.3f);
+            for (var i = 0; i <= HumpPoints; i++)
+            {
+                var u = i / (float)HumpPoints * 2f - 1f;
+                var place = at + right * (u * length / 2f);
+                var water = near ? SurfaceOn(coming.Water, place) : at.y - 0.03f;
+                var top = water + 0.01f + height * TrollHump.Arch(u, front);
+                coming.HumpTop[i] = new Vector3(place.x, top, place.z);
+                coming.HumpVerts[i * 2] = new Vector3(place.x, top - 0.01f, place.z);
+                coming.HumpVerts[i * 2 + 1] = new Vector3(place.x, water - 0.02f, place.z);
+                coming.HumpColours[i * 2] = dark;
+                coming.HumpColours[i * 2 + 1] = under;
+            }
+
+            var band = go.transform.Find("Band");
+            band.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
+            var mesh = band.GetComponent<MeshFilter>().sharedMesh;
+            coming.HumpMesh = mesh;
+            mesh.vertices = coming.HumpVerts;
+            mesh.colors = coming.HumpColours;
+            if (mesh.triangles.Length == 0) mesh.triangles = HumpTriangles;
+            mesh.RecalculateBounds();
+
+            var crest = go.transform.Find("Crest").GetComponent<LineRenderer>();
+            crest.SetPositions(coming.HumpTop);
+            crest.widthMultiplier = 0.05f * _lineWidth;
+            var lit = Lit(at, 0.85f * shown);
+            crest.startColor = lit;
+            crest.endColor = lit;
+
+            // Spray off the front end as the hump surges.
+            var nose = at + right * (front * length / 2f * 0.85f);
+            var noseY = near ? SurfaceOn(coming.Water, nose) : at.y - 0.03f;
+            var sprayColour = Lit(nose, 0.8f * spray * strength);
+            for (var k = 0; k < SprayTicks; k++)
+            {
+                var tick = go.transform.Find("Spray" + k).GetComponent<LineRenderer>();
+                var foot = new Vector3(nose.x, noseY + 0.03f, nose.z);
+                var lean = right * (front * (0.2f + 0.15f * (k - 1)));
+                tick.SetPosition(0, foot);
+                tick.SetPosition(1, foot + (Vector3.up + lean).normalized * (spray * (0.25f + 0.1f * k) * _size));
+                tick.widthMultiplier = 0.035f * _lineWidth;
+                tick.startColor = sprayColour;
+                tick.endColor = new Color(sprayColour.r, sprayColour.g, sprayColour.b, 0f);
+            }
+        }
+
+        /// <summary>How high the Trollfish's hump stands at a float now, how long it is and how strongly spray flies off it, for the self-test; zeros for none.</summary>
+        [ForTest]
+        public static (float Height, float Length, float Spray) HumpForTest(ZDOID floatId) =>
+            Floats.TryGetValue(floatId, out var coming) ? (coming.HumpHeight, coming.HumpLength, coming.HumpSpray) : (0f, 0f, 0f);
 
         private static void Wake(GameObject parent, string name)
         {
@@ -887,6 +995,7 @@ namespace Rodnarok
             if (Floats.TryGetValue(id, out var coming))
             {
                 if (coming.Lasting != null) Object.Destroy(coming.Lasting);
+                if (coming.HumpMesh != null) Object.Destroy(coming.HumpMesh);
                 Upright(coming);
             }
             Floats.Remove(id);
@@ -898,6 +1007,7 @@ namespace Rodnarok
             foreach (var coming in Floats.Values)
             {
                 if (coming.Lasting != null) Object.Destroy(coming.Lasting);
+                if (coming.HumpMesh != null) Object.Destroy(coming.HumpMesh);
                 Upright(coming);
             }
             Floats.Clear();
@@ -927,7 +1037,9 @@ namespace Rodnarok
             if (sun != null)
             {
                 _toSun = -sun.transform.forward;
-                var crest = SignLight.Crest(new Shade(sun.color.r, sun.color.g, sun.color.b), sun.intensity, _toSun.y, air);
+                // Never darker than the sky the water mirrors, which the game's fog colour stands for.
+                var sky = RenderSettings.fogColor;
+                var crest = SignLight.Crest(new Shade(sun.color.r, sun.color.g, sun.color.b), sun.intensity, _toSun.y, air, new Shade(sky.r, sky.g, sky.b));
                 _crest = new Color(crest.R, crest.G, crest.B);
             }
             var trough = SignLight.Trough(air);

@@ -16,6 +16,20 @@ namespace Rodnarok
         public const float FirstAfter = 0.4f;
         public const float LastBefore = 0.6f;
 
+        /// <summary>How close to the float, across the water in metres, the picked fish hovers until it may go for the hook, and how close it must be for a bump.</summary>
+        public const float Hover = 1.5f;
+        public const float Reach = 2f;
+
+        /// <summary>Whether a bump due at <paramref name="due"/> comes now: once due, with the picked fish by the float, and not in the last moment before it may bite.</summary>
+        public static bool Fires(float now, float due, float metresFromFloat, float freeAt) =>
+            now >= due && metresFromFloat <= Reach && !Dropped(now, freeAt);
+
+        /// <summary>Whether the sign follows the picked fish in: only once it may bite; while it hovers and bumps the sign stays quiet by the float, where it is.</summary>
+        public static bool FollowedIn(bool picked, bool mayBite) => picked && mayBite;
+
+        /// <summary>Whether bumps still due are dropped: in the last moment before the picked fish may bite, as no bump comes right before a bite.</summary>
+        public static bool Dropped(float now, float freeAt) => now > freeAt - LastBefore;
+
         /// <summary>How far apart two bumps are at the least, in seconds.</summary>
         public const float Apart = 0.5f;
 

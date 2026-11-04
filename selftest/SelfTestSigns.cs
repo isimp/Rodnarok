@@ -13,18 +13,20 @@ namespace Rodnarok
     /// float for every game; the float must show the Perch's rings on the way in, more often as the
     /// school nears, and once a fish bites the marks must be gone and no more signs show. Then one
     /// fish of each of the game's fish is put a few metres from a float and marked as coming: each
-    /// must show its own sign, and a picture of each is taken, 5 m short of the float toward the
+    /// must show its own sign, and a picture of each is taken, 5 m beyond the float, away from the
     /// character, the character looking down at it. On the way in the showings must follow one
     /// path, no further apart than the school can swim; at the float the signs go quiet, slow and by
     /// the float; and the fish marked for every game as going for the bait must be the one that
     /// bites. A Trollfish, Anglerfish and salmon are pictured swimming across the view, their sign
     /// facing that way, and the Trollfish's bulge must fade at the float, leaving a slow ring there.
     /// The float must tremble toward the Perch going for the bait in its last 1.5 m; hooked, the
-    /// rest of the school must dart off and the float's look stand upright again; the signs must
+    /// rest of the school must dart off, the float's look upright again from the bite; the signs must
     /// use their parts again rather than make new ones; a two-star Perch must show its hint coming
     /// and its size going for the bait, pictured; the server's contrast must reach the signs,
     /// pictured at twice as strong; the crest must be lit by the game's light; and
-    /// rings near the camera must lie on the waves, the water's roughness noted.
+    /// rings near the camera must lie on the waves, the water's roughness noted. While the school
+    /// comes the float is claimed, a world fish beside it leaving its bait alone, and once the
+    /// Perch is hooked the claim goes.
     /// A Wisplight's wisp stays with the character meanwhile, so it does not sit in the pictures.
     /// The rules, the setting, the rod, the floats and the fish are put back after.
     /// </summary>
@@ -38,6 +40,7 @@ namespace Rodnarok
         private static readonly AccessTools.FieldRef<Character, Quaternion> LookYaw = AccessTools.FieldRefAccess<Character, Quaternion>("m_lookYaw");
         private static readonly System.Reflection.MethodInfo TryToHook = AccessTools.Method(typeof(FishingFloat), "TryToHook");
         private static readonly System.Reflection.MethodInfo SetCatch = AccessTools.Method(typeof(FishingFloat), "SetCatch");
+        private static readonly System.Reflection.MethodInfo FindFloat = AccessTools.Method(typeof(Fish), "FindFloat");
 
         private static readonly (string Prefab, string Name)[] GameFish =
         {
@@ -52,8 +55,8 @@ namespace Rodnarok
 
         private static string F(float value) => value.ToString("0.0", CultureInfo.InvariantCulture);
 
-        /// <summary>How far short of the float, toward the character, each fish of the pictures is put, in metres: near enough for the Pike's swirl.</summary>
-        private const float PictureShort = 5f;
+        /// <summary>How far beyond the float, away from the character, each fish of the pictures is put, in metres: near enough for the Pike's swirl, and out in front, as a fish short of a float landing close in sat behind the character.</summary>
+        private const float PictureBeyond = 5f;
 
         private static bool Travels(ArrivalSignKind kind) => kind == ArrivalSignKind.Bulge || kind == ArrivalSignKind.Glow || kind == ArrivalSignKind.Fin;
 
@@ -120,6 +123,20 @@ namespace Rodnarok
                 if (school == null || school.Count == 0) yield break;
                 for (var waited = 0f; waited < 1f; waited += Time.deltaTime) yield return null;
                 check.That(school.Where(f => f != null).All(f => Schools.ComingTo(f) == floatId), "every fish of the school is marked for every game as coming to the float");
+
+                // The float is claimed: one of the world's other fish right beside it leaves its bait alone.
+                check.That(Schools.Claimed(ff), "the float is claimed while its school comes");
+                var wildPrefab = ZNetScene.instance.GetPrefab("Fish1");
+                if (wildPrefab != null)
+                {
+                    var wild = Object.Instantiate(wildPrefab, ff.transform.position + Vector3.down * 1.5f + Vector3.right * 1.5f, Quaternion.identity);
+                    placed.Add(wild);
+                    yield return null;
+                    var takes = FindFloat.Invoke(wild.GetComponent<Fish>(), null) as FishingFloat;
+                    check.That(takes == null, "one of the world's other fish beside the claimed float leaves its bait alone" + (takes != null ? ": it went for it" : ""));
+                    ZNetScene.instance.Destroy(wild);
+                    placed.Remove(wild);
+                }
 
                 var showsFar = new List<float>();
                 var showsNear = new List<float>();
@@ -217,9 +234,13 @@ namespace Rodnarok
                 check.That(going != null && going == Nibbler(ff), "the fish marked as going for the bait is the one that bit" + (going == null ? ": none was marked" : ""));
                 check.That(lookParts > 0 && tiltMost >= 3f && tiltToward > 0.8f, "the float trembled toward the fish closing in: up to " + F(tiltMost) + " degrees, toward it " + F(tiltToward) + ", " + lookParts + " parts of its look tilting");
 
-                // Hooked, the rest of the school darts off, and the float's look stands upright again.
+                // At the bite the float's look stands upright again, before the hook, after which the
+                // struggle warning may tilt it in its own right; hooked, the rest of the school darts off.
                 if (bitBy != null)
                 {
+                    for (var waited = 0f; waited < 0.3f; waited += Time.deltaTime) yield return null;
+                    var tilted = lookBefore.Where(l => l.T != null && (Quaternion.Angle(l.T.localRotation, l.Rot) > 0.5f || Vector3.Distance(l.T.localPosition, l.Pos) > 0.005f)).Select(l => l.T.name).ToList();
+                    check.That(tilted.Count == 0, "at the bite the float's look stands as before" + (tilted.Count == 0 ? "" : ": still tilted " + string.Join(", ", tilted)));
                     var dartsBefore = ArrivalSigns.DartsForTest();
                     var others = school.Count(f => f != null && f != bitBy);
                     Nibbler(ff) = bitBy;
@@ -229,9 +250,8 @@ namespace Rodnarok
                     check.That(hooked == bitBy, "reeling just after the bite hooks the Perch");
                     for (var waited = 0f; waited < 1.5f; waited += Time.deltaTime) yield return null;
                     var darted = ArrivalSigns.DartsForTest() - dartsBefore;
+                    if (hooked != null) check.That(!Schools.Claimed(ff), "once a fish is hooked the float is claimed no more");
                     if (hooked != null) check.That(darted >= others, "the rest of the school darted off when the Perch was hooked: " + darted + " darts for " + others + " fish");
-                    var tilted = lookBefore.Where(l => l.T != null && (Quaternion.Angle(l.T.localRotation, l.Rot) > 0.5f || Vector3.Distance(l.T.localPosition, l.Pos) > 0.005f)).Select(l => l.T.name).ToList();
-                    check.That(tilted.Count == 0, "after the bite the float's look stands as before" + (tilted.Count == 0 ? "" : ": still tilted " + string.Join(", ", tilted)));
                     if (hooked != null)
                     {
                         SetCatch.Invoke(ff, new object[] { null });
@@ -266,7 +286,7 @@ namespace Rodnarok
                         wrong.Add(prefab + " not in the game");
                         continue;
                     }
-                    var at = spot.Value - away * PictureShort + Vector3.down * 1.5f;
+                    var at = spot.Value + away * PictureBeyond + Vector3.down * 1.5f;
                     var go = Object.Instantiate(fishPrefab, at, Quaternion.LookRotation(-away));
                     placed.Add(go);
                     var fish = go.GetComponent<Fish>();
@@ -278,12 +298,24 @@ namespace Rodnarok
                     Schools.MarkComingForTest(fish, floatId);
                     var expected = ArrivalSign.Of(prefab);
                     var shownBy = 0;
+                    var humpLow = float.MaxValue;
+                    var humpHigh = 0f;
+                    var humpSpray = 0f;
+                    var humpLength = 0f;
                     var kindSeen = ArrivalSignKind.Rings;
                     // The picture is taken just after a showing, a travelling sign after 2 s of its fish swimming.
                     var shownAt = -1f;
                     for (var waited = 0f; waited < 4f; waited += Time.deltaTime)
                     {
                         if (swims) Swim(go, at + across * (-2f + 2f * waited));
+                        if (swims && waited > 0.5f)
+                        {
+                            var hump = ArrivalSigns.HumpForTest(floatId);
+                            humpLow = Mathf.Min(humpLow, hump.Height);
+                            humpHigh = Mathf.Max(humpHigh, hump.Height);
+                            humpSpray = Mathf.Max(humpSpray, hump.Spray);
+                            humpLength = Mathf.Max(humpLength, hump.Length);
+                        }
                         // The camera follows a swimming fish, so its travelling sign stays in the picture.
                         Aim(player, (swims ? go.transform.position : at) + Vector3.up * 1.5f);
                         var seen = ArrivalSigns.ForTest(floatId);
@@ -294,6 +326,9 @@ namespace Rodnarok
                         yield return null;
                     }
                     if (kindSeen != expected || shownBy == 0) wrong.Add(name + " showed " + kindSeen + " " + shownBy + " times, " + expected + " wanted");
+                    // The Trollfish's hump surges as it swims across the view, long across it, throwing spray off its front.
+                    if (expected == ArrivalSignKind.Bulge && (humpHigh - humpLow < 0.08f || humpSpray < 0.3f || humpLength < 1.2f))
+                        wrong.Add("the " + name + "'s hump swimming across stood " + F(humpLow) + " to " + F(humpHigh) + " m high, " + F(humpLength) + " m long, spray " + F(humpSpray) + "; it should surge, stretch across and spray");
                     if (expected == ArrivalSignKind.Rings)
                     {
                         // A starred fish: a hint while it only comes, clearly bigger once it goes for the bait.
@@ -368,12 +403,14 @@ namespace Rodnarok
                 check.That(wrong.Count == 0, "each fish of the game coming to a float shows its own sign: " + string.Join("; ", wrong));
                 // The signs are lit by the game's own light this frame, readable however dark.
                 var light = ArrivalSigns.LightForTest();
-                var expect = SignLight.Crest(new Shade(light.Sun.r, light.Sun.g, light.Sun.b), light.Intensity, light.SunUp, new Shade(light.Ambient.r, light.Ambient.g, light.Ambient.b));
+                var expect = SignLight.Crest(new Shade(light.Sun.r, light.Sun.g, light.Sun.b), light.Intensity, light.SunUp, new Shade(light.Ambient.r, light.Ambient.g, light.Ambient.b), new Shade(light.Sky.r, light.Sky.g, light.Sky.b));
+                var sky = new Shade(light.Sky.r, light.Sky.g, light.Sky.b);
                 var crest = new Shade(light.Crest.r, light.Crest.g, light.Crest.b);
                 var trough = new Shade(light.Trough.r, light.Trough.g, light.Trough.b);
                 check.That(Mathf.Abs(crest.R - expect.R) < 0.01f && Mathf.Abs(crest.G - expect.G) < 0.01f && Mathf.Abs(crest.B - expect.B) < 0.01f
-                    && crest.Luminance >= SignLight.MinLight - 0.01f && trough.Luminance < crest.Luminance,
-                    "the signs take the game's light: crest " + crest + " (wanted " + expect + "), trough " + trough);
+                    && crest.Luminance >= SignLight.MinLight - 0.01f && trough.Luminance < crest.Luminance
+                    && (crest.Luminance >= sky.Luminance * SignLight.SkyMargin - 0.01f || crest.R >= 0.99f || crest.G >= 0.99f || crest.B >= 0.99f),
+                    "the signs take the game's light and stay brighter than the sky the water mirrors: crest " + crest + " (wanted " + expect + "), sky " + sky + ", trough " + trough);
                 check.Note("the game's light: sun " + new Shade(light.Sun.r, light.Sun.g, light.Sun.b) + " x " + F(light.Intensity) + ", " + F(light.SunUp) + " up, ambient "
                     + new Shade(light.Ambient.r, light.Ambient.g, light.Ambient.b) + ", fog " + light.Fog + " density " + light.FogDensity.ToString("0.0000", CultureInfo.InvariantCulture));
                 check.Note("sign pictures taken at " +(EnvMan.instance != null ? (EnvMan.instance.GetDayFraction() * 24f).ToString("00.0", CultureInfo.InvariantCulture) : "?") + " o'clock in game");

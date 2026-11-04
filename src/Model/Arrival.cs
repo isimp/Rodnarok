@@ -26,6 +26,12 @@ namespace Rodnarok
     /// </summary>
     internal static class Arrival
     {
+        /// <summary>Whether a float is claimed, its bait kept for what Rodnarok brings: from the cast until a fish is hooked.</summary>
+        public static bool Claimed(bool cast, bool hooked) => cast && !hooked;
+
+        /// <summary>Whether one of the world's other fish may take a float's bait: only an unclaimed one, so no unannounced fish bites while a sign shows another coming.</summary>
+        public static bool WildFishMayTake(bool claimed) => !claimed;
+
         /// <summary>Seconds until the fish comes, for a roll from 0 to 1; bounds the wrong way round are read the right way, and below zero as at once.</summary>
         public static float Seconds(float min, float max, double roll)
         {

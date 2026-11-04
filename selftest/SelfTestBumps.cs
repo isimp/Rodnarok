@@ -57,12 +57,15 @@ namespace Rodnarok
                 var lastHeight = OverWater(ff);
                 var heightBefore = lastHeight;
                 var bumpedAt = -1f;
+                var bumperFrom = -1f;
                 for (var waited = 0f; waited < 60f && bumpedAt < 0f; waited += Time.deltaTime)
                 {
                     if (Bites.BumpsForTest > bumpsBefore)
                     {
                         bumpedAt = Time.time;
                         heightBefore = lastHeight;
+                        var (bumper, _) = Schools.BiterForTest(ff);
+                        if (bumper != null) bumperFrom = Vector2.Distance(new Vector2(bumper.transform.position.x, bumper.transform.position.z), new Vector2(ff.transform.position.x, ff.transform.position.z));
                         break;
                     }
                     lastHeight = OverWater(ff);
@@ -71,6 +74,7 @@ namespace Rodnarok
                 check.That(bumpedAt > 0f, "the fish picked to take the bait bumps the float within 60 s of the cast");
                 if (bumpedAt < 0f) yield break;
                 check.That(Nibbler(ff) == null || NibbleTime(ff) < bumpedAt - 0.5f, "a bump is no nibble the game knows of");
+                check.That(bumperFrom >= 0f && bumperFrom <= Bumps.Reach + 0.1f, "the bump comes with the picked fish by the float, " + bumperFrom.ToString("0.0", CultureInfo.InvariantCulture) + " m off");
 
                 // The float dips a little; reeling as it does, as a player taking it for the bite would, hooks nothing.
                 var lowest = OverWater(ff);

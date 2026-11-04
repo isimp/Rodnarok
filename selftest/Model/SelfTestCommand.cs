@@ -13,6 +13,12 @@ namespace Rodnarok
 
         /// <summary>Write every scenario's name.</summary>
         List,
+
+        /// <summary>Run again the scenarios that failed or were skipped last.</summary>
+        Failed,
+
+        /// <summary>Run the scenarios the plan a session wrote asks for.</summary>
+        Plan,
     }
 
     /// <summary>A request to the self-test: what it asks, and the words picking scenarios.</summary>
@@ -43,6 +49,8 @@ namespace Rodnarok
             rest = rest.Trim();
             if (rest.Equals("stop", StringComparison.OrdinalIgnoreCase)) return new SelfTestRequest(SelfTestAsk.Stop, "");
             if (rest.Equals("list", StringComparison.OrdinalIgnoreCase)) return new SelfTestRequest(SelfTestAsk.List, "");
+            if (rest.Equals("failed", StringComparison.OrdinalIgnoreCase)) return new SelfTestRequest(SelfTestAsk.Failed, "");
+            if (rest.Equals("plan", StringComparison.OrdinalIgnoreCase)) return new SelfTestRequest(SelfTestAsk.Plan, "");
             return new SelfTestRequest(SelfTestAsk.Run, rest);
         }
     }

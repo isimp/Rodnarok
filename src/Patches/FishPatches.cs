@@ -14,6 +14,13 @@ namespace Rodnarok
             __result = Schools.FloatFor(__instance);
             return false;
         }
+
+        /// <summary>One of the world's other fish leaves a claimed float alone, so only the fish whose sign shows takes its bait.</summary>
+        private static void Postfix(Fish __instance, ref FishingFloat __result)
+        {
+            if (__result == null || Schools.IsOurs(__instance) || Schools.IsCalled(__instance)) return;
+            if (!Arrival.WildFishMayTake(Schools.Claimed(__result))) __result = null;
+        }
     }
 
     /// <summary>
