@@ -1,24 +1,18 @@
 # Changelog
 
-## 0.2.2
+## 0.3.0
 
-The signs of a fish coming to your float follow the school's way in instead of jumping between its fish, and the *Trollfish* shows as a hump of water surging up with spray, its wake trailing where it swam. At the float they go quiet until one fish goes for the bait, which the sign then follows in.
+A hooked fish warns of its next struggle: the float grows restless and the line goes taut just before it bolts. Server setting `StruggleWarning`.
 
-The signs take the light of the hour and the weather, warm at dusk and dull in rain, with a bright crest over a darker trough, and far ones fade into the fog.
+In a rest the rod's secondary attack heaves the fish toward you and leaves slack to wind in quickly, but slack still out when the fish bolts jolts the line. Server setting `Heave`.
 
-Your float twitches toward the fish going for the bait in its last moments, and once a fish is hooked or a school scared away the others dart off. A school holding a starred fish shows a little bolder, and a starred fish going for the bait shows bigger the more stars it has.
+The signs of a coming school follow its way in, go quiet while it waits at your float and then follow the fish that goes for the bait. The *Trollfish* shows as a surging hump of water.
 
-The signs ride the waves and drift with the wind. Calm water shows them clear and whole, rough water fainter and broken, so a *Serpent trophy*'s calm water reads best.
+The signs take the light of the hour, ride the waves and drift with the wind, and read best on calm water. How strongly they show is a server setting, `SignContrast`.
 
-How strongly the signs show is a server setting, from half to twice as strong. Server setting `SignContrast`.
+Before the bite the crosshair ring grows stronger as the fish comes closer, and your float twitches toward it at the last. Once a fish is hooked the rest of the school darts away.
 
-Only the fish your float's sign follows takes your bait: other wild fish leave it alone until a fish is hooked, and the fish picked to bite stays by the float and bumps it only from there.
-
-A hooked fish shows its next struggle coming. Your float lies still while there is time, grows restless in the last moments of a rest, and the line goes taut and quivers just before the fish bolts, later for a fast or starred fish. Through the struggle the line stays taut and shakes harder the closer it comes to snapping. Server setting `StruggleWarning`.
-
-The rod's secondary attack heaves the fish. While it rests, a heave snaps your rod up, lifts the fish 3 m toward you in a moment and leaves the line slack, and holding winds slack in three times as fast and without the fish's weight. A heave costs the stamina of a weapon's secondary attack. A struggle that starts with slack still out jolts the line hard enough that a whole heave's slack nearly snaps it, and a heave into a struggle only strains it. Server setting `Heave`.
-
-While a school is at your float the crosshair ring tells how close the fish is, faint while it is out and growing stronger as it comes in. A *Wisplight*'s wisp guarding your float comes back to you once the school has left.
+Only the fish your float's sign follows takes your bait, and a *Wisplight*'s wisp guarding your float comes home once the school has left.
 
 ## 0.2.1
 
