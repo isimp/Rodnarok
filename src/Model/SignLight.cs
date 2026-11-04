@@ -105,6 +105,18 @@ namespace Rodnarok
             return new Shade(colour.R * (1f - t) + fog.R * t, colour.G * (1f - t) + fog.G * t, colour.B * (1f - t) + fog.B * t);
         }
 
+        /// <summary>The weakest and strongest contrast the server can set for the signs.</summary>
+        public const float MinContrast = 0.5f;
+        public const float MaxContrast = 2f;
+
+        /// <summary>How strongly a part of a sign shows at a contrast: its strength times the contrast, never past whole.</summary>
+        public static float Shown(float alpha, float contrast) => Clamp01(alpha * Contrast(contrast));
+
+        /// <summary>How wide the lines of the signs are at a contrast, as a share of their width as made: wider when stronger, up to half again at the strongest; a weaker contrast keeps them as wide.</summary>
+        public static float LineWidth(float contrast) => 1f + 0.5f * Math.Max(0f, Contrast(contrast) - 1f) / (MaxContrast - 1f);
+
+        private static float Contrast(float contrast) => contrast < MinContrast ? MinContrast : contrast > MaxContrast ? MaxContrast : contrast;
+
         /// <summary>How wide a ring or wake line is, as a share of its first width, as it spreads from 0 to 1 of its life.</summary>
         public static float Taper(float q) => 1f - 0.6f * Clamp01(q);
 

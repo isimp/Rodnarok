@@ -22,7 +22,8 @@ namespace Rodnarok
     /// The float must tremble toward the Perch going for the bait in its last 1.5 m; hooked, the
     /// rest of the school must dart off and the float's look stand upright again; the signs must
     /// use their parts again rather than make new ones; a two-star Perch must show its hint coming
-    /// and its size going for the bait, pictured; the crest must be lit by the game's light; and
+    /// and its size going for the bait, pictured; the server's contrast must reach the signs,
+    /// pictured at twice as strong; the crest must be lit by the game's light; and
     /// rings near the camera must lie on the waves, the water's roughness noted.
     /// A Wisplight's wisp stays with the character meanwhile, so it does not sit in the pictures.
     /// The rules, the setting, the rod, the floats and the fish are put back after.
@@ -314,6 +315,21 @@ namespace Rodnarok
                         if (starredPicture != null) wrong.Add("no picture of the starred " + name + ": " + starredPicture);
                         Schools.MarkGoingForTest(fish, ZDOID.None);
                         zdo.Set(ZDOVars.s_quality, 1);
+                        // The server's contrast reaches every game's signs: twice as strong, lines half again as wide, pictured.
+                        var rulesWere = PlayRules.ForTest;
+                        PlayRules.ForTest = PlayRules.Now.With(signContrast: 2f);
+                        for (var waited = 0f; waited < 2.5f; waited += Time.deltaTime)
+                        {
+                            Aim(player, at + Vector3.up * 1.5f);
+                            yield return null;
+                        }
+                        var contrast = ArrivalSigns.ContrastForTest();
+                        var strongPicture = SelfTestPictures.Take("sign-" + name + "-contrast-2");
+                        yield return null;
+                        PlayRules.ForTest = rulesWere;
+                        if (strongPicture != null) wrong.Add("no picture of the " + name + " at contrast 2: " + strongPicture);
+                        if (Mathf.Abs(contrast.Contrast - 2f) > 0.001f || Mathf.Abs(contrast.LineWidth - SignLight.LineWidth(2f)) > 0.001f)
+                            wrong.Add("the server's contrast 2 drew the signs at " + F(contrast.Contrast) + " with lines " + F(contrast.LineWidth) + "x wide");
                         if (Mathf.Abs(hint.Size - SignStars.Size(3, false, 1)) > 0.001f || Mathf.Abs(goingStars.Size - SignStars.Size(3, true, 3)) > 0.001f)
                             wrong.Add("a two-star " + name + " showed " + F(hint.Size) + "x coming and " + F(goingStars.Size) + "x going for the bait, " + F(SignStars.Size(3, false, 1)) + "x and " + F(SignStars.Size(3, true, 3)) + "x wanted");
                     }

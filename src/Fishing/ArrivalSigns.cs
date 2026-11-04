@@ -90,11 +90,17 @@ namespace Rodnarok
         private static float _fogStart;
         private static float _fogEnd;
         private static float _wind;
+        private static float _contrast = 1f;
+        private static float _lineWidth = 1f;
         private static Vector3 _windFlat = Vector3.forward;
 
         /// <summary>How much bigger and bolder the sign being drawn shows for the stars of its fish (<see cref="SignStars"/>).</summary>
         private static float _size = 1f;
         private static float _bold = 1f;
+
+        /// <summary>The contrast the signs are drawn at now and the width of their lines for it, for the self-test.</summary>
+        [ForTest]
+        public static (float Contrast, float LineWidth) ContrastForTest() => (_contrast, _lineWidth);
 
         /// <summary>The light the signs are drawn in now, for the self-test: the crest and trough colours, the game's light they come from, and its fog.</summary>
         [ForTest]
@@ -399,10 +405,10 @@ namespace Rodnarok
                     var pulse = (0.75f + 0.25f * Mathf.Sin(Time.time * 3f)) * showing;
                     var light = go.GetComponentInChildren<Light>();
                     light.transform.position = at + Vector3.down * 0.6f;
-                    light.intensity = (0.6f + 1.4f * nearness) * pulse;
+                    light.intensity = (0.6f + 1.4f * nearness) * pulse * Mathf.Clamp(_contrast, SignLight.MinContrast, SignLight.MaxContrast);
                     light.range = (2f + 2f * nearness) * _size;
                     var halo = go.transform.Find("Halo").GetComponent<SpriteRenderer>();
-                    halo.color = new Color(0.82f, 1f, 0.67f, (0.15f + 0.4f * nearness) * pulse * (1f - FogAt(at)));
+                    halo.color = new Color(0.82f, 1f, 0.67f, SignLight.Shown((0.15f + 0.4f * nearness) * pulse, _contrast) * (1f - FogAt(at)));
                     halo.transform.localScale = Vector3.one * (0.8f + 0.8f * nearness) * _size;
                     break;
                 case ArrivalSignKind.Fin:
@@ -459,6 +465,7 @@ namespace Rodnarok
                 coming.Wake[i] = new Vector3(point.X - dz / length * off, coming.WakeY[i] + lift, point.Z + dx / length * off);
             }
             line.positionCount = n;
+            line.widthMultiplier = 0.07f * _lineWidth;
             if (n > 0) line.SetPositions(coming.Wake);
             var head = new Vector3(coming.Path.At.X, coming.WakeY[0] + lift, coming.Path.At.Z);
             var colour = dark ? Dark(head, alpha) : Lit(head, alpha);
@@ -557,7 +564,7 @@ namespace Rodnarok
             var line = part.Line;
             line.loop = false;
             line.positionCount = points;
-            line.widthMultiplier = width;
+            line.widthMultiplier = width * _lineWidth;
             line.widthCurve = Even;
             line.enabled = false;
             return part;
@@ -591,7 +598,7 @@ namespace Rodnarok
             {
                 // Thin against its size from the start, so a young ring is a ring and not a disc, and thinner as it spreads.
                 var r = radius * (0.25f + 0.75f * q);
-                var w = Mathf.Min(width, r * 0.12f) * SignLight.Taper(q);
+                var w = Mathf.Min(width, r * 0.12f) * SignLight.Taper(q) * _lineWidth;
                 line.widthMultiplier = w;
                 trough.widthMultiplier = w * 1.4f;
                 // Drifting downwind, and near the camera rising and falling with the waves, sampled round it and followed between.
@@ -762,7 +769,7 @@ namespace Rodnarok
                 line.SetPosition(0, OnWater(water, head - away * 0.9f - side * spread, start.y));
                 line.SetPosition(1, OnWater(water, head, start.y));
                 line.SetPosition(2, OnWater(water, head - away * 0.9f + side * spread, start.y));
-                line.widthMultiplier = 0.06f * SignLight.Taper(q);
+                line.widthMultiplier = 0.06f * SignLight.Taper(q) * _lineWidth;
                 var c = Lit(head, ScatterBurst.Alpha(q) * clarity);
                 line.startColor = c;
                 line.endColor = c;
@@ -935,6 +942,9 @@ namespace Rodnarok
             _fogEnd = RenderSettings.fogEndDistance;
             var camera = Utils.GetMainCamera();
             if (camera != null) _camera = camera.transform.position;
+            // How strongly the server has the signs show, and how wide their lines are for it.
+            _contrast = PlayRules.Now.SignContrast;
+            _lineWidth = SignLight.LineWidth(_contrast);
             // The wind the game's waves blow by, for signs drifting downwind.
             _wind = env != null ? env.GetWindIntensity() : 0f;
             if (env != null) _windFlat = Flat(env.GetWindDir());
@@ -1042,12 +1052,12 @@ namespace Rodnarok
         /// <summary>How much of the game's fog lies between the camera and a place.</summary>
         private static float FogAt(Vector3 at) => SignLight.FogShare(_fogMode, _fogDensity, _fogStart, _fogEnd, Vector3.Distance(_camera, at));
 
-        /// <summary>A colour as it shows at a place through the game's fog: toward the fog's colour and fainter.</summary>
+        /// <summary>A colour as it shows at a place, as strong as the server's contrast has it, through the game's fog: toward the fog's colour and fainter.</summary>
         private static Color Fogged(Vector3 at, Color colour)
         {
             var share = FogAt(at);
             var c = Color.Lerp(colour, _fogColour, share);
-            return new Color(c.r, c.g, c.b, colour.a * (1f - share));
+            return new Color(c.r, c.g, c.b, SignLight.Shown(colour.a, _contrast) * (1f - share));
         }
 
         /// <summary>A crest's colour at a place: foam, or a tint of it, lit by the game's light, through its fog.</summary>

@@ -22,6 +22,7 @@ namespace Rodnarok
         private static ConfigEntry<float> _reelStamina;
         private static ConfigEntry<float> _calmReach;
         private static ConfigEntry<float> _calmKeep;
+        private static ConfigEntry<float> _signContrast;
         private static ConfigEntry<bool> _schools;
         private static ConfigEntry<bool> _bumps;
         private static ConfigEntry<bool> _tension;
@@ -108,6 +109,7 @@ namespace Rodnarok
                     reelStaminaShare: _reelStamina.Value,
                     calmReach: _calmReach.Value,
                     calmKeep: _calmKeep.Value,
+                    signContrast: _signContrast.Value,
                     schools: _schools.Value,
                     bumps: _bumps.Value,
                     tension: _tension.Value,
@@ -188,6 +190,8 @@ namespace Rodnarok
                 new ConfigDescription("How far an item stand calming the waters with a Serpent trophy reaches, in metres. Waves are calmed by the corners of the game's 64 m water tiles, so the calm water fades out over a tile. Below 46 m a stand in the middle of a tile may reach no corner and calm nothing.", new AcceptableValueRange<float>(0f, 128f))));
             _calmKeep = Sync(config.Bind(Section, "CalmKeep", rules.CalmKeep,
                 new ConfigDescription("The share of the waves left where a calming item stand reaches: 0 is flat water, 1 leaves the waves as they are.", new AcceptableValueRange<float>(0f, 1f))));
+            _signContrast = Sync(config.Bind(Section, "SignContrast", rules.SignContrast,
+                new ConfigDescription("How strongly the signs of fish coming to a float show on the water, for everyone: 1 as made, 0.5 half as strong, 2 twice as strong with lines half again as wide. Rough water still shows them fainter than calm water.", new AcceptableValueRange<float>(SignLight.MinContrast, SignLight.MaxContrast))));
             _schools = Sync(config.Bind(Section, "Schools", rules.Schools,
                 "Whether the bait draws a school of its fish, as many as the world spawns together, of which one takes the bait. Off, a single fish comes."));
             _bumps = Sync(config.Bind(Section, "Bumps", rules.Bumps,

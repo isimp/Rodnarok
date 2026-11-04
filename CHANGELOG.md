@@ -10,6 +10,8 @@ Your float twitches toward the fish going for the bait in its last moments, and 
 
 The signs ride the waves and drift with the wind. Calm water shows them clear and whole, rough water fainter and broken, so a *Serpent trophy*'s calm water reads best.
 
+How strongly the signs show is a server setting, from half to twice as strong. Server setting `SignContrast`.
+
 ## 0.2.1
 
 Five difficulty levels from `VeryEasy` to `VeryHard`, `Normal` playing as before. Picking a level fills in the settings it sets, and changing one of them yourself makes it `Custom`. Server setting `Difficulty`.

@@ -57,6 +57,9 @@ namespace Rodnarok
         /// <summary>The share of the waves a calmed corner keeps.</summary>
         public float CalmKeep { get; private set; } = 0.1f;
 
+        /// <summary>How strongly the signs on the water show, for everyone: 1 as made, from half to twice as strong (<see cref="SignLight.Shown"/>).</summary>
+        public float SignContrast { get; private set; } = 1f;
+
         /// <summary>Whether the bait draws a school; without, one fish comes.</summary>
         public bool Schools { get; private set; } = true;
 
@@ -101,6 +104,7 @@ namespace Rodnarok
             float? stallStaminaPerSecond = null,
             float? calmReach = null,
             float? calmKeep = null,
+            float? signContrast = null,
             bool? schools = null,
             bool? bumps = null,
             float? leaveBackstop = null,
@@ -143,6 +147,7 @@ namespace Rodnarok
             copy.StallStaminaPerSecond = stallStaminaPerSecond ?? StallStaminaPerSecond;
             copy.CalmReach = calmReach ?? CalmReach;
             copy.CalmKeep = calmKeep ?? CalmKeep;
+            copy.SignContrast = signContrast ?? SignContrast;
             return copy;
         }
     }
