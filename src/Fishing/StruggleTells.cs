@@ -42,6 +42,8 @@ namespace Rodnarok
             public bool Taut;
             public float TautSeconds;
             public float Quiver;
+            public float Tautness;
+            public float ShownQuiver;
             public float Strain;
         }
 
@@ -128,6 +130,9 @@ namespace Rodnarok
             tell.TautSeconds = StruggleWarning.TautSeconds(speed, fishZdo.GetInt(ZDOVars.s_quality, 1), rules);
             tell.Taut = StruggleWarning.Taut(tell.Struggling, tell.Until, tell.TautSeconds);
             tell.Quiver = StruggleWarning.Quiver(tell.Struggling, tell.Taut, tell.Strain);
+            // The line draws taut and sags back over a moment, and its quiver swells and settles, never at once.
+            tell.Tautness = StruggleWarning.EaseTaut(tell.Tautness, tell.Taut, Time.deltaTime);
+            tell.ShownQuiver = StruggleWarning.EaseQuiver(tell.ShownQuiver, tell.Taut ? tell.Quiver : 0f, Time.deltaTime);
             tell.Restless = tell.Struggling ? 0f : StruggleWarning.Restlessness(tell.Until);
 
             // The float's look trembles toward the fish as it grows restless, as at a bite.
@@ -155,12 +160,13 @@ namespace Rodnarok
         }
 
         /// <summary>
-        /// After the game drew a rod line: a line taut before or through a struggle is drawn straight from
-        /// the rod to the float, swinging aside by its quiver, both ends where the game put them.
+        /// After the game drew a rod line: a line taut before or through a struggle is drawn from the
+        /// game's sag toward straight from the rod to the float by how taut it is, swinging aside by its
+        /// quiver, both ends where the game put them.
         /// </summary>
         public static void Draw(LineConnect line)
         {
-            if (!LinesDrawn.TryGetValue(line, out var tell) || !tell.Taut) return;
+            if (!LinesDrawn.TryGetValue(line, out var tell) || tell.Tautness <= 0f) return;
             var renderer = line.GetComponent<LineRenderer>();
             if (renderer == null || !renderer.enabled || renderer.positionCount < 3) return;
             var count = renderer.positionCount;
@@ -173,13 +179,16 @@ namespace Rodnarok
             // Measured along the line in world metres, turned into the line's own space.
             var scale = line.transform.lossyScale.x;
             var aside = scale > 0.0001f ? side / scale : side;
+            var straightness = StruggleWarning.Straightness(tell.Tautness);
+            var quiver = tell.ShownQuiver * tell.Tautness;
             for (var i = 1; i < count - 1; i++)
             {
                 var along = (float)i / (count - 1);
-                var swing = StruggleWarning.QuiverOffset(tell.Quiver, along, Time.time);
+                var swing = StruggleWarning.QuiverOffset(quiver, along, Time.time);
                 // Half the swing goes up and down, so the quiver reads from the side and from behind alike.
-                var lift = up * (StruggleWarning.QuiverOffset(tell.Quiver, along, Time.time + 0.37f / StruggleWarning.QuiverHz) * 0.5f);
-                renderer.SetPosition(i, Vector3.Lerp(from, to, along) + aside * swing + (scale > 0.0001f ? lift / scale : lift));
+                var lift = up * (StruggleWarning.QuiverOffset(quiver, along, Time.time + 0.37f / StruggleWarning.QuiverHz) * 0.5f);
+                var straight = Vector3.Lerp(from, to, along) + aside * swing + (scale > 0.0001f ? lift / scale : lift);
+                renderer.SetPosition(i, Vector3.Lerp(renderer.GetPosition(i), straight, straightness));
             }
         }
 
@@ -224,10 +233,10 @@ namespace Rodnarok
 
         /// <summary>What a hooked float shows of the next struggle now, for the self-test; null for a float with no warning.</summary>
         [ForTest]
-        public static (float Until, float Restless, float Tilt, int Parts, bool Taut, float TautSeconds, float Quiver, float Strain, bool Struggling)? StateForTest(FishingFloat ff) =>
+        public static (float Until, float Restless, float Tilt, int Parts, bool Taut, float TautSeconds, float Quiver, float Strain, bool Struggling, float Tautness, float ShownQuiver)? StateForTest(FishingFloat ff) =>
             ff != null && Tells.TryGetValue(ff, out var t)
-                ? (t.Until, t.Restless, t.Tilt, t.Look?.Count ?? 0, t.Taut, t.TautSeconds, t.Quiver, t.Strain, t.Struggling)
-                : ((float, float, float, int, bool, float, float, float, bool)?)null;
+                ? (t.Until, t.Restless, t.Tilt, t.Look?.Count ?? 0, t.Taut, t.TautSeconds, t.Quiver, t.Strain, t.Struggling, t.Tautness, t.ShownQuiver)
+                : ((float, float, float, int, bool, float, float, float, bool, float, float)?)null;
 
         /// <summary>The game's own time a fish's next struggle is due, for the self-test to hold the shared time against.</summary>
         [ForTest]

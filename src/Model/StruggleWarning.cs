@@ -34,6 +34,36 @@ namespace Rodnarok
         /// <summary>How many times a second the line swings.</summary>
         public const float QuiverHz = 9f;
 
+        /// <summary>How long the line takes to draw from the game's sag to taut, in seconds: well within a Perch's taut moment.</summary>
+        public const float TautenSeconds = 0.3f;
+
+        /// <summary>How long a taut line takes to sag back to the game's own, in seconds, once the struggle is over.</summary>
+        public const float SlackenSeconds = 0.6f;
+
+        /// <summary>How long the quiver takes to swell from none to its strongest, or to settle back, in seconds.</summary>
+        public const float QuiverSwellSeconds = 0.3f;
+
+        /// <summary>How taut the line is after a step of this many seconds, from 0 as the game sags it to 1 taut, moving toward taut or slack at an even pace.</summary>
+        public static float EaseTaut(float tautness, bool taut, float seconds)
+        {
+            var step = seconds / (taut ? TautenSeconds : SlackenSeconds);
+            return taut ? Math.Min(1f, tautness + step) : Math.Max(0f, tautness - step);
+        }
+
+        /// <summary>How far the line lies from the game's sag toward straight at a tautness, eased at both ends so it starts and settles softly.</summary>
+        public static float Straightness(float tautness)
+        {
+            var t = Clamp01(tautness);
+            return t * t * (3f - 2f * t);
+        }
+
+        /// <summary>The quiver shown after a step of this many seconds, moving toward the quiver due at an even pace.</summary>
+        public static float EaseQuiver(float shown, float due, float seconds)
+        {
+            var step = seconds / QuiverSwellSeconds;
+            return shown < due ? Math.Min(due, shown + step) : Math.Max(due, shown - step);
+        }
+
         /// <summary>How restless the float is, from 0 still to 1 at the struggle, with this many seconds to go; still when none is known.</summary>
         public static float Restlessness(float untilStruggle)
         {

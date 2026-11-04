@@ -116,6 +116,8 @@ namespace Rodnarok
                 int struggles = 0, warnedStruggles = 0, parts = 0, points = 0;
                 float sharedWorst = 0f, mostTilt = 0f, restSag = 0f, tautBend = 0f, struggleBend = 0f, quiverLow = -1f, quiverHigh = -1f;
                 bool wasStruggling = false, sawFarFromIt = false;
+                int easeFrames = 0, easeJumps = 0, slackening = 0;
+                float lastTautness = -1f, worstJump = 0f;
                 string stillSeen = "", quiverSeen = "";
                 var pictured = new HashSet<string>();
                 var holding = false;
@@ -146,6 +148,20 @@ namespace Rodnarok
                     }
                     var st = state.Value;
                     parts = Mathf.Max(parts, st.Parts);
+                    // The line draws taut and sags back over a moment, never in one frame.
+                    if (lastTautness >= 0f && !Mathf.Approximately(st.Tautness, lastTautness))
+                    {
+                        easeFrames++;
+                        var change = st.Tautness - lastTautness;
+                        var most = Time.deltaTime / (change > 0f ? StruggleWarning.TautenSeconds : StruggleWarning.SlackenSeconds) + 0.01f;
+                        if (Mathf.Abs(change) > most)
+                        {
+                            easeJumps++;
+                            worstJump = Mathf.Max(worstJump, Mathf.Abs(change));
+                        }
+                        if (change < 0f && st.Tautness > 0f) slackening++;
+                    }
+                    lastTautness = st.Tautness;
                     var (count, bend) = StruggleTells.LineForTest(ff);
                     points = count;
                     if (struggled != struggling) continue;
@@ -186,8 +202,11 @@ namespace Rodnarok
                         {
                             tautFrames++;
                             if (st.Taut) tautSeen++;
-                            tautBend = Mathf.Max(tautBend, bend);
-                            if (bend > TautBendAllowed(StruggleWarning.WarnQuiver)) tautBent++;
+                            if (st.Tautness >= 0.999f)
+                            {
+                                tautBend = Mathf.Max(tautBend, bend);
+                                if (bend > TautBendAllowed(st.ShownQuiver)) tautBent++;
+                            }
                             if (daylight && pictured.Add("warn-taut")) SelfTestPictures.Take("warn-taut");
                         }
                         continue;
@@ -195,8 +214,11 @@ namespace Rodnarok
 
                     struggleFrames++;
                     if (!st.Taut) struggleSlack++;
-                    struggleBend = Mathf.Max(struggleBend, bend);
-                    if (bend > TautBendAllowed(st.Quiver)) struggleBent++;
+                    if (st.Tautness >= 0.999f)
+                    {
+                        struggleBend = Mathf.Max(struggleBend, bend);
+                        if (bend > TautBendAllowed(st.ShownQuiver)) struggleBent++;
+                    }
                     var strainNow = Lines.StrainOf(ff);
                     var rule = StruggleWarning.Quiver(true, true, strainNow);
                     if (Mathf.Abs(st.Quiver - rule) > 0.1f)
@@ -223,6 +245,9 @@ namespace Rodnarok
                 check.That(slackFrames > 0 && earlyTaut == 0, "the line is not taut before the Perch's last " + F(tautSeconds) + " s: " + N(earlyTaut) + " of " + N(slackFrames) + " frames taut");
                 check.That(tautFrames > 0 && tautSeen == tautFrames && tautBent == 0, "in the Perch's last " + F(tautSeconds) + " s the line goes taut, drawn straight but for its quiver: taut "
                     + N(tautSeen) + " of " + N(tautFrames) + " frames, bent at most " + F(tautBend, "0.000") + " m against " + F(restSag, "0.000") + " m sagging at rest");
+                check.That(easeFrames > 0 && easeJumps == 0 && slackening > 0, "the line draws taut over " + F(StruggleWarning.TautenSeconds, "0.0") + " s and sags back over "
+                    + F(StruggleWarning.SlackenSeconds, "0.0") + " s, never at once: " + N(easeJumps) + " of " + N(easeFrames) + " changing frames jumped, the most " + F(worstJump) + "; "
+                    + N(slackening) + " frames sagging back");
                 check.That(struggleFrames > 0 && struggleSlack == 0 && struggleBent == 0, "through the struggle the line stays taut, swinging no more than its quiver: slack " + N(struggleSlack) + " of "
                     + N(struggleFrames) + " frames, bent at most " + F(struggleBend, "0.000") + " m");
                 check.That(quiverOff <= 3 && quiverLow >= 0f && quiverHigh > quiverLow, "the line quivers by the strain on it: " + N(quiverOff) + " frames off the rule" + (quiverOff > 0 ? ", the last " + quiverSeen : "")

@@ -131,6 +131,60 @@ namespace Rodnarok.Tests
         }
 
         [Fact]
+        public void TheLineDrawsTautOverAMomentAndSagsBackSlowerNeverAtOnce()
+        {
+            const float frame = 1f / 60f;
+            var taut = 0f;
+            var steps = 0;
+            while (taut < 1f && steps < 1000)
+            {
+                var next = StruggleWarning.EaseTaut(taut, true, frame);
+                Assert.True(next - taut <= frame / StruggleWarning.TautenSeconds + 0.0001f, "a jump from " + taut + " to " + next);
+                taut = next;
+                steps++;
+            }
+            Assert.Equal(StruggleWarning.TautenSeconds, steps * frame, 1);
+            steps = 0;
+            while (taut > 0f && steps < 1000)
+            {
+                var next = StruggleWarning.EaseTaut(taut, false, frame);
+                Assert.True(taut - next <= frame / StruggleWarning.SlackenSeconds + 0.0001f, "a drop from " + taut + " to " + next);
+                taut = next;
+                steps++;
+            }
+            Assert.Equal(StruggleWarning.SlackenSeconds, steps * frame, 1);
+            Assert.True(StruggleWarning.TautenSeconds < StruggleWarning.TautBefore, "the line is whole taut before a Perch bolts");
+            Assert.True(StruggleWarning.SlackenSeconds > StruggleWarning.TautenSeconds);
+        }
+
+        [Fact]
+        public void TheLineHalfTautLiesBetweenTheSagAndStraight()
+        {
+            Assert.Equal(0f, StruggleWarning.Straightness(0f), 3);
+            Assert.Equal(1f, StruggleWarning.Straightness(1f), 3);
+            Assert.Equal(0.5f, StruggleWarning.Straightness(0.5f), 3);
+            var before = 0f;
+            for (var t = 0.05f; t <= 1f; t += 0.05f)
+            {
+                var now = StruggleWarning.Straightness(t);
+                Assert.True(now > before, "at " + t);
+                before = now;
+            }
+        }
+
+        [Fact]
+        public void TheQuiverSwellsAndSettlesRatherThanJumping()
+        {
+            const float frame = 1f / 60f;
+            var shown = StruggleWarning.EaseQuiver(0f, 1f, frame);
+            Assert.True(shown > 0f && shown <= frame / StruggleWarning.QuiverSwellSeconds + 0.0001f, "first frame " + shown);
+            for (var i = 0; i < 200; i++) shown = StruggleWarning.EaseQuiver(shown, 1f, frame);
+            Assert.Equal(1f, shown, 2);
+            var settled = StruggleWarning.EaseQuiver(1f, 0.2f, frame);
+            Assert.True(settled < 1f && settled > 0.9f, "one frame down " + settled);
+        }
+
+        [Fact]
         public void TheWarningIsOnUnlessTheServerSwitchesItOff()
         {
             Assert.True(FishingRules.Default.StruggleWarning);
