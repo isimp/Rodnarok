@@ -32,23 +32,23 @@ namespace Rodnarok.Tests
         }
 
         [Fact]
-        public void WhileAFishWaitsTheRingBreathesWhiteWithItsDistance()
+        public void WhileAFishWaitsTheRingKeepsTheBitesSizeAndFadesInWithItsDistance()
         {
             var bite = RingDraw.For(Ring.ForBite(0f, 1.5f));
             var near = RingDraw.For(Ring.ForWaiting(Jig.Reach));
             var far = RingDraw.For(Ring.ForWaiting(Jig.Hover));
             Assert.True(near.Shown && far.Shown);
             Assert.Equal(bite.Scale, near.Scale, 3);
-            Assert.Equal(bite.Scale * 2f, far.Scale, 3);
+            Assert.Equal(bite.Scale, far.Scale, 3);
             Assert.True(near.R > 0.95f && near.G > 0.95f && near.B > 0.95f, "white as at the bite");
             Assert.Equal(1f, near.Fill, 3);
             Assert.Equal(1f, near.A, 3);
-            Assert.Equal(0.25f, far.A, 3);
-            Assert.True(far.TrackA > 0f && far.TrackA < far.A, "a faint track behind it");
+            Assert.Equal(Jig.Faint, far.A, 3);
+            Assert.True(near.TrackA > 0f && near.TrackA < near.A, "a faint track behind it");
         }
 
         [Fact]
-        public void AGoodJigFlashesTheRingClosedAndAnOffCueOneJoltsItWide()
+        public void AGoodJigFlashesTheRingClosedAndAnOffCueOneDropsItOutAtItsSize()
         {
             var good0 = RingDraw.For(Ring.ForJigged(0f));
             var goodEnd = RingDraw.For(Ring.ForJigged(1f));
@@ -57,8 +57,8 @@ namespace Rodnarok.Tests
             Assert.True(goodEnd.Scale < good0.Scale && goodEnd.A < 0.05f);
             var off0 = RingDraw.For(Ring.ForFlinch(0f));
             var offEnd = RingDraw.For(Ring.ForFlinch(1f));
-            Assert.True(off0.Shown && off0.Scale >= bite.Scale * 2f);
-            Assert.True(offEnd.Scale > off0.Scale && offEnd.A < 0.05f);
+            Assert.True(off0.Shown && off0.Scale <= bite.Scale + 0.001f && off0.A > 0.3f);
+            Assert.True(offEnd.A < 0.05f && offEnd.Scale <= bite.Scale + 0.001f);
         }
 
         [Fact]

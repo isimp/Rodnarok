@@ -68,6 +68,7 @@ namespace Rodnarok
         private static readonly AccessTools.FieldRef<Fish, Vector3> SpawnPoint = AccessTools.FieldRefAccess<Fish, Vector3>("m_spawnPoint");
         private static readonly AccessTools.FieldRef<Fish, float> SwimTimer = AccessTools.FieldRefAccess<Fish, float>("m_swimTimer");
         private static readonly AccessTools.FieldRef<Fish, Vector3> FishWaypoint = AccessTools.FieldRefAccess<Fish, Vector3>("m_waypoint");
+        private static readonly AccessTools.FieldRef<Fish, Rigidbody> NoseBody = AccessTools.FieldRefAccess<Fish, Rigidbody>("m_body");
         private static readonly AccessTools.FieldRef<Fish, FishingFloat> WaypointFloat = AccessTools.FieldRefAccess<Fish, FishingFloat>("m_waypointFF");
         private static readonly AccessTools.FieldRef<Fish, bool> Jumping = AccessTools.FieldRefAccess<Fish, bool>("m_isJumping");
         private static readonly Action<Fish> Jump = AccessTools.MethodDelegate<Action<Fish>>(AccessTools.Method(typeof(Fish), "Jump"));
@@ -109,6 +110,12 @@ namespace Rodnarok
             public float JigUsedFor = -2f;
             public float GoodJigAt = -10f;
             public float OffCueAt = -10f;
+
+            // The waiting fish's runs in to the float: which part it is in, the fish and run under way, and the run's steady speed.
+            public Jig.Nose NosePhase;
+            public Fish RunFish;
+            public int RunCycle = -1;
+            public float RunSpeed;
             public float ReadyAt = -1f;
             public float Shyness;
             public Vector3 FloatSeen;
@@ -809,18 +816,19 @@ namespace Rodnarok
         }
 
         /// <summary>
-        /// The fish waiting at a cast's float, and how far it is from the hook: the one picked to bite while
-        /// it hovers, or the nearest of a wary school while it hesitates; none otherwise.
+        /// The fish waiting at a cast's float, and how far it is from the float across the water, as the
+        /// player sees it: the one picked to bite while it hovers, or the nearest of a wary school while it
+        /// hesitates; none otherwise.
         /// </summary>
         private static (Fish Fish, float Distance) Waiting(Cast cast)
         {
             if (cast.Hooked || cast.Spooked || cast.Away || cast.Float == null) return (null, 0f);
-            var hook = Bites.Hook(cast.Float);
+            var at = cast.Float.transform.position;
             var now = Time.time;
             if (cast.Biter >= 0 && cast.Biter < cast.Fish.Count && cast.BiterFreeAt < float.MaxValue && now < cast.BiterFreeAt)
             {
                 var picked = cast.Fish[cast.Biter];
-                return picked != null ? (picked, Vector3.Distance(picked.transform.position, hook)) : (null, 0f);
+                return picked != null ? (picked, Across(picked.transform.position, at)) : (null, 0f);
             }
             if (Rules.Wary && cast.ReadyAt >= 0f && cast.BiterFreeAt >= float.MaxValue && now - cast.ReadyAt < Wary.Hesitation(cast.Shyness))
             {
@@ -829,7 +837,7 @@ namespace Rodnarok
                 foreach (var fish in cast.Fish)
                 {
                     if (fish == null) continue;
-                    var d = Vector3.Distance(fish.transform.position, hook);
+                    var d = Across(fish.transform.position, at);
                     if (d < best)
                     {
                         best = d;
@@ -845,16 +853,55 @@ namespace Rodnarok
         private static float WaitLeft(Cast cast) =>
             cast.BiterFreeAt < float.MaxValue ? cast.BiterFreeAt - Time.time : cast.ReadyAt + Wary.Hesitation(cast.Shyness) - Time.time;
 
-        /// <summary>The waiting fish noses in toward the hook now and then (<see cref="Jig.Nosing"/>), so every wait has its moments for a jig.</summary>
+        /// <summary>
+        /// Each frame: where the waiting fish is in its runs in to the float (<see cref="Jig.NoseAt"/>). As a
+        /// run starts, its steady speed is set from how far out the fish is, so it reaches the float as the
+        /// run ends; the fish's own step then holds it to the run (<see cref="SteerNose"/>).
+        /// </summary>
         private static void NoseIn(Cast cast)
         {
+            cast.NosePhase = Jig.Nose.Free;
             if (!Rules.Jig || cast.WaitStart < 0f) return;
-            var (fish, _) = Waiting(cast);
-            if (fish == null || !Jig.Nosing(Time.time - cast.WaitStart, WaitLeft(cast))) return;
+            var (fish, distance) = Waiting(cast);
+            if (fish == null) return;
+            var since = Time.time - cast.WaitStart;
+            var (phase, _) = Jig.NoseAt(since, WaitLeft(cast));
+            cast.NosePhase = phase;
+            if (phase == Jig.Nose.Free) return;
+            var cycle = (int)((since - Jig.FirstNose) / Jig.NoseEvery);
+            if (cast.RunFish != fish || cast.RunCycle != cycle)
+            {
+                cast.RunFish = fish;
+                cast.RunCycle = cycle;
+                cast.RunSpeed = Jig.RunSpeed(distance);
+            }
+        }
+
+        /// <summary>
+        /// After a fish's step, in the game owning it: a waiting fish on a run in swims straight for the
+        /// float at the run's steady speed, and holding by it is kept within reach; free, it swims as the
+        /// game steers it.
+        /// </summary>
+        public static void SteerNose(Fish fish)
+        {
+            if (fish == null || !CastOf.TryGetValue(fish, out var cast) || cast.RunFish != fish || cast.NosePhase == Jig.Nose.Free || cast.Float == null) return;
             var view = fish.GetComponent<ZNetView>();
             if (view == null || !view.IsValid() || !view.IsOwner()) return;
-            FishWaypoint(fish) = Bites.Hook(cast.Float);
+            var body = NoseBody(fish);
+            if (body == null) return;
+            var toward = cast.Float.transform.position - fish.transform.position;
+            toward.y = 0f;
+            var left = toward.magnitude;
+            Vector3 velocity;
+            if (cast.NosePhase == Jig.Nose.Run && left > Jig.HoldAt) velocity = toward / left * cast.RunSpeed;
+            else velocity = left > Jig.HoldAt ? toward / left * Mathf.Min(1f, left - Jig.HoldAt + 0.2f) : Vector3.zero;
+            velocity.y = body.linearVelocity.y;
+            body.linearVelocity = velocity;
         }
+
+        /// <summary>Where a waiting fish is in its runs in, for the self-test.</summary>
+        [ForTest]
+        public static Jig.Nose NosePhaseForTest(FishingFloat ff) => ff != null && Casts.TryGetValue(ff, out var cast) ? cast.NosePhase : Jig.Nose.Free;
 
         /// <summary>
         /// A float of this game was jigged (<see cref="Jig"/>): the first jig of a wait with the waiting fish

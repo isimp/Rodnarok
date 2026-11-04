@@ -6,11 +6,12 @@ namespace Rodnarok
     /// Before the hook the rod's secondary attack jigs the float: it twitches <see cref="Metres"/> toward
     /// the rod over <see cref="Seconds"/>, and the rod flicks up for <see cref="FlickSeconds"/>. While a
     /// fish waits at the float, the one picked to bite as it hovers or the nearest of a shy school as it
-    /// hesitates, the crosshair ring breathes with it (<see cref="RingScale"/>): at the bite's size and
-    /// whole with the fish within <see cref="Reach"/> of the hook, twice the size and faint at
-    /// <see cref="Hover"/>. The waiting fish noses in now and then (<see cref="Nosing"/>), so every wait
-    /// has its moments. The first jig of a wait with the fish in reach draws it <see cref="Cut"/> sooner;
-    /// any other is off cue, and a wary school near the float flinches.
+    /// hesitates, the crosshair ring keeps the bite's size and fades in with the fish's distance across
+    /// the water (<see cref="RingStrength"/>): whole within <see cref="Reach"/>, <see cref="Faint"/> at
+    /// <see cref="Hover"/>. The waiting fish runs in steadily now and then and holds by the float
+    /// (<see cref="NoseAt"/>), so the ring fades in on a rhythm. The first jig of a wait with the fish in
+    /// reach draws it <see cref="Cut"/> sooner; any other is off cue, and a wary school near the float
+    /// flinches.
     /// </summary>
     internal static class Jig
     {
@@ -23,7 +24,7 @@ namespace Rodnarok
         /// <summary>How much sooner, in seconds, a waiting fish comes for a good jig.</summary>
         public const float Cut = 1.5f;
 
-        /// <summary>The reach a fish bites from, in metres, to the hook a metre under the float (as <c>Bites.Reach</c>).</summary>
+        /// <summary>How near the float, across the water, the waiting fish is in reach for a jig, in metres: the reach a fish bites from (as <c>Bites.Reach</c>).</summary>
         public const float Reach = 0.6f;
 
         /// <summary>How far the picked fish hovers from the float, in metres (as <see cref="Bumps.Hover"/>).</summary>
@@ -32,11 +33,26 @@ namespace Rodnarok
         /// <summary>How long every jig shows the rod flicked up, in seconds.</summary>
         public const float FlickSeconds = 0.15f;
 
-        /// <summary>When a waiting fish first noses in, how often, and for how long, in seconds; and how long before it may bite it stops.</summary>
+        /// <summary>When a waiting fish first runs in, how often, how long the run and the hold by the float take, in seconds; and how long before it may bite it stops.</summary>
         public const float FirstNose = 0.4f;
         public const float NoseEvery = 2f;
-        public const float NoseSeconds = 1f;
+        public const float RunSeconds = 0.8f;
+        public const float HoldSeconds = 0.6f;
         public const float NoseLeaveBefore = 0.4f;
+
+        /// <summary>How far from the float, across the water, a run in ends and the fish holds, in metres: within reach.</summary>
+        public const float HoldAt = 0.3f;
+
+        /// <summary>How strongly the ring shows with the waiting fish at the edge of its hover or beyond.</summary>
+        public const float Faint = 0.15f;
+
+        /// <summary>Where a waiting fish is in its runs in to the float.</summary>
+        public enum Nose
+        {
+            Free,
+            Run,
+            Hold,
+        }
 
         /// <summary>How long a good jig's flash and an off-cue jig's jolt show on the ring, in seconds.</summary>
         public const float FlashSeconds = 0.3f;
@@ -58,25 +74,32 @@ namespace Rodnarok
         /// <summary>A jig is good only as the first of its wait with the fish in reach.</summary>
         public static Judged Judge(bool usedThisWait, bool inReach) => !usedThisWait && inReach ? Judged.Good : Judged.OffCue;
 
-        /// <summary>Whether a waiting fish this far from the hook is in reach of it.</summary>
+        /// <summary>Whether a waiting fish this far from the float across the water is in reach.</summary>
         public static bool InReach(float distance) => distance <= Reach;
 
         /// <summary>How far out the waiting fish is between the reach and its hover, 0 in reach to 1 at the hover's edge or beyond.</summary>
         private static float Out(float distance) => Clamp01((distance - Reach) / (Hover - Reach));
 
-        /// <summary>The ring's size against the bite's while a fish waits this far from the hook: 1 in reach, 2 at the hover's edge.</summary>
-        public static float RingScale(float distance) => 1f + Out(distance);
+        /// <summary>How strongly the ring shows while a fish waits this far from the float across the water: whole in reach, <see cref="Faint"/> at the hover's edge or beyond.</summary>
+        public static float RingStrength(float distance) => 1f - (1f - Faint) * Out(distance);
 
-        /// <summary>How strongly the ring shows while a fish waits this far from the hook: whole in reach, a quarter at the hover's edge.</summary>
-        public static float RingStrength(float distance) => 1f - 0.75f * Out(distance);
-
-        /// <summary>Whether the waiting fish noses in toward the hook this long into its wait with this long left before it may bite.</summary>
-        public static bool Nosing(float since, float left)
+        /// <summary>
+        /// Where the waiting fish is in its runs in this long into its wait, with this long left before it
+        /// may bite, and how far through that part it is: from <see cref="FirstNose"/> every
+        /// <see cref="NoseEvery"/> a steady run of <see cref="RunSeconds"/>, a hold of <see cref="HoldSeconds"/>
+        /// by the float, then free; free in the last <see cref="NoseLeaveBefore"/>.
+        /// </summary>
+        public static (Nose Phase, float Progress) NoseAt(float since, float left)
         {
-            if (left < NoseLeaveBefore || since < FirstNose) return false;
-            var phase = (since - FirstNose) % NoseEvery;
-            return phase < NoseSeconds;
+            if (left < NoseLeaveBefore || since < FirstNose) return (Nose.Free, 0f);
+            var into = (since - FirstNose) % NoseEvery;
+            if (into < RunSeconds) return (Nose.Run, into / RunSeconds);
+            if (into < RunSeconds + HoldSeconds) return (Nose.Hold, (into - RunSeconds) / HoldSeconds);
+            return (Nose.Free, 0f);
         }
+
+        /// <summary>The steady speed, in metres a second, of a run in from this far out across the water to <see cref="HoldAt"/>.</summary>
+        public static float RunSpeed(float startDistance) => Math.Max(0f, startDistance - HoldAt) / RunSeconds;
 
         /// <summary>When the hovering picked fish may bite after a good jig: <see cref="Cut"/> sooner, never before now; unchanged with no fish waiting.</summary>
         public static float SoonerFree(float freeAt, float now)

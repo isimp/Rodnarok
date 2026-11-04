@@ -9,19 +9,19 @@ namespace Rodnarok
     /// <summary>
     /// Before the hook the rod's secondary attack jigs the float, timed by the crosshair ring. Pressed
     /// through the game's own controls (<c>Player.SetControls</c>) as a key or gamepad press reaches it.
-    /// With a school drawn by real bait and its picked fish hovering by the float: the ring must breathe
-    /// with the fish's distance from the hook as the rule has it, the fish must nose into reach during its
-    /// wait, a jig out of reach must draw nothing, the first jig in reach must bring the bite 1.5 s sooner
+    /// With a school drawn by real bait and its picked fish hovering by the float: the ring must keep the
+    /// bite's size and fade in with the fish's distance across the water as the rule has it, the fish must
+    /// make a steady run in and hold within reach during its wait, a jig out of reach must draw nothing, the first jig in reach must bring the bite 1.5 s sooner
     /// and flick the rod, and a second one that wait must draw nothing more. With a wary school, a jig off
-    /// cue must make it flinch. Pictures: the ring wide and the ring in reach. Each float is taken away
+    /// cue must make it flinch. Pictures: the ring faint with the fish far and whole in reach. Each float is taken away
     /// again with its school.
     /// </summary>
     internal static class SelfTestJig
     {
         private const string Bait = "FishingBait";
 
-        /// <summary>How far the drawn ring's size may stray from the rule for the fish's distance, the fish moving between frames.</summary>
-        private const float ScaleWithin = 0.08f;
+        /// <summary>How far the drawn ring's strength may stray from the rule for the fish's distance, the fish moving between frames.</summary>
+        private const float StrengthWithin = 0.1f;
 
         private static readonly AccessTools.FieldRef<Character, Quaternion> LookYaw = AccessTools.FieldRefAccess<Character, Quaternion>("m_lookYaw");
         private static readonly AccessTools.FieldRef<Player, float> LookPitch = AccessTools.FieldRefAccess<Player, float>("m_lookPitch");
@@ -105,6 +105,9 @@ namespace Rodnarok
                 // The ring breathes with the fish's distance; out of reach a jig draws nothing; the fish noses into reach.
                 int frames = 0, wrong = 0;
                 var wrongSeen = "";
+                var sawRun = false;
+                var holdFrames = 0;
+                var holdOut = 0f;
                 var nearest = float.MaxValue;
                 var offCueTried = false;
                 var offCueDrew = false;
@@ -120,16 +123,23 @@ namespace Rodnarok
                     nearest = Mathf.Min(nearest, distance);
                     var drawn = Drawn();
                     frames++;
-                    var scale = RingDraw.For(Ring.ForWaiting(distance)).Scale;
-                    if (!drawn.Shown || Mathf.Abs(drawn.Scale - scale) > ScaleWithin)
+                    var rule = RingDraw.For(Ring.ForWaiting(distance));
+                    if (!drawn.Shown || Mathf.Abs(drawn.Scale - rule.Scale) > 0.01f || Mathf.Abs(drawn.A - rule.A) > StrengthWithin)
                     {
                         wrong++;
-                        wrongSeen = (drawn.Shown ? "size " + F(drawn.Scale) : "hidden") + " for the rule's " + F(scale) + " at " + F(distance) + " m";
+                        wrongSeen = (drawn.Shown ? "size " + F(drawn.Scale) + " strength " + F(drawn.A) : "hidden") + " for the rule's size " + F(rule.Scale) + " strength " + F(rule.A) + " at " + F(distance) + " m";
+                    }
+                    var phase = Schools.NosePhaseForTest(ff);
+                    if (phase == Jig.Nose.Run) sawRun = true;
+                    if (phase == Jig.Nose.Hold && sawRun)
+                    {
+                        holdFrames++;
+                        if (!Jig.InReach(distance)) holdOut = Mathf.Max(holdOut, distance);
                     }
                     if (daylight && !picturedFar && distance > Jig.Hover - 0.3f)
                     {
                         picturedFar = true;
-                        if (SelfTestPictures.Take("jig-ring-far") is string trouble) check.That(false, "a picture of the wide ring is taken: " + trouble);
+                        if (SelfTestPictures.Take("jig-ring-far") is string trouble) check.That(false, "a picture of the faint ring is taken: " + trouble);
                     }
                     if (!offCueTried && distance > Jig.Reach + 0.3f)
                     {
@@ -146,8 +156,10 @@ namespace Rodnarok
                         if (SelfTestPictures.Take("jig-ring-near") is string trouble) check.That(false, "a picture of the ring in reach is taken: " + trouble);
                     }
                 }
-                check.That(frames > 0 && wrong <= frames / 10 + 1, "while the picked fish hovers the ring breathes with its distance from the hook, at the bite's size in reach and twice that at the hover's edge: "
+                check.That(frames > 0 && wrong <= frames / 10 + 1, "while the picked fish hovers the ring keeps the bite's size and fades in with its distance across the water, whole in reach, faint at the hover's edge: "
                     + N(wrong) + " of " + N(frames) + " frames off" + (wrong > 0 ? ", the last " + wrongSeen : ""));
+                check.That(!inReach || (sawRun && holdOut == 0f) || holdFrames == 0, "after a steady run in the fish holds within reach of the float"
+                    + (holdOut > 0f ? ", but held as far as " + F(holdOut) + " m" : "") + (sawRun ? "" : " (no run seen before reach)"));
                 check.That(offCueTried && !offCueDrew, "a jig with the fish out of reach draws it no sooner" + (offCueTried ? "" : " (the fish was never out of reach to try)"));
                 check.That(inReach, "the hovering fish noses into reach of the hook within 4 s, nearest " + F(nearest) + " m");
                 if (!inReach || ff == null) yield break;
@@ -197,7 +209,8 @@ namespace Rodnarok
                 var jolt = Drawn();
                 check.That(Schools.JigStartlesForTest == startles + 1 && Schools.AwayForTest(ff), "a jig off cue makes the wary school flinch off the float, "
                     + N(Schools.JigStartlesForTest - startles) + " startles by jigging");
-                check.That(jolt.Shown && jolt.Scale >= RingDraw.For(Ring.ForWaiting(Jig.Hover)).Scale - 0.01f, "the ring jolts wide as it flinches, size " + F(jolt.Scale));
+                var biteSize = RingDraw.For(Ring.ForBite(0f, 1.5f)).Scale;
+                check.That(jolt.Shown && jolt.Scale <= biteSize + 0.01f && jolt.A <= 0.55f, "the ring drops out at its size as the school flinches, size " + F(jolt.Scale) + " strength " + F(jolt.A));
             }
             finally
             {

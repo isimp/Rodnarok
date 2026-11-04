@@ -84,6 +84,7 @@ namespace Rodnarok
         {
             Thrash.Step(__instance);
             Heaves.MoveFish(__instance);
+            Schools.SteerNose(__instance);
             StruggleTells.Share(__instance);
         }
     }

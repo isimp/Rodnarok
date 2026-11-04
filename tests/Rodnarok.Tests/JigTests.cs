@@ -5,11 +5,12 @@ namespace Rodnarok.Tests
     /// <summary>
     /// Before the hook the rod's secondary attack jigs the float, and the crosshair ring tells when.
     /// While a fish waits at the float, the one picked to bite as it hovers or a shy school as it
-    /// hesitates, the ring breathes with the fish: at the bite's size and whole white with it in reach
-    /// of the hook, twice the size and faint at the edge of its hover, and the fish noses in now and
-    /// then so every wait has its moments. The first jig of a wait with the fish in reach draws it
-    /// 1.5 s sooner; any other jig is off cue, and a wary school near the float flinches. Every jig
-    /// flicks the rod up a moment. The server switches it on or off; a difficulty level leaves it.
+    /// hesitates, the ring keeps the bite's size and fades in as the fish comes closer across the water:
+    /// faint at the edge of its hover, whole white within reach. The waiting fish makes a steady run in
+    /// to the float now and then and holds there a moment, so the ring fades in on a rhythm that can be
+    /// read ahead. The first jig of a wait with the fish in reach draws it 1.5 s sooner; any other jig
+    /// is off cue, and a wary school near the float flinches. Every jig flicks the rod up a moment.
+    /// The server switches it on or off; a difficulty level leaves it as set.
     /// </summary>
     public class JigTests
     {
@@ -26,35 +27,32 @@ namespace Rodnarok.Tests
         }
 
         [Fact]
-        public void TheRingIsAtTheBitesSizeAndWholeWithTheFishInReach()
+        public void TheRingIsWholeWithTheFishInReachAcrossTheWater()
         {
             Assert.Equal(0.6f, Jig.Reach, 3);
-            Assert.Equal(1f, Jig.RingScale(0.3f), 3);
-            Assert.Equal(1f, Jig.RingScale(Jig.Reach), 3);
+            Assert.Equal(1f, Jig.RingStrength(0.2f), 3);
             Assert.Equal(1f, Jig.RingStrength(Jig.Reach), 3);
             Assert.True(Jig.InReach(Jig.Reach));
             Assert.False(Jig.InReach(Jig.Reach + 0.01f));
         }
 
         [Fact]
-        public void TheRingIsTwiceTheSizeAndFaintAtTheEdgeOfTheHover()
+        public void TheRingIsFaintAtTheEdgeOfTheHoverAndBeyond()
         {
             // The picked fish hovers within 1.5 m of the float (Bumps.Hover).
             Assert.Equal(1.5f, Jig.Hover, 3);
-            Assert.Equal(2f, Jig.RingScale(Jig.Hover), 3);
-            Assert.Equal(2f, Jig.RingScale(4f), 3);
-            Assert.Equal(0.25f, Jig.RingStrength(Jig.Hover), 3);
+            Assert.Equal(Jig.Faint, Jig.RingStrength(Jig.Hover), 3);
+            Assert.Equal(Jig.Faint, Jig.RingStrength(4f), 3);
+            Assert.True(Jig.Faint > 0f && Jig.Faint <= 0.2f, "faint " + Jig.Faint);
         }
 
         [Fact]
-        public void TheRingBreathesSmoothlyWithTheFishsDistance()
+        public void TheRingFadesInSmoothlyAsTheFishComesCloser()
         {
-            var size = Jig.RingScale(Jig.Hover);
             var strength = Jig.RingStrength(Jig.Hover);
             for (var d = Jig.Hover - 0.05f; d > Jig.Reach; d -= 0.05f)
             {
-                Assert.True(Jig.RingScale(d) < size && Jig.RingStrength(d) > strength, "at " + d + " m");
-                size = Jig.RingScale(d);
+                Assert.True(Jig.RingStrength(d) > strength, "at " + d + " m");
                 strength = Jig.RingStrength(d);
             }
         }
@@ -69,19 +67,36 @@ namespace Rodnarok.Tests
         }
 
         [Fact]
-        public void TheWaitingFishNosesInNowAndThenSoEveryWaitHasItsMoment()
+        public void TheWaitingFishRunsInSteadilyThenHoldsInReachThenGoesFree()
         {
-            // The picked fish hovers 2 to 4 s; within the shortest it noses in at least once, well before it may bite.
-            Assert.False(Jig.Nosing(0f, 2f));
-            var nosed = false;
-            for (var t = 0f; t < 2f; t += 0.05f) nosed |= Jig.Nosing(t, 2f - t);
-            Assert.True(nosed);
+            Assert.Equal(Jig.Nose.Free, Jig.NoseAt(0f, 10f).Phase);
+            var run = Jig.NoseAt(Jig.FirstNose + Jig.RunSeconds * 0.5f, 10f);
+            Assert.Equal(Jig.Nose.Run, run.Phase);
+            Assert.Equal(0.5f, run.Progress, 2);
+            Assert.Equal(Jig.Nose.Hold, Jig.NoseAt(Jig.FirstNose + Jig.RunSeconds + 0.05f, 10f).Phase);
+            Assert.Equal(Jig.Nose.Free, Jig.NoseAt(Jig.FirstNose + Jig.RunSeconds + Jig.HoldSeconds + 0.05f, 10f).Phase);
+            Assert.Equal(Jig.Nose.Run, Jig.NoseAt(Jig.FirstNose + Jig.NoseEvery + 0.05f, 10f).Phase);
+            Assert.True(Jig.RunSeconds + Jig.HoldSeconds < Jig.NoseEvery);
+        }
+
+        [Fact]
+        public void EveryWaitHoldsTheFishInReachAtLeastOnce()
+        {
+            // The picked fish hovers 2 to 4 s; within the shortest it holds by the float once, before it may bite.
+            var held = false;
+            for (var t = 0f; t < 2f; t += 0.02f) held |= Jig.NoseAt(t, 2f - t).Phase == Jig.Nose.Hold;
+            Assert.True(held);
             // Not in the last moment before it goes for the bait, which the bite's own approach takes over.
-            Assert.False(Jig.Nosing(1.0f, Jig.NoseLeaveBefore - 0.01f));
-            // And not without pause: there are times it is out too.
-            var outToo = false;
-            for (var t = Jig.FirstNose; t < 6f; t += 0.05f) outToo |= !Jig.Nosing(t, 10f);
-            Assert.True(outToo);
+            Assert.Equal(Jig.Nose.Free, Jig.NoseAt(Jig.FirstNose + 0.1f, Jig.NoseLeaveBefore - 0.01f).Phase);
+        }
+
+        [Fact]
+        public void TheRunIsSteadyAndEndsWithinReach()
+        {
+            Assert.True(Jig.HoldAt < Jig.Reach, "holds at " + Jig.HoldAt);
+            Assert.Equal((1.5f - Jig.HoldAt) / Jig.RunSeconds, Jig.RunSpeed(1.5f), 3);
+            Assert.Equal((2.4f - Jig.HoldAt) / Jig.RunSeconds, Jig.RunSpeed(2.4f), 3);
+            Assert.Equal(0f, Jig.RunSpeed(Jig.HoldAt - 0.1f), 3);
         }
 
         [Fact]
@@ -100,7 +115,6 @@ namespace Rodnarok.Tests
             Assert.Equal(10f, Jig.SoonerFree(10.5f, 10f), 3);
             Assert.Equal(float.MaxValue, Jig.SoonerFree(float.MaxValue, 10f));
             Assert.Equal(9f, Jig.SoonerFree(9f, 10f), 3);
-            // A picked fish hovers 2 to 4 s, so one jig never makes it bite at once.
             Assert.True(Jig.Cut < 2f && Jig.Cut >= 1f, "cut " + Jig.Cut);
         }
 
@@ -119,7 +133,6 @@ namespace Rodnarok.Tests
             Assert.False(Jig.RodRaised(false, Jig.FlickSeconds));
             Assert.True(Jig.PoseOver(false, Jig.FlickSeconds));
             Assert.False(Jig.PoseOver(false, Jig.FlickSeconds - 0.01f));
-            // Held up already, it dips as a heave's does.
             Assert.False(Jig.RodRaised(holding: true, since: 0f));
             Assert.True(Jig.RodRaised(true, Heave.DipSeconds));
         }

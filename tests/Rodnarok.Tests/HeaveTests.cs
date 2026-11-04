@@ -4,10 +4,11 @@ namespace Rodnarok.Tests
 {
     /// <summary>
     /// The rod's free secondary attack heaves the fish. In a rest, a heave lifts the hooked fish and its
-    /// float three metres toward the rod in a moment, faster than any reel, for what the game charges
-    /// for pulling that fish while it struggles; the line stays as long, so it hangs slack, and slack
+    /// float three metres toward the rod in a moment, faster than any reel, for the rod's own secondary
+    /// attack stamina as the game charges an attack; the line stays as long, so it hangs slack, and slack
     /// winds in three times as fast as a loaded reel. A struggle starting with slack still out jolts
-    /// the line by the slack. Heaving into a struggle lifts nothing and only strains the line. The
+    /// the line by the slack, a whole heave's slack nearly snapping it. Heaving into a struggle lifts
+    /// nothing and only strains the line. The
     /// server switches it on or off for everyone; a difficulty level leaves it as set.
     /// </summary>
     public class HeaveTests
@@ -23,13 +24,15 @@ namespace Rodnarok.Tests
         }
 
         [Fact]
-        public void AHeaveCostsWhatPullingTheStrugglingFishCostsForTheLift()
+        public void AHeaveCostsTheRodsOwnSecondaryAttackAsTheGameChargesOne()
         {
-            // A Perch's m_escapeStaminaUse is 10, a Northern Salmon's 60; the game lowers reeling costs with Fishing skill by the float's share.
-            Assert.Equal(10f * Heave.LiftSeconds, Heave.Cost(10f, 1, 0f, 0.2f), 3);
-            Assert.Equal(60f * 3f * Heave.LiftSeconds, Heave.Cost(60f, 3, 0f, 0.2f), 3);
-            Assert.Equal(10f * Heave.LiftSeconds * 0.2f, Heave.Cost(10f, 1, 1f, 0.2f), 3);
-            Assert.Equal(Heave.Cost(10f, 1, 0f, 0.2f), Heave.Cost(10f, 0, 0f, 0.2f), 3);
+            // The fishing rod's m_secondaryAttack.m_attackStamina is 20, as an iron sword's or mace's secondary;
+            // the game takes a third off at full skill in the weapon's skill (Attack.GetAttackStamina).
+            Assert.Equal(20f, Heave.Cost(20f, 0f), 3);
+            Assert.Equal(20f * (1f - 0.33f), Heave.Cost(20f, 1f), 3);
+            Assert.Equal(20f * (1f - 0.33f * 0.5f), Heave.Cost(20f, 0.5f), 3);
+            Assert.Equal(0f, Heave.Cost(0f, 0.3f), 3);
+            Assert.Equal(Heave.Cost(20f, 1f), Heave.Cost(20f, 5f), 3);
         }
 
         [Fact]
@@ -78,11 +81,19 @@ namespace Rodnarok.Tests
         [Fact]
         public void AStruggleStartingWithSlackOutJoltsTheLineByTheSlack()
         {
-            Assert.Equal(0.1f + (3f - Heave.SlackFrom) * 0.2f, Heave.Jolt(0.1f, 3f), 3);
+            Assert.Equal(0.1f + (1.5f - Heave.SlackFrom) * 0.35f, Heave.Jolt(0.1f, 1.5f), 3);
             Assert.Equal(0.1f, Heave.Jolt(0.1f, Heave.SlackFrom), 3);
             Assert.Equal(0.1f, Heave.Jolt(0.1f, 0f), 3);
             Assert.Equal(1f, Heave.Jolt(0.8f, 6f), 3);
             Assert.True(Heave.Jolt(0f, 1f) < Heave.Jolt(0f, 2f));
+        }
+
+        [Fact]
+        public void AWholeHeavesSlackLeftOutNearlySnapsAnUnstrainedLine()
+        {
+            var jolt = Heave.Jolt(0f, Heave.Metres);
+            Assert.True(jolt >= 0.9f && jolt < 1f, "a heave's slack jolts an unstrained line to " + jolt);
+            Assert.Equal(1f, Heave.Jolt(0.1f, Heave.Metres), 3);
         }
 
         [Fact]

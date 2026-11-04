@@ -146,7 +146,7 @@ namespace Rodnarok
                 check.That(ff.GetCatch() == fish, "the Perch put beside the float is hooked");
                 if (ff.GetCatch() != fish) yield break;
                 var skill = player.GetSkillFactor(Skills.SkillType.Fishing);
-                var cost = Heave.Cost(fish.m_escapeStaminaUse, 1, skill, ff.m_pullStaminaUseMaxSkillMultiplier);
+                var cost = Heaves.CostFor(player);
                 var reel = Mathf.Lerp(ff.m_pullLineSpeed, ff.m_pullLineSpeedMaxSkill, skill);
                 var drain = Mathf.Lerp(ff.m_hookedStaminaPerSec, ff.m_hookedStaminaPerSecMaxSkill, skill);
 
@@ -195,7 +195,7 @@ namespace Rodnarok
                 check.That(came > Heave.Metres * 0.6f && came < Heave.Metres + 1f, "the heave brings the float about " + F(Heave.Metres, "0") + " m nearer the rod tip within the lift, " + F(came) + " m");
                 check.That(Mathf.Abs(LineLength(ff) - line) < 0.1f, "the line stays as long through the lift, " + F(line) + " m to " + F(LineLength(ff)) + " m");
                 check.That(slack > 1.5f, "so it hangs slack, " + F(slack) + " m longer than the way to the float");
-                check.That(spent > cost * 0.9f && spent < cost + drain * (Heave.LiftSeconds + 0.3f) + 1f, "the heave costs " + F(cost, "0.0") + " stamina, the Perch's struggling cost for the lift; spent " + F(spent, "0.0"));
+                check.That(spent > cost * 0.9f && spent < cost + drain * (Heave.LiftSeconds + 0.3f) + 1f, "the heave costs " + F(cost, "0.0") + " stamina, the rod's secondary attack as the game charges an attack; spent " + F(spent, "0.0"));
                 if (daylight && SelfTestPictures.Take("heave-slack") is string trouble) check.That(false, "a picture of the slack line is taken: " + trouble);
 
                 // 2. Holding winds the slack in fast, for no more than the hooked drain.

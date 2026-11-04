@@ -5,8 +5,8 @@ namespace Rodnarok
     /// <summary>
     /// The rod's secondary attack, which the game leaves unused for a rod, heaves the fish. In a rest a
     /// heave lifts the hooked fish and its float <see cref="Metres"/> toward the rod over
-    /// <see cref="LiftSeconds"/>, for what the game charges for pulling that fish while it struggles
-    /// (its <c>m_escapeStaminaUse</c> times its quality) for the lift's length. The line stays as long,
+    /// <see cref="LiftSeconds"/>, for the rod's own secondary attack stamina as the game charges an
+    /// attack (<see cref="Cost"/>). The line stays as long,
     /// so it hangs slack; slack winds in <see cref="WindFactor"/> times as fast as the game's reel, with
     /// no fish on it. A struggle starting with slack out jolts the line by the slack; heaving into a
     /// struggle lifts nothing and only strains the line.
@@ -26,7 +26,7 @@ namespace Rodnarok
         public const float SlackFrom = 0.3f;
 
         /// <summary>How much strain each metre of slack beyond <see cref="SlackFrom"/> puts on the line when a struggle starts.</summary>
-        public const float JoltPerMetre = 0.2f;
+        public const float JoltPerMetre = 0.35f;
 
         /// <summary>How much strain a heave into a struggle puts on the line.</summary>
         public const float StruggleStrain = 0.25f;
@@ -59,12 +59,12 @@ namespace Rodnarok
             return staminaEnough ? Pressed.Lifts : Pressed.Nothing;
         }
 
-        /// <summary>The stamina a heave costs: the fish's struggling cost times its quality for the lift's length, lowered by Fishing skill as the game lowers reeling.</summary>
-        public static float Cost(float escapeStaminaUse, int quality, float skill, float maxSkillShare)
-        {
-            var share = 1f + (maxSkillShare - 1f) * Clamp01(skill);
-            return escapeStaminaUse * Math.Max(1, quality) * LiftSeconds * share;
-        }
+        /// <summary>
+        /// The stamina a heave costs: the rod's own secondary attack stamina (20 on the game's rod, as an
+        /// iron sword's secondary), already raised by the player's gear and effects as the game does,
+        /// lowered by a third at full Fishing skill as the game lowers any attack (<c>Attack.GetAttackStamina</c>).
+        /// </summary>
+        public static float Cost(float attackStamina, float skill) => Math.Max(0f, attackStamina) * (1f - 0.33f * Clamp01(skill));
 
         /// <summary>How much longer the line is than the way from the rod tip to the float, in metres; 0 for none.</summary>
         public static float Slack(float line, float distance) => Math.Max(0f, line - distance);

@@ -135,9 +135,7 @@ namespace Rodnarok
                     return;
                 }
                 if (!rules.Heave) return;
-                var item = fish.GetComponent<ItemDrop>();
-                var quality = item == null ? 1 : item.m_itemData.m_quality;
-                var cost = Heave.Cost(fish.m_escapeStaminaUse, quality, player.GetSkillFactor(Skills.SkillType.Fishing), ff.m_pullStaminaUseMaxSkillMultiplier);
+                var cost = CostFor(player);
                 switch (Heave.OnPress(rules.Heave, true, fish.IsEscaping(), Lifts.ContainsKey(fish), rules.Tension, player.HaveStamina(cost)))
                 {
                     case Heave.Pressed.Lifts:
@@ -158,6 +156,21 @@ namespace Rodnarok
                         return;
                 }
             }
+        }
+
+        /// <summary>
+        /// What a heave costs this player: the secondary attack stamina of the rod in hand, raised by gear
+        /// and effects and lowered by Fishing skill as the game charges any attack (<see cref="Heave.Cost"/>).
+        /// </summary>
+        public static float CostFor(Player player)
+        {
+            var rod = player != null ? player.GetCurrentWeapon() : null;
+            if (rod == null) return 0f;
+            var stamina = rod.m_shared.m_secondaryAttack.m_attackStamina;
+            if (stamina <= 0f) return 0f;
+            stamina *= 1f + player.GetEquipmentAttackStaminaModifier();
+            player.GetSEMan().ModifyAttackStaminaUsage(stamina, ref stamina);
+            return Heave.Cost(stamina, player.GetSkillFactor(Skills.SkillType.Fishing));
         }
 
         /// <summary>Whether a hooked fish is being lifted now.</summary>
