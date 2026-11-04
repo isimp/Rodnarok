@@ -18,6 +18,8 @@ namespace Rodnarok
     {
         private const string Bait = "FishingBait";
 
+        private static readonly HarmonyLib.AccessTools.FieldRef<FishingFloat, float> LineLength = HarmonyLib.AccessTools.FieldRefAccess<FishingFloat, float>("m_lineLength");
+
         public static IEnumerable<Scenario> All()
         {
             yield return new Scenario("AWarySchoolDartsAtNoiseFlinchesAtAShortReelAndLeavesWhenReeledThrough", Wariness);
@@ -117,6 +119,11 @@ namespace Rodnarok
                 var awayDrag = Schools.AwayForTest(ff);
                 check.That(nearDrag < 6f, "before the long reel, a fish of the school comes within 6 m of the float within 40 s, the nearest " + nearDrag.ToString("0.0", CultureInfo.InvariantCulture) + " m");
                 var dragFrom = ff.transform.position;
+                // Line the game holds beyond the float's distance is taken in before the float moves.
+                var rodTop = Utils.FindChild(player.transform, "_RodTop");
+                var slack = rodTop != null ? LineLength(ff) - Vector3.Distance(rodTop.position, ff.transform.position) : 0f;
+                var dragStart = Time.time;
+                Schools.WaryWindowsForTest = new List<(float At, float Speed, bool Near, bool Away, bool Dragging, float Nearest)>();
                 SelfTestDraw.Reeling = true;
                 float dragReeled = 0f, fastest = 0f, longestDrag = 0f;
                 for (; dragReeled < Wary.DraggedSeconds + 2f && Schools.LeftForTest == leavingBefore && ff != null; dragReeled += Time.deltaTime)
@@ -127,6 +134,11 @@ namespace Rodnarok
                     yield return null;
                 }
                 SelfTestDraw.Reeling = false;
+                var windows = Schools.WaryWindowsForTest;
+                Schools.WaryWindowsForTest = null;
+                var windowsSeen = string.Join("; ", windows.Select(w => "+" + (w.At - dragStart).ToString("0.0", CultureInfo.InvariantCulture) + " s "
+                    + w.Speed.ToString("0.0", CultureInfo.InvariantCulture) + " m/s, nearest " + w.Nearest.ToString("0.0", CultureInfo.InvariantCulture) + " m"
+                    + (w.Near ? ", near" : "") + (w.Away ? ", off the float" : "") + (w.Dragging ? ", dragging" : "")));
                 var dragMoved = ff != null ? Across(ff.transform.position, dragFrom) : 0f;
                 var afterDrag = Schools.WaryForTest(ff);
                 for (var waited = 0f; waited < 1f; waited += Time.deltaTime) yield return null;
@@ -136,13 +148,15 @@ namespace Rodnarok
                     + "; reeled " + dragReeled.ToString("0.0", CultureInfo.InvariantCulture) + " s over " + dragMoved.ToString("0.0", CultureInfo.InvariantCulture)
                     + " m, the float measured at most " + fastest.ToString("0.0", CultureInfo.InvariantCulture) + " m/s (over " + Wary.FloatSpeed.ToString("0.0", CultureInfo.InvariantCulture)
                     + " drags), dragged through it at most " + longestDrag.ToString("0.0", CultureInfo.InvariantCulture) + " s of " + Wary.DraggedSeconds.ToString("0", CultureInfo.InvariantCulture)
-                    + ", fright " + afterDrag.Fright.ToString(CultureInfo.InvariantCulture) + (ff == null ? ", the float gone" : ""));
+                    + ", fright " + afterDrag.Fright.ToString(CultureInfo.InvariantCulture) + (ff == null ? ", the float gone" : "")
+                    + "; " + slack.ToString("0.0", CultureInfo.InvariantCulture) + " m of line beyond the float's distance at the start; each half second measured: " + windowsSeen);
                 var reeledOff = SchoolGone.Text(GoneWhy.Reeled, null);
                 check.That(Schools.LastGoneForTest == reeledOff, "driven off, the one fishing is told \"" + reeledOff + "\"; told \"" + Schools.LastGoneForTest + "\"");
             }
             finally
             {
                 SelfTestDraw.Reeling = false;
+                Schools.WaryWindowsForTest = null;
                 PlayRules.ForTest = null;
                 if (ff != null) ZNetScene.instance.Destroy(ff.gameObject);
                 gear.PutBack();

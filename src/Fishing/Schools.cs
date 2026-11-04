@@ -413,6 +413,14 @@ namespace Rodnarok
         public static bool AwayForTest(FishingFloat ff) => ff != null && Casts.TryGetValue(ff, out var cast) && cast.Away;
 
         /// <summary>
+        /// While set, each half second a wary school measures its float's speed is written here: when,
+        /// the speed, whether the school was near the float or off it, whether that counted as dragging,
+        /// and the nearest fish's distance, for the self-test to tell why a drag fell short.
+        /// </summary>
+        [ForTest]
+        public static List<(float At, float Speed, bool Near, bool Away, bool Dragging, float Nearest)> WaryWindowsForTest { get; set; }
+
+        /// <summary>
         /// What a wary school of a float this game cast makes of the float now, for the self-test: the
         /// float's speed as last measured, how long it has been dragged through the school (0 when not),
         /// how frightened the school is and whether it was driven off.
@@ -616,7 +624,8 @@ namespace Rodnarok
             var at = cast.Float.transform.position;
             var now = Time.time;
             var seenBefore = cast.FloatSeenAt >= 0f ? cast.FloatSeen : at;
-            if (cast.FloatSeenAt < 0f || now - cast.FloatSeenAt >= 0.5f)
+            var measured = cast.FloatSeenAt < 0f || now - cast.FloatSeenAt >= 0.5f;
+            if (measured)
             {
                 cast.FloatSpeed = cast.FloatSeenAt < 0f ? 0f : Across(at, cast.FloatSeen) / (now - cast.FloatSeenAt);
                 cast.FloatSeen = at;
@@ -631,6 +640,8 @@ namespace Rodnarok
             var dragging = Wary.Dragging(cast.FloatSpeed, near, cast.Away);
             if (!dragging) cast.FastSince = -1f;
             else if (cast.FastSince < 0f) cast.FastSince = now;
+            if (measured && WaryWindowsForTest != null)
+                WaryWindowsForTest.Add((now, cast.FloatSpeed, near, cast.Away, dragging, cast.Fish.Where(f => f != null).Select(f => Across(f.transform.position, at)).DefaultIfEmpty(float.MaxValue).Min()));
             if (dragging && Wary.Dragged(now - cast.FastSince))
             {
                 StartledForTest++;
