@@ -884,7 +884,8 @@ namespace Rodnarok
         /// </summary>
         public static void SteerNose(Fish fish)
         {
-            if (fish == null || !CastOf.TryGetValue(fish, out var cast) || cast.RunFish != fish || cast.NosePhase == Jig.Nose.Free || cast.Float == null) return;
+            // A hooked fish is the fight's, never a run's, whatever phase was last noted before the hook.
+            if (fish == null || fish.IsHooked() || !CastOf.TryGetValue(fish, out var cast) || cast.Hooked || cast.RunFish != fish || cast.NosePhase == Jig.Nose.Free || cast.Float == null) return;
             var view = fish.GetComponent<ZNetView>();
             if (view == null || !view.IsValid() || !view.IsOwner()) return;
             var body = NoseBody(fish);
