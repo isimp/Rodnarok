@@ -43,7 +43,7 @@ The two stores have different category lists. Hexium takes category names, Thund
 
 ## Install location
 
-Rodnarok runs in each player's game. With the same DLL in a dedicated server's plugins, the server sets the fishing rules for everyone on it ([technical notes](technical.md)).
+Rodnarok runs in each player's game. With the same DLL in a dedicated server's plugins, the server sets the fishing rules for everyone on it ([settings](settings.md)).
 
 ## How the publish works
 

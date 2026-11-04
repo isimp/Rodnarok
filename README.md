@@ -10,11 +10,17 @@ Most of Rodnarök was written by Claude Code (Anthropic), which did the heavy li
 
 ## Fishing
 
-Each bait brings its own fish anywhere, and plain *Fishing Bait* also brings the fish that live where the float lands. A school swims in from out of sight, each kind showing its own sign on the water.
+Each bait brings its own fish anywhere, and plain *Fishing Bait* also brings the fish that live where the float lands. Cast out over deep water and keep still. A school swims in from out of sight, each kind showing its own sign on the water, brighter on calm water and fainter in a swell. The signs go quiet while the school waits at your float, then follow the one fish that goes for the bait, and the crosshair ring grows stronger as it comes closer.
 
-When a fish bites, the float goes under and the crosshair ring drains: hold the line to hook it. While the fish struggles the ring is red, and holding strains the line until it snaps, so ease off. While it rests the ring is yellow: hold to reel it in. A still float means the fish rests a while yet; a restless float and a line going taut tell you it is about to bolt. In a rest the secondary attack heaves the fish nearer and leaves slack to wind in quickly, but slack still out when the fish bolts jolts the line. Before the bite the crosshair ring grows stronger as a fish comes closer to your float. A missed bite may cost your bait.
+Noise and quick reels scare the fish, and a line at the top left says why a school left.
 
-Noise and quick reels scare the fish, and a line at the top left says why a school left. Cast out over deep water and keep still.
+## The fight
+
+When a fish bites, the float goes under and the crosshair ring drains. Hold block before it empties to hook the fish. A missed bite may cost your bait.
+
+A hooked fish takes turns struggling and resting. While it struggles the ring is red, and holding block strains the line until it snaps, so ease off and let the fish run. While it rests the ring is yellow, and holding block reels it in. A still float means the rest goes on a while yet, and a restless float and a line drawn taut mean the fish is about to bolt.
+
+In a rest your secondary attack heaves the fish toward you and leaves slack on the line, which holding block winds in quickly. Slack still out when the fish bolts jolts the line, so wind it in before the next struggle.
 
 You can fish sitting on a chair, a bench or the ground. A *Serpent trophy* on an *Item stand* calms the waves around it once you tap the use key on that stand.
 
