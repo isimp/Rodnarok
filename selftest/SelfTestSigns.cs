@@ -278,17 +278,18 @@ namespace Rodnarok
                     var expected = ArrivalSign.Of(prefab);
                     var shownBy = 0;
                     var kindSeen = ArrivalSignKind.Rings;
-                    // The picture is taken just after a showing, a travelling sign a second after it starts.
+                    // The picture is taken just after a showing, a travelling sign after 2 s of its fish swimming.
                     var shownAt = -1f;
                     for (var waited = 0f; waited < 4f; waited += Time.deltaTime)
                     {
                         if (swims) Swim(go, at + across * (-2f + 2f * waited));
-                        Aim(player, at + Vector3.up * 1.5f);
+                        // The camera follows a swimming fish, so its travelling sign stays in the picture.
+                        Aim(player, (swims ? go.transform.position : at) + Vector3.up * 1.5f);
                         var seen = ArrivalSigns.ForTest(floatId);
                         kindSeen = seen.Kind;
                         if (seen.Shown > shownBy && shownAt < 0f && waited > 1f) shownAt = waited;
                         shownBy = seen.Shown;
-                        if (shownAt >= 0f && waited >= shownAt + (Travels(expected) ? 1f : 0.35f)) break;
+                        if (swims ? waited >= 2f : shownAt >= 0f && waited >= shownAt + 0.35f) break;
                         yield return null;
                     }
                     if (kindSeen != expected || shownBy == 0) wrong.Add(name + " showed " + kindSeen + " " + shownBy + " times, " + expected + " wanted");

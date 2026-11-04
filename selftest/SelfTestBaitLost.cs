@@ -66,7 +66,7 @@ namespace Rodnarok
 
                 var biters = new List<Fish>();
                 var bitTwice = new List<string>();
-                var leavingBefore = Schools.LeavingForTest;
+                var leavingBefore = Schools.LeftForTest;
                 var lastBite = -1f;
                 var swamOff = false;
                 for (var waited = 0f; waited < 120f && !Bites.BareForTest(ff) && !swamOff; waited += Time.deltaTime)
@@ -78,7 +78,7 @@ namespace Rodnarok
                         if (biters.Contains(nibbler)) bitTwice.Add(Utils.GetPrefabName(nibbler.gameObject));
                         biters.Add(nibbler);
                     }
-                    swamOff = Bites.MissesForTest(ff) >= size && Schools.LeavingForTest > leavingBefore;
+                    swamOff = Bites.MissesForTest(ff) >= size && Schools.LeftForTest > leavingBefore;
                     yield return null;
                 }
                 var misses = Bites.MissesForTest(ff);

@@ -162,6 +162,10 @@ namespace Rodnarok
         [ForTest]
         public static int LeavingForTest => GoneSince.Count;
 
+        /// <summary>How many fish have started leaving since the world loaded, for the self-test: a fish taken away out of sight still counts.</summary>
+        [ForTest]
+        public static int LeftForTest { get; private set; }
+
         /// <summary>Each leaving fish: what it is, how long it has left, how far the nearest player is, how deep it swims and whether this game owns it, for the self-test.</summary>
         [ForTest]
         public static string LeavingDescribedForTest() => string.Join("; ", GoneSince.Select(pair =>
@@ -1106,7 +1110,9 @@ namespace Rodnarok
             CastOf.Remove(fish);
             NextLeap.Remove(fish);
             Flee(fish, from, Rules.DiveDepth);
-            if (!GoneSince.ContainsKey(fish)) GoneSince[fish] = Time.time;
+            if (GoneSince.ContainsKey(fish)) return;
+            GoneSince[fish] = Time.time;
+            LeftForTest++;
         }
 
         /// <summary>

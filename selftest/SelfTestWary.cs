@@ -63,7 +63,7 @@ namespace Rodnarok
 
                 // Noise as the game makes it for a step or a run, loud enough that what a fish hears of it reaches past the float.
                 var startledBefore = Schools.StartledForTest;
-                var leavingBefore = Schools.LeavingForTest;
+                var leavingBefore = Schools.LeftForTest;
                 var before = FromPlayer(school, player);
                 var startedAt = school.ToDictionary(f => f, f => f != null ? f.transform.position : Vector3.zero);
                 player.AddNoise(Vector3.Distance(player.transform.position, ff.transform.position) / PlayRules.Now.Hearing + 10f);
@@ -106,17 +106,17 @@ namespace Rodnarok
                 for (var waited = 0f; waited < Wary.StillBeforeComingBack + 5f && Schools.AwayForTest(ff); waited += Time.deltaTime) yield return null;
                 check.That(flinched, "a short reel with the school near makes it flinch; startled " + (Schools.StartledForTest - startledBefore).ToString(CultureInfo.InvariantCulture) + " times, reeled "
                     + reeled.ToString("0.0", CultureInfo.InvariantCulture) + " s at " + reelSpeed.ToString("0.0", CultureInfo.InvariantCulture) + " m/s (more than " + Wary.FloatSpeed.ToString("0.0", CultureInfo.InvariantCulture) + " startles)");
-                check.That(!Schools.AwayForTest(ff) && Schools.LeavingForTest == leavingBefore, "after the flinch the school is back within "
+                check.That(!Schools.AwayForTest(ff) && Schools.LeftForTest == leavingBefore, "after the flinch the school is back within "
                     + (Time.time - stillFrom).ToString("0.0", CultureInfo.InvariantCulture) + " s of the float lying still, and none of it left");
 
                 // Reeled in through the school a while, the float drives it off.
                 for (var waited = 0f; waited < 40f && Nearest(SelfTestArrival.SchoolOf(floatId), ff) >= 6f; waited += Time.deltaTime) yield return null;
                 SelfTestDraw.Reeling = true;
-                for (var waited = 0f; waited < Wary.DraggedSeconds + 2f && Schools.LeavingForTest == leavingBefore; waited += Time.deltaTime) yield return null;
+                for (var waited = 0f; waited < Wary.DraggedSeconds + 2f && Schools.LeftForTest == leavingBefore; waited += Time.deltaTime) yield return null;
                 SelfTestDraw.Reeling = false;
                 for (var waited = 0f; waited < 1f; waited += Time.deltaTime) yield return null;
-                check.That(Schools.LeavingForTest > leavingBefore, "the float reeled in through the school a while drives it off; "
-                    + (Schools.LeavingForTest - leavingBefore).ToString(CultureInfo.InvariantCulture) + " fish leaving");
+                check.That(Schools.LeftForTest > leavingBefore, "the float reeled in through the school a while drives it off; "
+                    + (Schools.LeftForTest - leavingBefore).ToString(CultureInfo.InvariantCulture) + " fish leaving");
                 var reeledOff = SchoolGone.Text(GoneWhy.Reeled, null);
                 check.That(Schools.LastGoneForTest == reeledOff, "driven off, the one fishing is told \"" + reeledOff + "\"; told \"" + Schools.LastGoneForTest + "\"");
             }

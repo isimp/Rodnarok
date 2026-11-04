@@ -60,11 +60,11 @@ namespace Rodnarok
                 check.That(school != null && school.Count > 0 && Nearest(school, ff) < 14f, "a school swam to within 14 m of the float within 60 s");
                 if (school == null || school.Count == 0) yield break;
                 var told = Schools.GoneToldForTest;
-                var leaving = Schools.LeavingForTest;
+                var leaving = Schools.LeftForTest;
                 player.AddNoise(Vector3.Distance(player.transform.position, ff.transform.position) / PlayRules.Now.Hearing + 10f);
                 for (var waited = 0f; waited < 2f && Schools.GoneToldForTest == told; waited += Time.deltaTime) yield return null;
                 var steps = SchoolGone.Text(GoneWhy.Noise, null);
-                check.That(Schools.LeavingForTest > leaving, "the school startled by the character's steps leaves; " + (Schools.LeavingForTest - leaving).ToString(CultureInfo.InvariantCulture) + " fish leaving");
+                check.That(Schools.LeftForTest > leaving, "the school startled by the character's steps leaves; " + (Schools.LeftForTest - leaving).ToString(CultureInfo.InvariantCulture) + " fish leaving");
                 check.That(Schools.GoneToldForTest == told + 1 && Schools.LastGoneForTest == steps, "the one fishing is told once \"" + steps + "\"; told "
                     + (Schools.GoneToldForTest - told).ToString(CultureInfo.InvariantCulture) + " times, last \"" + Schools.LastGoneForTest + "\"");
                 check.Note("another player's steps name that player; that needs a second player and is checked outside the game");
@@ -78,14 +78,14 @@ namespace Rodnarok
                 PlayRules.ForTest = SelfTestRules.Normal.With(waitMin: 1f, waitMax: 1f, schools: true, callWorldFish: false, wary: true, baitLost: false, bumps: false, mostGivingUp: 1.0);
                 Schools.GiveUpRollForTest = 0f;
                 told = Schools.GoneToldForTest;
-                leaving = Schools.LeavingForTest;
+                leaving = Schools.LeftForTest;
                 ff = Cast(floatPrefab, baitPrefab, spot.Value, player, out _);
                 for (var waited = 0f; waited < 60f && Schools.GoneToldForTest == told; waited += Time.deltaTime) yield return null;
                 var at = ff != null ? ff.transform.position : spot.Value;
                 var distance = Across(player.transform.position, at);
                 var depth = ZoneSystem.instance.GetSolidHeight(at, out var ground) ? ZoneSystem.instance.m_waterLevel - ground : 0f;
                 var shy = SchoolGone.Text(SchoolGone.Shy(distance, depth), null);
-                check.That(Schools.LeavingForTest > leaving, "the shy school swims off without biting; " + (Schools.LeavingForTest - leaving).ToString(CultureInfo.InvariantCulture) + " fish leaving");
+                check.That(Schools.LeftForTest > leaving, "the shy school swims off without biting; " + (Schools.LeftForTest - leaving).ToString(CultureInfo.InvariantCulture) + " fish leaving");
                 check.That(Schools.GoneToldForTest == told + 1 && Schools.LastGoneForTest == shy, "the float " + F(distance) + " m from the character over " + F(depth) + " m of water, the one fishing is told once \""
                     + shy + "\"; told " + (Schools.GoneToldForTest - told).ToString(CultureInfo.InvariantCulture) + " times, last \"" + Schools.LastGoneForTest + "\"");
             }
