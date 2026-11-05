@@ -32,7 +32,7 @@ The fourth root keeps the game's order of fish with small steps between them, so
 
 ## The struggle warning
 
-A hooked fish shows its next struggle coming (`StruggleWarning`, `StruggleTells`, setting `StruggleWarning`, on by default). The game decides when the next struggle starts as one ends (`Fish.m_nextEscape`, a rest of the fish's `m_escapeWaitMin` to `m_escapeWaitMax`), on the game owning the fish; that game writes the time onto the fish's networked data as server time (`Rodnarok.struggleAt`), and the game owning the float writes the line's strain in steps of 0.05 (`Rodnarok.strain`), so every game shows the same.
+A hooked fish shows its next struggle coming (`StruggleWarning`, `StruggleTells`, setting `StruggleWarning`, on by default). The game decides when the next struggle starts as one ends (`Fish.m_nextEscape`, a rest of the fish's `m_escapeWaitMin` to `m_escapeWaitMax`, brought sooner by each heave), on the game owning the fish; that game writes the time, again whenever it changes, onto the fish's networked data as server time (`Rodnarok.struggleAt`), and the game owning the float writes the line's strain in steps of 0.05 (`Rodnarok.strain`), so every game shows the same.
 
 With more than 1.5 s to go the float lies still, so a still float always leaves that long. Within the last 1.5 s the float's look trembles toward the fish as at a bite (`FloatTremble`, its closeness standing for how restless the fish is, eased in from the first moment), never the float with its physics body.
 
