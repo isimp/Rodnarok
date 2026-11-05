@@ -366,17 +366,24 @@ namespace Rodnarok
                         if (Mathf.Abs(contrast.Contrast - 2f) > 0.001f || Mathf.Abs(contrast.LineWidth - SignLight.LineWidth(2f)) > 0.001f)
                             wrong.Add("the server's contrast 2 drew the signs at " + F(contrast.Contrast) + " with lines " + F(contrast.LineWidth) + "x wide");
                         // How deep the fish swims shows in the sign: as made at the bait's depth, broader and fainter deeper, pictured both ways.
-                        var ground = ZoneSystem.instance.GetGroundHeight(at);
+                        // Held at the deep water spot itself, nearer the camera than the gallery, its own depth and speed
+                        // pinned so the game does not swim it back to its prefab's depth between frames.
+                        var near = spot.Value;
+                        var ground = ZoneSystem.instance.GetGroundHeight(near);
                         var surface = ZoneSystem.instance.m_waterLevel;
                         var deepest = Mathf.Min(SignDepth.Broadest, surface - ground - 0.4f);
                         var depths = new List<(float Under, (float Under, float Size, float Bold) Seen)>();
+                        var ownDepth = (fish.m_minDepth, fish.m_maxDepth, fish.m_speed);
                         foreach (var (under, label) in new[] { (SignDepth.Crisp, "shallow"), (deepest, "deep") })
                         {
-                            var held = new Vector3(at.x, surface - under, at.z);
+                            var held = new Vector3(near.x, surface - under, near.z);
+                            fish.m_minDepth = under;
+                            fish.m_maxDepth = under;
+                            fish.m_speed = 0f;
                             for (var waited = 0f; waited < 2.5f; waited += Time.deltaTime)
                             {
                                 Swim(go, held);
-                                Aim(player, at + Vector3.up * 1.5f);
+                                Aim(player, near + Vector3.up * 1.5f);
                                 yield return null;
                             }
                             depths.Add((under, ArrivalSigns.DepthForTest(floatId)));
@@ -384,6 +391,7 @@ namespace Rodnarok
                             yield return null;
                             if (depthPicture != null) wrong.Add("no picture of the " + name + " " + label + ": " + depthPicture);
                         }
+                        (fish.m_minDepth, fish.m_maxDepth, fish.m_speed) = ownDepth;
                         var crisp = depths[0].Seen;
                         var deepSeen = depths[1].Seen;
                         if (deepest < SignDepth.Crisp + 1f)
