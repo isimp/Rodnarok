@@ -32,6 +32,9 @@ namespace Rodnarok
         private static readonly Dictionary<Fish, Lift> Lifts = new Dictionary<Fish, Lift>();
         private static readonly HashSet<Fish> Slack = new HashSet<Fish>();
 
+        /// <summary>Each hooked fish's slack from its last heave still out (<see cref="Heave.Unwound"/>), in metres.</summary>
+        private static readonly Dictionary<Fish, float> HeaveSlack = new Dictionary<Fish, float>();
+
         /// <summary>Each heaving player's rod motion: when the heave began and whether the rod was held up then.</summary>
         private static readonly Dictionary<Humanoid, (float Since, bool Holding)> Poses = new Dictionary<Humanoid, (float, bool)>();
 
@@ -72,6 +75,10 @@ namespace Rodnarok
         [ForTest]
         public static int PoseRaisedForTest { get; private set; }
 
+        /// <summary>Whether the game has a character's rod held up now, for the self-test.</summary>
+        [ForTest]
+        public static bool RodHeldUpForTest(Humanoid humanoid) => InternalBlocking(humanoid);
+
         /// <summary>Each frame, the local player's rod motion as well, so it shows whatever order the game updates in.</summary>
         public static void Tick()
         {
@@ -110,7 +117,7 @@ namespace Rodnarok
                 var fish = ff.GetCatch();
                 if (fish == null || !rules.Heave) return;
                 var cost = CostFor(player);
-                switch (Heave.OnPress(rules.Heave, true, fish.IsEscaping(), IsLifting(fish), rules.Tension, player.HaveStamina(cost), OnSlack(fish)))
+                switch (Heave.OnPress(rules.Heave, true, fish.IsEscaping(), IsLifting(fish), rules.Tension, player.HaveStamina(cost), HeaveSlackOut(fish)))
                 {
                     case Heave.Pressed.Lifts:
                         var tip = Utils.FindChild(player.transform, "_RodTop");
@@ -156,6 +163,12 @@ namespace Rodnarok
         /// <summary>Whether a hooked fish's line hangs slack, so its weight is off the reel.</summary>
         public static bool OnSlack(Fish fish) => fish != null && Slack.Contains(fish);
 
+        /// <summary>The slack the last heave put out that is still out, in metres; 0 with none.</summary>
+        public static float HeaveSlackOf(Fish fish) => fish != null && HeaveSlack.TryGetValue(fish, out var metres) ? metres : 0f;
+
+        /// <summary>Whether the last heave's slack is still out, so the next heave waits for the wind.</summary>
+        public static bool HeaveSlackOut(Fish fish) => Heave.HasSlack(HeaveSlackOf(fish));
+
         /// <summary>After the fish's step, in the game owning it: a lifted fish comes toward the rod at the lift's speed until the lift is over or it struggles.</summary>
         public static void MoveFish(Fish fish)
         {
@@ -182,10 +195,12 @@ namespace Rodnarok
         /// </summary>
         public static float Step(FishingFloat ff, Fish fish, Character owner, float strain, bool struggleStarts, bool holding, FishingRules rules)
         {
+            var lifting = false;
             if (Lifts.TryGetValue(fish, out var lift))
             {
                 var body = FloatBody(ff);
-                if (Time.time < lift.Until && !fish.IsEscaping())
+                lifting = Time.time < lift.Until && !fish.IsEscaping();
+                if (lifting)
                 {
                     if (body != null)
                     {
@@ -206,6 +221,9 @@ namespace Rodnarok
             var slack = tip != null ? Heave.Slack(LineLength(ff), Vector3.Distance(tip.position, ff.transform.position)) : 0f;
             if (Heave.HasSlack(slack) && rules.Heave) Slack.Add(fish);
             else Slack.Remove(fish);
+            var unwound = rules.Heave ? Heave.Unwound(HeaveSlackOf(fish), slack, lifting) : 0f;
+            if (unwound > 0f) HeaveSlack[fish] = unwound;
+            else HeaveSlack.Remove(fish);
 
             if (struggleStarts && rules.Tension && rules.Heave && Heave.HasSlack(slack))
             {
@@ -229,6 +247,7 @@ namespace Rodnarok
             if (fish == null) return;
             Lifts.Remove(fish);
             Slack.Remove(fish);
+            HeaveSlack.Remove(fish);
         }
 
         /// <summary>Lets go of every heave, on leaving a world.</summary>
@@ -236,6 +255,7 @@ namespace Rodnarok
         {
             Lifts.Clear();
             Slack.Clear();
+            HeaveSlack.Clear();
             Poses.Clear();
         }
     }

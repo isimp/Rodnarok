@@ -45,6 +45,46 @@ namespace Rodnarok.Tests
         }
 
         [Fact]
+        public void SlackFromTheFloatDriftingCloserNeverHoldsAHeaveBack()
+        {
+            // No heave yet: the fish swims toward the rod, or the player steps closer, and the line hangs 1.5 m slack.
+            var unwound = 0f;
+            foreach (var slack in new[] { 0.2f, 0.8f, 1.5f })
+                unwound = Heave.Unwound(unwound, slack, lifting: false);
+            Assert.Equal(0f, unwound, 3);
+            Assert.False(Heave.HasSlack(unwound));
+        }
+
+        [Fact]
+        public void TheHeavesOwnSlackHoldsTheNextBackUntilItIsWoundIn()
+        {
+            // The lift puts out the whole heave's slack.
+            var unwound = 0f;
+            foreach (var slack in new[] { 1f, 2f, Heave.Metres })
+                unwound = Heave.Unwound(unwound, slack, lifting: true);
+            Assert.Equal(Heave.Metres, unwound, 3);
+            Assert.True(Heave.HasSlack(unwound));
+            // Winding takes it off.
+            unwound = Heave.Unwound(unwound, 1.2f, lifting: false);
+            Assert.Equal(1.2f, unwound, 3);
+            Assert.True(Heave.HasSlack(unwound));
+            unwound = Heave.Unwound(unwound, Heave.SlackFrom - 0.05f, lifting: false);
+            Assert.False(Heave.HasSlack(unwound));
+        }
+
+        [Fact]
+        public void DriftingCloserAfterAHeaveAddsNothingToItsSlackAndSwimmingAwayTakesSomeOff()
+        {
+            var unwound = Heave.Unwound(0f, Heave.Metres, lifting: true);
+            // The fish swims away: the line straightens without a wind and the heave's slack is taken in.
+            unwound = Heave.Unwound(unwound, 1f, lifting: false);
+            Assert.Equal(1f, unwound, 3);
+            // Then it drifts closer and the line sags again: that slack is not the heave's.
+            unwound = Heave.Unwound(unwound, 2.5f, lifting: false);
+            Assert.Equal(1f, unwound, 3);
+        }
+
+        [Fact]
         public void EachHeaveBringsTheFishsNextStruggleTwoSecondsSooner()
         {
             Assert.Equal(2f, Heave.RestCut, 3);

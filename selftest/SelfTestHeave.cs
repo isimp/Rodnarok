@@ -97,11 +97,17 @@ namespace Rodnarok
                 {
                     result.Came = true;
                     SelfTestHold.Holding = false;
+                    // A player lets go before heaving; the press waits until the game has the rod down again.
+                    for (var down = 0f; down < 0.3f && Heaves.RodHeldUpForTest(player); down += Time.deltaTime)
+                    {
+                        Aim(player, ff);
+                        yield return null;
+                    }
                     yield break;
                 }
                 var strain = Lines.StrainOf(ff);
                 // Tapped through struggles; in a rest, slack left from a heave is wound in, as a player would before the next.
-                holding = fish.IsEscaping() ? (strain >= EaseAt ? false : strain <= HoldAgainAt || holding) : Heaves.OnSlack(fish);
+                holding = fish.IsEscaping() ? (strain >= EaseAt ? false : strain <= HoldAgainAt || holding) : Heaves.HeaveSlackOut(fish);
                 SelfTestHold.Holding = holding;
                 player.AddStamina(player.GetMaxStamina());
                 Aim(player, ff);
@@ -243,8 +249,11 @@ namespace Rodnarok
                 if (moment.Came && ff != null)
                 {
                     var jolted = Heaves.JoltedForTest;
+                    var liftedLate = Heaves.LiftedForTest;
                     player.AddStamina(player.GetMaxStamina());
                     Press(player);
+                    check.That(Heaves.LiftedForTest == liftedLate + 1, "with the last heave's slack wound in, the next heave lifts: " + (Heaves.LiftedForTest - liftedLate).ToString(CultureInfo.InvariantCulture) + " heaves, "
+                        + F(Heaves.HeaveSlackOf(fish)) + " m of its slack out, " + F(LineLength(ff) - TipToFloat(player, ff)) + " m of slack on the line");
                     for (var waited = 0f; waited < 2f && Heaves.JoltedForTest == jolted && ff != null && ff.GetCatch() == fish; waited += Time.deltaTime)
                     {
                         player.AddStamina(player.GetMaxStamina());

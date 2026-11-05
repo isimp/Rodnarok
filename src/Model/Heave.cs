@@ -52,8 +52,8 @@ namespace Rodnarok
         }
 
         /// <summary>
-        /// What a press does: in a rest, with the slack of the last heave wound in and the stamina for it,
-        /// a lift; into a struggle, with the line's strain on, only strain; else nothing.
+        /// What a press does: in a rest, with the slack of the last heave wound in (<see cref="Unwound"/>)
+        /// and the stamina for it, a lift; into a struggle, with the line's strain on, only strain; else nothing.
         /// </summary>
         public static Pressed OnPress(bool on, bool hooked, bool struggling, bool lifting, bool tension, bool staminaEnough, bool slackOut = false)
         {
@@ -81,6 +81,14 @@ namespace Rodnarok
 
         /// <summary>How much longer the line is than the way from the rod tip to the float, in metres; 0 for none.</summary>
         public static float Slack(float line, float distance) => Math.Max(0f, line - distance);
+
+        /// <summary>
+        /// The slack the last heave put out that is still out, in metres, after a step with this much
+        /// slack on the line: through the lift it is the line's slack; after, it only shrinks, as the line
+        /// is wound in or the fish swims away, and slack from the float drifting closer adds none, so only
+        /// a heave's own slack holds the next heave back.
+        /// </summary>
+        public static float Unwound(float unwound, float slack, bool lifting) => lifting ? slack : Math.Min(unwound, slack);
 
         /// <summary>Whether the line hangs slack.</summary>
         public static bool HasSlack(float slack) => slack > SlackFrom;
