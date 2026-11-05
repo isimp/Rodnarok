@@ -148,12 +148,25 @@ namespace Rodnarok.Tests
         }
 
         [Fact]
-        public void AHeaveInTheLastTwoSecondsOfARestHasTheFishBoltAsTheLiftEndsWithTheSlackOut()
+        public void AHeaveLateInARestStillLeavesTheWholeWarningAfterItsLift()
         {
-            // Pressed at 10 s, the lift ends at 10.3 s.
+            // Pressed at 10 s, the lift ends at 10.3 s; the float grows restless 1.5 s before a struggle.
             var liftEnds = 10f + Heave.LiftSeconds;
-            Assert.Equal(liftEnds, Heave.ShortenRest(11f, liftEnds), 3);
-            Assert.Equal(liftEnds, Heave.ShortenRest(10.5f, liftEnds), 3);
+            Assert.Equal(liftEnds + StruggleWarning.RestlessFrom, Heave.ShortenRest(12.5f, liftEnds), 3);
+            Assert.Equal(liftEnds + StruggleWarning.RestlessFrom, Heave.ShortenRest(12f, liftEnds), 3);
+            for (var next = liftEnds; next < liftEnds + 10f; next += 0.05f)
+            {
+                var after = Heave.ShortenRest(next, liftEnds);
+                Assert.True(after == next || after - liftEnds >= StruggleWarning.RestlessFrom - 0.001f, "a struggle due at " + next + " brought to " + after);
+            }
+        }
+
+        [Fact]
+        public void AHeaveOnceTheFloatIsRestlessBringsNothingSoonerAndTheFishBoltsWithTheSlackOut()
+        {
+            var liftEnds = 10f + Heave.LiftSeconds;
+            Assert.Equal(11f, Heave.ShortenRest(11f, liftEnds), 3);
+            Assert.Equal(10.5f, Heave.ShortenRest(10.5f, liftEnds), 3);
             // A struggle already due before the lift ends comes no later for the heave.
             Assert.Equal(10.1f, Heave.ShortenRest(10.1f, liftEnds), 3);
         }
@@ -167,16 +180,15 @@ namespace Rodnarok.Tests
             Assert.Equal(0, Pumps(1.25f));
         }
 
-        /// <summary>How many heaves a rest this long takes before the next would bring the struggle at once; counted up to 100.</summary>
+        /// <summary>How many heaves, pressed one after the other at the same moment, still bring a rest this long sooner; counted up to 100.</summary>
         private static int Pumps(float rest)
         {
-            var now = 0f;
             var next = rest;
             var heaves = 0;
             while (heaves < 100)
             {
-                var after = Heave.ShortenRest(next, now);
-                if (after <= now) return heaves;
+                var after = Heave.ShortenRest(next, Heave.LiftSeconds);
+                if (after >= next - 0.001f) return heaves;
                 heaves++;
                 next = after;
             }

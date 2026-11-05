@@ -185,7 +185,9 @@ namespace Rodnarok
                 var nextBefore = StruggleTells.NextStruggleForTest(fish);
                 Press(player);
                 var nextAfter = StruggleTells.NextStruggleForTest(fish);
-                check.That(Mathf.Abs(nextAfter - (nextBefore - Heave.RestCut)) < 0.05f, "the fish answers the heave: its next struggle comes " + F(Heave.RestCut, "0") + " s sooner, "
+                var nextWanted = Heave.ShortenRest(nextBefore, Time.time + Heave.LiftSeconds);
+                check.That(Mathf.Abs(nextAfter - nextWanted) < 0.05f && nextAfter < nextBefore - 1f && nextAfter - Time.time >= Heave.LiftSeconds + StruggleWarning.RestlessFrom - 0.05f,
+                    "the fish answers the heave: its next struggle comes up to " + F(Heave.RestCut, "0") + " s sooner but leaves the whole warning after the lift, "
                     + F(nextBefore - Time.time) + " s to go before, " + F(nextAfter - Time.time) + " s after");
                 for (var waited = 0f; waited < Heave.LiftSeconds + 0.15f; waited += Time.deltaTime)
                 {
@@ -287,8 +289,11 @@ namespace Rodnarok
                 {
                     var jolted = Heaves.JoltedForTest;
                     var liftedLate = Heaves.LiftedForTest;
+                    var nextLate = StruggleTells.NextStruggleForTest(fish);
                     player.AddStamina(player.GetMaxStamina());
                     Press(player);
+                    check.That(Mathf.Abs(StruggleTells.NextStruggleForTest(fish) - nextLate) < 0.01f, "a heave once the float is restless brings the struggle no sooner: "
+                        + F(nextLate - Time.time) + " s to go before, " + F(StruggleTells.NextStruggleForTest(fish) - Time.time) + " s after");
                     check.That(Heaves.LiftedForTest == liftedLate + 1, "with the last heave's slack wound in, the next heave lifts: " + (Heaves.LiftedForTest - liftedLate).ToString(CultureInfo.InvariantCulture) + " heaves, "
                         + F(Heaves.HeaveSlackOf(fish)) + " m of its slack out, " + F(LineLength(ff) - TipToFloat(player, ff)) + " m of slack on the line");
                     for (var waited = 0f; waited < 2f && Heaves.JoltedForTest == jolted && ff != null && ff.GetCatch() == fish; waited += Time.deltaTime)

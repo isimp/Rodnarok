@@ -105,10 +105,13 @@ namespace Rodnarok
 
         /// <summary>
         /// When the fish's next struggle comes after a heave whose lift ends at <paramref name="liftEnds"/>:
-        /// <see cref="RestCut"/> sooner, but not before the lift is done, so a heave too late in a rest has
-        /// the fish bolt as it ends with the whole slack out; never later than it would have come.
+        /// <see cref="RestCut"/> sooner, but never sooner than the whole struggle warning after the lift
+        /// (<see cref="StruggleWarning.RestlessFrom"/>), so a heave never brings a struggle on unseen; a heave
+        /// once the float is restless brings nothing sooner, and the fish bolts in its own time with the
+        /// slack out. Never later than it would have come.
         /// </summary>
-        public static float ShortenRest(float nextStruggle, float liftEnds) => Math.Min(nextStruggle, Math.Max(liftEnds, nextStruggle - RestCut));
+        public static float ShortenRest(float nextStruggle, float liftEnds) =>
+            Math.Min(nextStruggle, Math.Max(liftEnds + StruggleWarning.RestlessFrom, nextStruggle - RestCut));
 
         /// <summary>
         /// The stamina a heave costs: the rod's own secondary attack stamina (20 on the game's rod, as an
