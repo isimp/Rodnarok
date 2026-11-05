@@ -51,13 +51,26 @@ namespace Rodnarok
             Strains,
         }
 
-        /// <summary>What a press does: in a rest with the stamina for it a lift; into a struggle, with the line's strain on, only strain; else nothing.</summary>
-        public static Pressed OnPress(bool on, bool hooked, bool struggling, bool lifting, bool tension, bool staminaEnough)
+        /// <summary>
+        /// What a press does: in a rest, with the slack of the last heave wound in and the stamina for it,
+        /// a lift; into a struggle, with the line's strain on, only strain; else nothing.
+        /// </summary>
+        public static Pressed OnPress(bool on, bool hooked, bool struggling, bool lifting, bool tension, bool staminaEnough, bool slackOut = false)
         {
             if (!on || !hooked || lifting) return Pressed.Nothing;
             if (struggling) return tension ? Pressed.Strains : Pressed.Nothing;
-            return staminaEnough ? Pressed.Lifts : Pressed.Nothing;
+            return staminaEnough && !slackOut ? Pressed.Lifts : Pressed.Nothing;
         }
+
+        /// <summary>How much sooner, in seconds, each heave brings the fish's next struggle.</summary>
+        public const float RestCut = 2f;
+
+        /// <summary>
+        /// When the fish's next struggle comes after a heave whose lift ends at <paramref name="liftEnds"/>:
+        /// <see cref="RestCut"/> sooner, but not before the lift is done, so a heave too late in a rest has
+        /// the fish bolt as it ends with the whole slack out; never later than it would have come.
+        /// </summary>
+        public static float ShortenRest(float nextStruggle, float liftEnds) => Math.Min(nextStruggle, Math.Max(liftEnds, nextStruggle - RestCut));
 
         /// <summary>
         /// The stamina a heave costs: the rod's own secondary attack stamina (20 on the game's rod, as an

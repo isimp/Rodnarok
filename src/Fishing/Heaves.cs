@@ -17,6 +17,7 @@ namespace Rodnarok
         private static readonly AccessTools.FieldRef<FishingFloat, float> LineLength = AccessTools.FieldRefAccess<FishingFloat, float>("m_lineLength");
         private static readonly AccessTools.FieldRef<FishingFloat, Rigidbody> FloatBody = AccessTools.FieldRefAccess<FishingFloat, Rigidbody>("m_body");
         private static readonly AccessTools.FieldRef<Fish, Rigidbody> FishBody = AccessTools.FieldRefAccess<Fish, Rigidbody>("m_body");
+        private static readonly AccessTools.FieldRef<Fish, float> NextEscape = AccessTools.FieldRefAccess<Fish, float>("m_nextEscape");
 
         private struct Lift
         {
@@ -109,7 +110,7 @@ namespace Rodnarok
                 var fish = ff.GetCatch();
                 if (fish == null || !rules.Heave) return;
                 var cost = CostFor(player);
-                switch (Heave.OnPress(rules.Heave, true, fish.IsEscaping(), IsLifting(fish), rules.Tension, player.HaveStamina(cost)))
+                switch (Heave.OnPress(rules.Heave, true, fish.IsEscaping(), IsLifting(fish), rules.Tension, player.HaveStamina(cost), OnSlack(fish)))
                 {
                     case Heave.Pressed.Lifts:
                         var tip = Utils.FindChild(player.transform, "_RodTop");
@@ -119,6 +120,9 @@ namespace Rodnarok
                         player.UseStamina(cost);
                         Lifts[fish] = new Lift { Until = Time.time + Heave.LiftSeconds, Way = way.normalized };
                         Poses[player] = (Time.time, InternalBlocking(player));
+                        // The fish answers the heave: its next struggle comes sooner, as the game owning it counts the rest.
+                        var fishView = fish.GetComponent<ZNetView>();
+                        if (fishView != null && fishView.IsValid() && fishView.IsOwner()) NextEscape(fish) = Heave.ShortenRest(NextEscape(fish), Time.time + Heave.LiftSeconds);
                         LiftedForTest++;
                         return;
                     case Heave.Pressed.Strains:

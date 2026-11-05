@@ -36,6 +36,58 @@ namespace Rodnarok.Tests
         }
 
         [Fact]
+        public void WithSlackStillOutAHeaveLiftsNothingSoEachMustBeWoundIn()
+        {
+            Assert.Equal(Heave.Pressed.Nothing, Heave.OnPress(true, true, false, false, true, true, slackOut: true));
+            Assert.Equal(Heave.Pressed.Lifts, Heave.OnPress(true, true, false, false, true, true, slackOut: false));
+            // Into a struggle a heave strains the line, slack or not.
+            Assert.Equal(Heave.Pressed.Strains, Heave.OnPress(true, true, true, false, true, true, slackOut: true));
+        }
+
+        [Fact]
+        public void EachHeaveBringsTheFishsNextStruggleTwoSecondsSooner()
+        {
+            Assert.Equal(2f, Heave.RestCut, 3);
+            Assert.Equal(13f, Heave.ShortenRest(15f, 10f), 3);
+        }
+
+        [Fact]
+        public void AHeaveInTheLastTwoSecondsOfARestHasTheFishBoltAsTheLiftEndsWithTheSlackOut()
+        {
+            // Pressed at 10 s, the lift ends at 10.3 s.
+            var liftEnds = 10f + Heave.LiftSeconds;
+            Assert.Equal(liftEnds, Heave.ShortenRest(11f, liftEnds), 3);
+            Assert.Equal(liftEnds, Heave.ShortenRest(10.5f, liftEnds), 3);
+            // A struggle already due before the lift ends comes no later for the heave.
+            Assert.Equal(10.1f, Heave.ShortenRest(10.1f, liftEnds), 3);
+        }
+
+        [Fact]
+        public void ALongRestTakesAFewPumpsAndAShortOneNone()
+        {
+            // The game's rests run from 1.25 to 5 s (a fish's m_escapeWaitMin to m_escapeWaitMax).
+            Assert.Equal(2, Pumps(5f));
+            Assert.Equal(1, Pumps(3f));
+            Assert.Equal(0, Pumps(1.25f));
+        }
+
+        /// <summary>How many heaves a rest this long takes before the next would bring the struggle at once; counted up to 100.</summary>
+        private static int Pumps(float rest)
+        {
+            var now = 0f;
+            var next = rest;
+            var heaves = 0;
+            while (heaves < 100)
+            {
+                var after = Heave.ShortenRest(next, now);
+                if (after <= now) return heaves;
+                heaves++;
+                next = after;
+            }
+            return heaves;
+        }
+
+        [Fact]
         public void WithoutTheStaminaForItAHeaveLiftsNothing()
         {
             Assert.Equal(Heave.Pressed.Nothing, Heave.OnPress(true, true, false, false, true, staminaEnough: false));

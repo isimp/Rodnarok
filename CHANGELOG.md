@@ -4,7 +4,7 @@
 
 A hooked fish warns of its next struggle: the float grows restless and the line goes taut just before it bolts. Server setting `StruggleWarning`.
 
-In a rest the rod's secondary attack heaves the fish toward you and leaves slack to wind in quickly, but slack still out when the fish bolts jolts the line. Server setting `Heave`.
+In a rest the rod's secondary attack heaves the fish toward you and leaves slack to wind in quickly, but slack still out when the fish bolts jolts the line. Each heave must be wound in before the next, and each brings the fish's next struggle sooner, so pumping a fish in takes reading the rest. Server setting `Heave`.
 
 The signs of a coming school follow its way in, go quiet while it waits at your float and then follow the fish that goes for the bait. The *Trollfish* shows as a surging hump of water.
 

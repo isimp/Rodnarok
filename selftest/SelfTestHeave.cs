@@ -100,7 +100,8 @@ namespace Rodnarok
                     yield break;
                 }
                 var strain = Lines.StrainOf(ff);
-                holding = fish.IsEscaping() && (strain >= EaseAt ? false : strain <= HoldAgainAt || holding);
+                // Tapped through struggles; in a rest, slack left from a heave is wound in, as a player would before the next.
+                holding = fish.IsEscaping() ? (strain >= EaseAt ? false : strain <= HoldAgainAt || holding) : Heaves.OnSlack(fish);
                 SelfTestHold.Holding = holding;
                 player.AddStamina(player.GetMaxStamina());
                 Aim(player, ff);
@@ -154,8 +155,9 @@ namespace Rodnarok
 
                 // 1. In a rest with time to spare: the lift, its cost and the slack it leaves.
                 var moment = new Moment();
-                foreach (var frame in WaitFor(player, ff, fish, () => Until(fish) > 1.6f && Until(fish) < 6f, moment)) yield return frame;
-                check.That(moment.Came, "the Perch rests with more than 1.6 s to its next struggle within " + F(WaitSeconds, "0") + " s");
+                // The heave brings the struggle 2 s sooner, so the rest must leave room for the lift and the wind after that.
+                foreach (var frame in WaitFor(player, ff, fish, () => Until(fish) > Heave.RestCut + 1.3f && Until(fish) < 6f, moment)) yield return frame;
+                check.That(moment.Came, "the Perch rests with more than " + F(Heave.RestCut + 1.3f, "0.0") + " s to its next struggle within " + F(WaitSeconds, "0") + " s");
                 if (!moment.Came || ff == null) yield break;
                 player.AddStamina(player.GetMaxStamina());
                 var lifted = Heaves.LiftedForTest;
@@ -171,7 +173,11 @@ namespace Rodnarok
                 var raisedFrames = 0;
                 var liftFrames = 0;
                 var pictured = false;
+                var nextBefore = StruggleTells.NextStruggleForTest(fish);
                 Press(player);
+                var nextAfter = StruggleTells.NextStruggleForTest(fish);
+                check.That(Mathf.Abs(nextAfter - (nextBefore - Heave.RestCut)) < 0.05f, "the fish answers the heave: its next struggle comes " + F(Heave.RestCut, "0") + " s sooner, "
+                    + F(nextBefore - Time.time) + " s to go before, " + F(nextAfter - Time.time) + " s after");
                 for (var waited = 0f; waited < Heave.LiftSeconds + 0.15f; waited += Time.deltaTime)
                 {
                     Aim(player, ff);
@@ -203,6 +209,14 @@ namespace Rodnarok
                 check.That(slack > 1.5f, "so it hangs slack, " + F(slack) + " m longer than the way to the float");
                 check.That(spent > cost * 0.9f && spent < cost + drain * (Heave.LiftSeconds + 0.3f) + 1f, "the heave costs " + F(cost, "0.0") + " stamina, the rod's secondary attack as the game charges an attack; spent " + F(spent, "0.0"));
                 if (daylight && SelfTestPictures.Take("heave-slack") is string trouble) check.That(false, "a picture of the slack line is taken: " + trouble);
+
+                // With the slack still out, a second heave lifts nothing: each must be wound in first.
+                var liftedOnce = Heaves.LiftedForTest;
+                var staminaSlack = player.GetStamina();
+                Press(player);
+                yield return null;
+                check.That(Heaves.LiftedForTest == liftedOnce && !Heaves.IsLifting(fish) && staminaSlack - player.GetStamina() < cost * 0.5f,
+                    "with the slack still out a second heave lifts nothing and costs nothing: " + (Heaves.LiftedForTest - liftedOnce).ToString(CultureInfo.InvariantCulture) + " heaves");
 
                 // 2. Holding winds the slack in fast, for no more than the hooked drain.
                 SelfTestHold.Holding = true;
