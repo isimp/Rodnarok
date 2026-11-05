@@ -258,23 +258,37 @@ namespace Rodnarok
                 var windFrom = LineLength(ff);
                 var windStamina = player.GetStamina();
                 var wound = 0f;
-                var refilling = false;
+                // The track is drawn for how far the heave's slack is wound; it must rise with the wind, every frame matching the share drawn.
+                var firstFill = -1f;
+                var mostFill = -1f;
+                var drawnFrames = 0;
+                var offFrames = 0;
+                var worstOff = 0f;
+                var refillPictured = false;
+                var slackAtStart = LineLength(ff) - TipToFloat(player, ff);
                 for (; wound < 0.35f && ff != null && ff.GetCatch() == fish && !fish.IsEscaping() && LineLength(ff) - TipToFloat(player, ff) > Heave.SlackFrom + 0.2f; wound += Time.deltaTime)
                 {
                     Aim(player, ff);
                     yield return null;
-                    if (!refilling && track != null && track.gameObject.activeInHierarchy && track.fillAmount > 0.3f && track.fillAmount < 0.9f)
+                    // A track filled to nothing is hidden, so a hidden track reads as empty.
+                    var fill = track == null ? -1f : track.gameObject.activeInHierarchy ? track.fillAmount : 0f;
+                    if (fill < 0f) continue;
+                    drawnFrames++;
+                    if (firstFill < 0f) firstFill = fill;
+                    mostFill = Mathf.Max(mostFill, fill);
+                    var off = Mathf.Abs(fill - CrosshairRing.WoundForTest);
+                    if (off > 0.02f) offFrames++;
+                    worstOff = Mathf.Max(worstOff, off);
+                    if (!refillPictured && fill > firstFill + 0.15f && fill < 0.95f)
                     {
-                        refilling = true;
-                        // The hud drew the ring earlier in the frame, so the slack may be wound a little further by now.
-                        var nowWound = Heave.Wound(Heaves.HeaveSlackOf(fish));
-                        check.That(Mathf.Abs(track.fillAmount - CrosshairRing.WoundForTest) < 0.02f && CrosshairRing.WoundForTest <= nowWound + 0.01f && nowWound - CrosshairRing.WoundForTest < 0.3f,
-                            "the track refills as the heave's slack is wound in: track " + F(track.fillAmount) + " drawn for " + F(CrosshairRing.WoundForTest) + " wound, " + F(nowWound) + " by now with "
-                            + F(Heaves.HeaveSlackOf(fish)) + " m still out");
+                        refillPictured = true;
                         if (daylight && SelfTestPictures.Take("heave-track-refilling") is string troubleRefill) check.That(false, "a picture of the track refilling is taken: " + troubleRefill);
                     }
                 }
-                check.That(refilling, "the ring track was seen refilling while the slack was wound in");
+                check.That(drawnFrames > 0 && offFrames == 0 && mostFill > firstFill + 0.2f,
+                    "the ring track refills with the wind, drawn for the share wound each frame: from " + F(firstFill) + " to " + F(mostFill) + " over " + drawnFrames.ToString(CultureInfo.InvariantCulture)
+                    + " frames in " + F(wound) + " s, " + offFrames.ToString(CultureInfo.InvariantCulture) + " frames off the share by up to " + F(worstOff) + ", " + F(slackAtStart) + " m of slack at the start, "
+                    + F(Heaves.HeaveSlackOf(fish)) + " m of the heave's slack out at the end, struggling " + fish.IsEscaping());
                 SelfTestHold.Holding = false;
                 if (ff == null || ff.GetCatch() != fish) yield break;
                 var windRate = wound > 0f ? (windFrom - LineLength(ff)) / wound : 0f;
