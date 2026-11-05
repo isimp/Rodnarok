@@ -292,7 +292,7 @@ namespace Rodnarok
                     var nextLate = StruggleTells.NextStruggleForTest(fish);
                     player.AddStamina(player.GetMaxStamina());
                     Press(player);
-                    check.That(Mathf.Abs(StruggleTells.NextStruggleForTest(fish) - nextLate) < 0.01f, "a heave once the float is restless brings the struggle no sooner: "
+                    check.That(Mathf.Abs(StruggleTells.NextStruggleForTest(fish) - (Time.time + Heave.LiftSeconds)) < 0.05f, "a heave once the float is restless has the fish bolt as its lift ends: "
                         + F(nextLate - Time.time) + " s to go before, " + F(StruggleTells.NextStruggleForTest(fish) - Time.time) + " s after");
                     check.That(Heaves.LiftedForTest == liftedLate + 1, "with the last heave's slack wound in, the next heave lifts: " + (Heaves.LiftedForTest - liftedLate).ToString(CultureInfo.InvariantCulture) + " heaves, "
                         + F(Heaves.HeaveSlackOf(fish)) + " m of its slack out, " + F(LineLength(ff) - TipToFloat(player, ff)) + " m of slack on the line");

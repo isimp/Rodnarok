@@ -154,7 +154,8 @@ namespace Rodnarok.Tests
             var liftEnds = 10f + Heave.LiftSeconds;
             Assert.Equal(liftEnds + StruggleWarning.RestlessFrom, Heave.ShortenRest(12.5f, liftEnds), 3);
             Assert.Equal(liftEnds + StruggleWarning.RestlessFrom, Heave.ShortenRest(12f, liftEnds), 3);
-            for (var next = liftEnds; next < liftEnds + 10f; next += 0.05f)
+            // Pressed while the float still lay still, a heave never brings the struggle sooner than the whole warning after its lift.
+            for (var next = 10f + StruggleWarning.RestlessFrom + 0.01f; next < liftEnds + 10f; next += 0.05f)
             {
                 var after = Heave.ShortenRest(next, liftEnds);
                 Assert.True(after == next || after - liftEnds >= StruggleWarning.RestlessFrom - 0.001f, "a struggle due at " + next + " brought to " + after);
@@ -162,13 +163,37 @@ namespace Rodnarok.Tests
         }
 
         [Fact]
-        public void AHeaveOnceTheFloatIsRestlessBringsNothingSoonerAndTheFishBoltsWithTheSlackOut()
+        public void AHeaveOnceTheFloatIsRestlessHasTheFishBoltAsTheLiftEndsWithTheSlackOut()
         {
+            // Pressed at 10 s, with the struggle 1.5 s off or nearer, the float already restless.
             var liftEnds = 10f + Heave.LiftSeconds;
-            Assert.Equal(11f, Heave.ShortenRest(11f, liftEnds), 3);
-            Assert.Equal(10.5f, Heave.ShortenRest(10.5f, liftEnds), 3);
+            Assert.Equal(liftEnds, Heave.ShortenRest(10f + StruggleWarning.RestlessFrom, liftEnds), 3);
+            Assert.Equal(liftEnds, Heave.ShortenRest(11f, liftEnds), 3);
+            Assert.Equal(liftEnds, Heave.ShortenRest(10.5f, liftEnds), 3);
             // A struggle already due before the lift ends comes no later for the heave.
             Assert.Equal(10.1f, Heave.ShortenRest(10.1f, liftEnds), 3);
+        }
+
+        [Fact]
+        public void HeavesChainedAsFastAsTheSlackWindsInEndInABoltOnceTheFloatStirs()
+        {
+            // A 5 s rest at Fishing 0: each heave lifts 0.3 s and its 2.7 m of slack beyond the line's winds in at three times the 2 m/s reel.
+            var cycle = Heave.LiftSeconds + (Heave.Metres - Heave.SlackFrom) / (2f * Heave.WindFactor);
+            var next = 5f;
+            var press = 0f;
+            var heaves = 0;
+            while (heaves < 10)
+            {
+                next = Heave.ShortenRest(next, press + Heave.LiftSeconds);
+                heaves++;
+                if (next <= press + Heave.LiftSeconds + 0.001f) break;
+                press += cycle;
+                if (press >= next) break;
+            }
+            Assert.True(next <= press + Heave.LiftSeconds + 0.001f, "the chain ended with the fish bolting as a lift ended, struggle at " + next + ", last heave at " + press);
+            // Two heaves bring the struggle 2.55 s off; the third comes once the float stirs and the fish bolts as its lift ends.
+            Assert.Equal(3, heaves);
+            Assert.Equal(2f * cycle + Heave.LiftSeconds, next, 3);
         }
 
         [Fact]
@@ -180,7 +205,7 @@ namespace Rodnarok.Tests
             Assert.Equal(0, Pumps(1.25f));
         }
 
-        /// <summary>How many heaves, pressed one after the other at the same moment, still bring a rest this long sooner; counted up to 100.</summary>
+        /// <summary>How many heaves, pressed one after the other at the same moment, still bring a rest this long sooner without setting the fish off; counted up to 100.</summary>
         private static int Pumps(float rest)
         {
             var next = rest;
@@ -188,7 +213,8 @@ namespace Rodnarok.Tests
             while (heaves < 100)
             {
                 var after = Heave.ShortenRest(next, Heave.LiftSeconds);
-                if (after >= next - 0.001f) return heaves;
+                // A heave that brings nothing sooner, or sets the fish off as its lift ends, is no pump.
+                if (after >= next - 0.001f || after <= Heave.LiftSeconds + 0.001f) return heaves;
                 heaves++;
                 next = after;
             }

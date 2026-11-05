@@ -2,7 +2,7 @@
 
 ## 0.3.1
 
-A heave must be wound in before the next, and each one brings the fish's next struggle sooner, never so soon that the warning is missed. Only the heave's own slack holds the next one back, the ring fills back up as you wind it in, and a heave pressed too soon twitches the rod and shakes the ring. Without the stamina for a heave the stamina bar flashes, as for any attack.
+A heave must be wound in before the next, and each one brings the fish's next struggle sooner, never so soon that the warning is missed; a heave once the float is restless makes the fish bolt at once. Only the heave's own slack holds the next one back, the ring fills back up as you wind it in, and a heave pressed too soon twitches the rod and shakes the ring. Without the stamina for a heave the stamina bar flashes, as for any attack.
 
 A fish's sign on the water shows how deep it swims, broader and fainter the deeper it is, sharpening as the fish going for your bait rises to the hook.
 
