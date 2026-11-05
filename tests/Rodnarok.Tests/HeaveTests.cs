@@ -184,9 +184,23 @@ namespace Rodnarok.Tests
         }
 
         [Fact]
-        public void WithoutTheStaminaForItAHeaveLiftsNothing()
+        public void WithoutTheStaminaForItAHeaveLiftsNothingAndSaysSoAsAnyAttackDoes()
         {
-            Assert.Equal(Heave.Pressed.Nothing, Heave.OnPress(true, true, false, false, true, staminaEnough: false));
+            // The game flashes the stamina bar for any attack it has not the stamina for (Attack.Start, Hud.StaminaBarEmptyFlash).
+            Assert.Equal(Heave.Pressed.NoStamina, Heave.OnPress(true, true, false, false, true, staminaEnough: false));
+            // Into a struggle a heave costs nothing, so it never runs short.
+            Assert.Equal(Heave.Pressed.Strains, Heave.OnPress(true, true, true, false, true, staminaEnough: false));
+            Assert.Equal(Heave.Pressed.Nothing, Heave.OnPress(true, hooked: false, false, false, true, staminaEnough: false));
+            Assert.Equal(Heave.Pressed.Nothing, Heave.OnPress(true, true, false, lifting: true, true, staminaEnough: false));
+        }
+
+        [Fact]
+        public void AHeaveNeedsATenthMoreStaminaThanItCostsAsTheGameAsksOfAnAttack()
+        {
+            Assert.False(Heave.StaminaEnough(stamina: 20.05f, cost: 20f));
+            Assert.True(Heave.StaminaEnough(20.2f, 20f));
+            // A heave that costs nothing needs none.
+            Assert.True(Heave.StaminaEnough(0f, 0f));
         }
 
         [Fact]

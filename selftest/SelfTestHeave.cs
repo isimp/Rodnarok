@@ -263,8 +263,11 @@ namespace Rodnarok
                     if (!refilling && track != null && track.gameObject.activeInHierarchy && track.fillAmount > 0.3f && track.fillAmount < 0.9f)
                     {
                         refilling = true;
-                        check.That(Mathf.Abs(track.fillAmount - Heave.Wound(Heaves.HeaveSlackOf(fish))) < 0.1f, "the track refills as the heave's slack is wound in: track " + F(track.fillAmount)
-                            + " for " + F(Heaves.HeaveSlackOf(fish)) + " m still out");
+                        // The hud drew the ring earlier in the frame, so the slack may be wound a little further by now.
+                        var nowWound = Heave.Wound(Heaves.HeaveSlackOf(fish));
+                        check.That(Mathf.Abs(track.fillAmount - CrosshairRing.WoundForTest) < 0.02f && CrosshairRing.WoundForTest <= nowWound + 0.01f && nowWound - CrosshairRing.WoundForTest < 0.3f,
+                            "the track refills as the heave's slack is wound in: track " + F(track.fillAmount) + " drawn for " + F(CrosshairRing.WoundForTest) + " wound, " + F(nowWound) + " by now with "
+                            + F(Heaves.HeaveSlackOf(fish)) + " m still out");
                         if (daylight && SelfTestPictures.Take("heave-track-refilling") is string troubleRefill) check.That(false, "a picture of the track refilling is taken: " + troubleRefill);
                     }
                 }
@@ -316,7 +319,25 @@ namespace Rodnarok
                 }
                 if (ff == null || ff.GetCatch() != fish) yield break;
 
-                // 5. Switched off, a press in a rest does nothing.
+                // 5. Without the stamina for it, a press in a rest lifts nothing and flashes the stamina bar, as the game does for any attack.
+                moment = new Moment();
+                foreach (var frame in WaitFor(player, ff, fish, () => Until(fish) > 1f && Until(fish) < 6f && !Heaves.HeaveSlackOut(fish), moment)) yield return frame;
+                check.That(moment.Came, "the Perch rests with the heave's slack wound in and more than a second to its next struggle within " + F(WaitSeconds, "0") + " s");
+                if (moment.Came && ff != null)
+                {
+                    player.UseStamina(player.GetStamina());
+                    var liftedTired = Heaves.LiftedForTest;
+                    var flashed = Heaves.NoStaminaForTest;
+                    var staminaLeft = player.GetStamina();
+                    Press(player);
+                    check.That(Heaves.LiftedForTest == liftedTired && !Heaves.IsLifting(fish) && Heaves.NoStaminaForTest == flashed + 1,
+                        "without the stamina for it a heave lifts nothing and flashes the stamina bar: " + (Heaves.LiftedForTest - liftedTired).ToString(CultureInfo.InvariantCulture) + " heaves, "
+                        + (Heaves.NoStaminaForTest - flashed).ToString(CultureInfo.InvariantCulture) + " flashes at " + F(staminaLeft, "0.0") + " stamina against a heave's " + F(cost, "0.0"));
+                    player.AddStamina(player.GetMaxStamina());
+                }
+                if (ff == null || ff.GetCatch() != fish) yield break;
+
+                // 6. Switched off, a press in a rest does nothing.
                 PlayRules.ForTest = PlayRules.Now.With(heave: false);
                 moment = new Moment();
                 foreach (var frame in WaitFor(player, ff, fish, () => Until(fish) > 1f && Until(fish) < 6f, moment)) yield return frame;

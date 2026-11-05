@@ -83,6 +83,10 @@ namespace Rodnarok
         [ForTest]
         public static int RefusedForTest { get; private set; }
 
+        /// <summary>How many presses found too little stamina for a heave and flashed the stamina bar, for the self-test.</summary>
+        [ForTest]
+        public static int NoStaminaForTest { get; private set; }
+
         /// <summary>When this game's player last pressed a heave that was refused, by the game's clock; the ring shakes from it.</summary>
         public static float RefusedAt { get; private set; } = float.NegativeInfinity;
 
@@ -128,7 +132,7 @@ namespace Rodnarok
                 var fish = ff.GetCatch();
                 if (fish == null || !rules.Heave) return;
                 var cost = CostFor(player);
-                switch (Heave.OnPress(rules.Heave, true, fish.IsEscaping(), IsLifting(fish), rules.Tension, player.HaveStamina(cost), HeaveSlackOut(fish)))
+                switch (Heave.OnPress(rules.Heave, true, fish.IsEscaping(), IsLifting(fish), rules.Tension, Heave.StaminaEnough(player.GetStamina(), cost), HeaveSlackOut(fish)))
                 {
                     case Heave.Pressed.Lifts:
                         var tip = Utils.FindChild(player.transform, "_RodTop");
@@ -148,6 +152,11 @@ namespace Rodnarok
                         Poses[player] = (Time.time, InternalBlocking(player), true);
                         RefusedAt = Time.time;
                         RefusedForTest++;
+                        return;
+                    case Heave.Pressed.NoStamina:
+                        // As the game answers any attack it has not the stamina for.
+                        if (Hud.instance != null) Hud.instance.StaminaBarEmptyFlash();
+                        NoStaminaForTest++;
                         return;
                     case Heave.Pressed.Strains:
                         Lines.Strain(ff, Heave.StruggleHeave(Lines.StrainOf(ff)));

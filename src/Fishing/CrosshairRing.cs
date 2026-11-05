@@ -48,6 +48,10 @@ namespace Rodnarok
         [ForTest]
         public static float ShakeForTest { get; private set; }
 
+        /// <summary>How far the heave's slack was wound when the ring was last drawn for a hooked fish, for the self-test.</summary>
+        [ForTest]
+        public static float WoundForTest { get; private set; } = 1f;
+
         /// <summary>After the game set the crosshair for this frame, draws the ring for the player's own float.</summary>
         public static void Draw(Hud hud, float bowDrawPercentage)
         {
@@ -132,6 +136,7 @@ namespace Rodnarok
             if (fish != null)
             {
                 var wound = Heave.Wound(Heaves.HeaveSlackOf(fish));
+                WoundForTest = wound;
                 return PlayRules.Now.Tension ? Ring.ForFight(fish.IsEscaping(), Lines.StrainOf(ff), wound) : Ring.ForFight(fish.IsEscaping(), wound);
             }
             if (Nibbler(ff) != null)

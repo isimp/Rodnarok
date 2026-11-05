@@ -2,7 +2,7 @@
 
 ## 0.3.1
 
-A heave must be wound in before the next, and each one brings the fish's next struggle sooner. Only the heave's own slack holds the next one back, the ring fills back up as you wind it in, and a heave pressed too soon twitches the rod and shakes the ring.
+A heave must be wound in before the next, and each one brings the fish's next struggle sooner. Only the heave's own slack holds the next one back, the ring fills back up as you wind it in, and a heave pressed too soon twitches the rod and shakes the ring. Without the stamina for a heave the stamina bar flashes, as for any attack.
 
 ## 0.3.0
 

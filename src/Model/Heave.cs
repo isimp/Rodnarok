@@ -52,11 +52,14 @@ namespace Rodnarok
 
             /// <summary>In a rest with the last heave's slack still out: nothing lifts, but the rod twitches and the ring shakes, so the press shows it was taken.</summary>
             Refused,
+
+            /// <summary>In a rest without the stamina for a lift: nothing lifts, and the stamina bar flashes as for any attack the game has not the stamina for.</summary>
+            NoStamina,
         }
 
         /// <summary>
         /// What a press does: in a rest, with the slack of the last heave wound in (<see cref="Unwound"/>)
-        /// and the stamina for it, a lift, and with that slack still out a refusal that shows; into a
+        /// and the stamina for it, a lift; with that slack still out, or without the stamina, a refusal that shows; into a
         /// struggle, with the line's strain on, only strain; else nothing.
         /// </summary>
         public static Pressed OnPress(bool on, bool hooked, bool struggling, bool lifting, bool tension, bool staminaEnough, bool slackOut = false)
@@ -64,8 +67,14 @@ namespace Rodnarok
             if (!on || !hooked || lifting) return Pressed.Nothing;
             if (struggling) return tension ? Pressed.Strains : Pressed.Nothing;
             if (slackOut) return Pressed.Refused;
-            return staminaEnough ? Pressed.Lifts : Pressed.Nothing;
+            return staminaEnough ? Pressed.Lifts : Pressed.NoStamina;
         }
+
+        /// <summary>
+        /// Whether this much stamina is enough for a heave of this cost: as the game asks of any attack
+        /// (<c>Attack.Start</c>), a tenth more than it costs, and none for one that costs nothing.
+        /// </summary>
+        public static bool StaminaEnough(float stamina, float cost) => cost <= 0f || stamina > cost + 0.1f;
 
         /// <summary>
         /// How far the last heave's slack is wound in, from 0 with a whole heave's slack out to 1 once
