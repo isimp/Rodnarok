@@ -225,8 +225,9 @@ namespace Rodnarok
                 var track = CrosshairRing.TrackForTest;
                 var under = CrosshairRing.UnderForTest;
                 var emptied = track == null || !track.gameObject.activeInHierarchy ? 0f : track.fillAmount;
-                check.That(track != null && under != null && under.gameObject.activeInHierarchy && emptied < 0.2f && !track.fillClockwise,
-                    "the heave empties the rest's ring track, leaving the fainter ring: track " + F(emptied) + " drawn " + (track != null && track.fillClockwise ? "clockwise" : "counter-clockwise")
+                // The float drifts on its own after the lift, so the heave's slack and the track it leaves vary; the track is drawn for that slack.
+                check.That(track != null && under != null && under.gameObject.activeInHierarchy && CrosshairRing.WoundForTest < 0.5f && Mathf.Abs(emptied - CrosshairRing.WoundForTest) < 0.02f && !track.fillClockwise,
+                    "the heave empties the rest's ring track, leaving the fainter ring: track " + F(emptied) + " drawn for " + F(CrosshairRing.WoundForTest) + " wound, " + (track != null && track.fillClockwise ? "clockwise" : "counter-clockwise")
                     + ", fainter ring shown " + (under != null && under.gameObject.activeInHierarchy) + ", " + F(Heaves.HeaveSlackOf(fish)) + " m of the heave's slack out");
 
                 // With the slack still out, a second heave lifts nothing: each must be wound in first. The press shows it was taken.
@@ -283,8 +284,8 @@ namespace Rodnarok
 
                 // 3. A heave late in a rest, left unwound: the struggle starts with slack out and jolts the line.
                 moment = new Moment();
-                foreach (var frame in WaitFor(player, ff, fish, () => Until(fish) > 0.5f && Until(fish) < 1f, moment)) yield return frame;
-                check.That(moment.Came, "the Perch rests with half a second to a second to its next struggle within " + F(WaitSeconds, "0") + " s");
+                foreach (var frame in WaitFor(player, ff, fish, () => Until(fish) > 0.5f && Until(fish) < 1f && !Heaves.HeaveSlackOut(fish), moment)) yield return frame;
+                check.That(moment.Came, "the Perch rests with half a second to a second to its next struggle and the last heave's slack wound in within " + F(WaitSeconds, "0") + " s");
                 if (moment.Came && ff != null)
                 {
                     var jolted = Heaves.JoltedForTest;

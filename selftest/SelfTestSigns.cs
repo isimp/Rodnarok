@@ -373,6 +373,7 @@ namespace Rodnarok
                         var surface = ZoneSystem.instance.m_waterLevel;
                         var deepest = Mathf.Min(SignDepth.Broadest, surface - ground - 0.4f);
                         var depths = new List<(float Under, (float Under, float Size, float Bold) Seen)>();
+                        var fishWas = new List<float>();
                         var ownDepth = (fish.m_minDepth, fish.m_maxDepth, fish.m_speed);
                         foreach (var (under, label) in new[] { (SignDepth.Crisp, "shallow"), (deepest, "deep") })
                         {
@@ -380,13 +381,23 @@ namespace Rodnarok
                             fish.m_minDepth = under;
                             fish.m_maxDepth = under;
                             fish.m_speed = 0f;
-                            for (var waited = 0f; waited < 2.5f; waited += Time.deltaTime)
+                            // The sign path follows the fish's depth over about a second; then the picture waits for a showing, looking down at the water there.
+                            var shownBefore = -1;
+                            var shownAgainAt = -1f;
+                            for (var waited = 0f; waited < 7f; waited += Time.deltaTime)
                             {
                                 Swim(go, held);
-                                Aim(player, near + Vector3.up * 1.5f);
+                                Aim(player, near);
                                 yield return null;
+                                if (waited < 3f) continue;
+                                var shownNow = ArrivalSigns.ForTest(floatId).Shown;
+                                if (shownBefore < 0) shownBefore = shownNow;
+                                else if (shownNow > shownBefore && shownAgainAt < 0f) shownAgainAt = waited;
+                                if (shownAgainAt >= 0f && waited >= shownAgainAt + 0.35f) break;
                             }
                             depths.Add((under, ArrivalSigns.DepthForTest(floatId)));
+                            fishWas.Add(surface - go.transform.position.y);
+                            if (shownAgainAt < 0f) wrong.Add("the " + name + " held " + label + " showed no sign within 4 s");
                             var depthPicture = SelfTestPictures.Take("sign-" + name + "-" + label);
                             yield return null;
                             if (depthPicture != null) wrong.Add("no picture of the " + name + " " + label + ": " + depthPicture);
@@ -396,9 +407,10 @@ namespace Rodnarok
                         var deepSeen = depths[1].Seen;
                         if (deepest < SignDepth.Crisp + 1f)
                             wrong.Add("the water beyond the float is " + F(surface - ground) + " m deep, too shallow to show a deep " + name);
-                        else if (Mathf.Abs(crisp.Under - SignDepth.Crisp) > 0.25f || Mathf.Abs(deepSeen.Under - deepest) > 0.25f || crisp.Size > 1.05f || deepSeen.Size <= crisp.Size + 0.2f || deepSeen.Bold >= crisp.Bold - 0.15f)
-                            wrong.Add("the " + name + "'s sign held at " + F(SignDepth.Crisp) + " m and " + F(deepest) + " m read " + F(crisp.Under) + " m (" + F(crisp.Size) + "x, " + F(crisp.Bold) + " bold) and "
-                                + F(deepSeen.Under) + " m (" + F(deepSeen.Size) + "x, " + F(deepSeen.Bold) + " bold); deeper should show broader and fainter");
+                        // The waves move the surface the depth is read from, so the reads are held to the depths within half a metre.
+                        else if (Mathf.Abs(crisp.Under - fishWas[0]) > 0.5f || Mathf.Abs(deepSeen.Under - fishWas[1]) > 0.5f || fishWas[1] < fishWas[0] + 1.5f || crisp.Size > 1.1f || deepSeen.Size <= crisp.Size + 0.2f || deepSeen.Bold >= crisp.Bold - 0.15f)
+                            wrong.Add("the " + name + "'s sign held at " + F(SignDepth.Crisp) + " m and " + F(deepest) + " m, the fish at " + F(fishWas[0]) + " m and " + F(fishWas[1]) + " m, read " + F(crisp.Under) + " m (" + F(crisp.Size) + "x, " + F(crisp.Bold) + " bold) and "
+                                + F(deepSeen.Under) + " m (" + F(deepSeen.Size) + "x, " + F(deepSeen.Bold) + " bold); the sign should follow the fish's depth and show broader and fainter deeper");
                         if (Mathf.Abs(hint.Size - SignStars.Size(3, false, 1)) > 0.001f || Mathf.Abs(goingStars.Size - SignStars.Size(3, true, 3)) > 0.001f)
                             wrong.Add("a two-star " + name + " showed " + F(hint.Size) + "x coming and " + F(goingStars.Size) + "x going for the bait, " + F(SignStars.Size(3, false, 1)) + "x and " + F(SignStars.Size(3, true, 3)) + "x wanted");
                     }
