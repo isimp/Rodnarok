@@ -1,6 +1,6 @@
 {
   "name": "Rodnarok",
-  "version_number": "0.3.0",
+  "version_number": "0.3.1",
   "website_url": "https://github.com/isimp/Rodnarok",
   "description": "Fishing you can read: the bait decides the fish in any water, each fish shows its own sign coming in, bites and struggles show on the float, line and crosshair, a heave lifts a resting fish, fish from a seat, and a trophy calms the waves.",
   "dependencies": []
