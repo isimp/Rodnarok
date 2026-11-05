@@ -2,7 +2,7 @@
 
 How each fish coming to a float tells itself on the water: its sign, the path the signs walk, the quiet at the float and the follow-in, the light and water they are drawn in, the Trollfish's hump, and the moments around a bite.
 
-Code: `src/Model/ArrivalSign.cs`, `src/Model/SignPath.cs`, `src/Model/SignLight.cs`, `src/Model/WaterMood.cs`, `src/Model/TrollHump.cs`, `src/Model/BiteBuildUp.cs`, `src/Fishing/ArrivalSigns.cs`, `src/Fishing/Schools.cs`.
+Code: `src/Model/ArrivalSign.cs`, `src/Model/SignPath.cs`, `src/Model/SignDepth.cs`, `src/Model/SignLight.cs`, `src/Model/WaterMood.cs`, `src/Model/TrollHump.cs`, `src/Model/BiteBuildUp.cs`, `src/Fishing/ArrivalSigns.cs`, `src/Fishing/Schools.cs`.
 
 See also: [arrival](arrival.md), [the bite](bite.md), [calm water](calm-water.md), [settings](settings.md); all notes in [the index](index.md).
 
@@ -49,5 +49,7 @@ As the fish marked as going for the bait closes its last 1.5 m, every game tilts
 A fish that flees, the rest of a hooked school, a school scared away or darting from a fright, has the place it fled from and the server time marked on its networked data (`Rodnarok.fledFrom`, `Rodnarok.fledAt`). Every game watches the fish that came to a float within the last 10 s and, for a flee marked within 1.5 s, shows it darting off once (`ScatterBurst`): a ring where it was and a short V of a wake running 2.5 m away from the fright in 0.8 s, fast at first. The game takes the coming marks at the nibble, before the hook scatters the school, hence the watch.
 
 A starred fish (the game's item quality on the fish's networked data, 1 plain) tells itself (`SignStars`): a school holding one shows 10% bigger and 15% bolder on the way in, the same for any number of stars, and a fish going for the bait shows by its own stars, 15% bigger a star up to 45% and 20% bolder, plain if it has none.
+
+How deep the fish swims shows in its sign (`SignDepth`), by how far under the surface the path the signs ride lies: from the bait's depth, 1 m under the float where the hook hangs, up to the surface a sign shows as made; deeper it shows broader and fainter, as a swirl spreads before it reaches the surface, up to 60% bigger and 45% fainter from the 4 m a school out of sight dives at, about as deep as a Tuna swims (its prefab's `m_minDepth`). The game's other fish swim 1.5 to 3 m deep by their prefabs (a Pike 2 to 4 m, a Tetra 0.5 to 1 m), and a school's fish keep within half a metre of their least depth all the way in, so most signs show about 15% bigger and 11% fainter and tighten as the fish going for the bait rises to the hook; a school that dived out of sight sharpens as it rises on the way in. It comes on top of the stars.
 
 The signs' rings, lines and spots are kept and used again rather than made with each showing (`PartPool`, 64 of each kind spare).

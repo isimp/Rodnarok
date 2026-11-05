@@ -10,7 +10,7 @@ Most of Rodnarök was written by Claude Code (Anthropic), which did the heavy li
 
 ## Fishing
 
-Each bait brings its own fish anywhere, and plain *Fishing Bait* also brings the fish that live where the float lands. Cast out over deep water and keep still. A school swims in from out of sight, each kind showing its own sign on the water, brighter on calm water and fainter in a swell. The signs go quiet while the school waits at your float, then follow the one fish that goes for the bait, and the crosshair ring grows stronger as it comes closer.
+Each bait brings its own fish anywhere, and plain *Fishing Bait* also brings the fish that live where the float lands. Cast out over deep water and keep still. A school swims in from out of sight, each kind showing its own sign on the water, brighter on calm water and fainter in a swell. A deeper fish's sign shows broader and fainter. The signs go quiet while the school waits at your float, then follow the one fish that goes for the bait, and the crosshair ring grows stronger as it comes closer.
 
 Noise and quick reels scare the fish, and a line at the top left says why a school left.
 

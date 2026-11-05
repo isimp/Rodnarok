@@ -48,6 +48,9 @@ namespace Rodnarok
             public readonly Vector3[] Wake = new Vector3[WakePoints];
             public float Size = 1f;
             public float Bold = 1f;
+
+            /// <summary>How deep under the surface the path the signs ride lies, in metres (<see cref="SignDepth"/>).</summary>
+            public float Under = float.NaN;
             public float Phase;
             public float Tilt;
             public Vector3 Axis;
@@ -227,8 +230,6 @@ namespace Rodnarok
             var goingQuality = going != null ? Quality(going) : 1;
             coming.Size = SignStars.Size(best, going != null, goingQuality);
             coming.Bold = SignStars.Boldness(best, going != null, goingQuality);
-            _size = coming.Size;
-            _bold = coming.Bold;
             Tremble(coming, going, floatObject);
             var nearness = ArrivalSign.Nearness(nearest);
             coming.Nearness = nearness;
@@ -238,6 +239,10 @@ namespace Rodnarok
             path.Step(target, going != null, floatSpot, Time.deltaTime);
             var pathAt = new Vector3(path.At.X, path.At.Y, path.At.Z);
             var surface = Surface(pathAt);
+            // A deeper fish shows broader and fainter, as a swirl spreads before it reaches the surface.
+            coming.Under = surface - pathAt.y;
+            _size = coming.Size * SignDepth.Size(coming.Under);
+            _bold = coming.Bold * SignDepth.Boldness(coming.Under);
 
             // A sign that travels with the school rides the path, fading while the school mills about at the float.
             var lasts = Lasts(coming.Kind);
@@ -962,6 +967,11 @@ namespace Rodnarok
         [ForTest]
         public static (float Size, float Bold) StarsForTest(ZDOID floatId) =>
             Floats.TryGetValue(floatId, out var coming) ? (coming.Size, coming.Bold) : (1f, 1f);
+
+        /// <summary>How deep a float's sign path lies and how much bigger and bolder its sign shows for that, for the self-test; NaN and 1 and 1 for none.</summary>
+        [ForTest]
+        public static (float Under, float Size, float Bold) DepthForTest(ZDOID floatId) =>
+            Floats.TryGetValue(floatId, out var coming) ? (coming.Under, SignDepth.Size(coming.Under), SignDepth.Boldness(coming.Under)) : (float.NaN, 1f, 1f);
 
         /// <summary>A fish's stars as the game's item quality, 1 for none, from its networked data so every game reads the same.</summary>
         private static int Quality(Fish fish)
