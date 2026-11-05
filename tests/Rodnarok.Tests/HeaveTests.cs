@@ -38,10 +38,66 @@ namespace Rodnarok.Tests
         [Fact]
         public void WithSlackStillOutAHeaveLiftsNothingSoEachMustBeWoundIn()
         {
-            Assert.Equal(Heave.Pressed.Nothing, Heave.OnPress(true, true, false, false, true, true, slackOut: true));
+            Assert.Equal(Heave.Pressed.Refused, Heave.OnPress(true, true, false, false, true, true, slackOut: true));
             Assert.Equal(Heave.Pressed.Lifts, Heave.OnPress(true, true, false, false, true, true, slackOut: false));
             // Into a struggle a heave strains the line, slack or not.
             Assert.Equal(Heave.Pressed.Strains, Heave.OnPress(true, true, true, false, true, true, slackOut: true));
+        }
+
+        [Fact]
+        public void APressWithTheHeavesSlackOutIsRefusedWithASignStaminaOrNot()
+        {
+            Assert.Equal(Heave.Pressed.Refused, Heave.OnPress(true, true, false, false, true, staminaEnough: false, slackOut: true));
+            // No sign without a fish, during a lift, or switched off.
+            Assert.Equal(Heave.Pressed.Nothing, Heave.OnPress(true, hooked: false, false, false, true, true, slackOut: true));
+            Assert.Equal(Heave.Pressed.Nothing, Heave.OnPress(true, true, false, lifting: true, true, true, slackOut: true));
+            Assert.Equal(Heave.Pressed.Nothing, Heave.OnPress(on: false, true, false, false, true, true, slackOut: true));
+        }
+
+        [Fact]
+        public void HowFarTheHeavesSlackIsWoundRunsFromNoneAtAWholeHeaveToAllAtTheSlackLine()
+        {
+            Assert.Equal(1f, Heave.Wound(0f), 3);
+            Assert.Equal(1f, Heave.Wound(Heave.SlackFrom), 3);
+            Assert.Equal(0f, Heave.Wound(Heave.Metres), 3);
+            Assert.Equal(0f, Heave.Wound(Heave.Metres + 2f), 3);
+            Assert.Equal(0.5f, Heave.Wound((Heave.Metres + Heave.SlackFrom) / 2f), 3);
+        }
+
+        [Fact]
+        public void ARefusedPressTwitchesTheRodBrieflyAndLessThanAHeave()
+        {
+            Assert.True(Heave.TwitchSeconds < Heave.DipSeconds && Heave.TwitchSeconds > 0f);
+            // Down: a short flick up. Held up: a short dip.
+            Assert.True(Heave.TwitchRaised(holding: false, since: 0f));
+            Assert.False(Heave.TwitchRaised(false, Heave.TwitchSeconds));
+            Assert.False(Heave.TwitchRaised(holding: true, since: 0f));
+            Assert.True(Heave.TwitchRaised(true, Heave.TwitchSeconds));
+            Assert.False(Heave.TwitchOver(Heave.TwitchSeconds - 0.01f));
+            Assert.True(Heave.TwitchOver(Heave.TwitchSeconds));
+        }
+
+        [Fact]
+        public void ARefusedPressShakesTheRingSidewaysAndSettles()
+        {
+            Assert.Equal(0f, Heave.Shake(0f), 3);
+            var peak = 0f;
+            for (var t = 0f; t < Heave.ShakeSeconds; t += 0.005f) peak = System.Math.Max(peak, System.Math.Abs(Heave.Shake(t)));
+            Assert.InRange(peak, Heave.ShakeAmplitude * 0.6f, Heave.ShakeAmplitude);
+            Assert.Equal(0f, Heave.Shake(Heave.ShakeSeconds), 3);
+            Assert.Equal(0f, Heave.Shake(5f), 3);
+            Assert.Equal(0f, Heave.Shake(-1f), 3);
+            Assert.True(Heave.ShakeSeconds <= 0.3f);
+            // It dies away rather than stopping at full swing.
+            var early = 0f;
+            var late = 0f;
+            for (var t = 0f; t < Heave.ShakeSeconds; t += 0.002f)
+            {
+                var aside = System.Math.Abs(Heave.Shake(t));
+                if (t < Heave.ShakeSeconds * 0.3f) early = System.Math.Max(early, aside);
+                else if (t > Heave.ShakeSeconds * 0.7f) late = System.Math.Max(late, aside);
+            }
+            Assert.True(late < early * 0.5f, "late " + late + " against early " + early);
         }
 
         [Fact]

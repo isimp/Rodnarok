@@ -35,8 +35,8 @@ namespace Rodnarok
         /// <summary>Each hooked fish's slack from its last heave still out (<see cref="Heave.Unwound"/>), in metres.</summary>
         private static readonly Dictionary<Fish, float> HeaveSlack = new Dictionary<Fish, float>();
 
-        /// <summary>Each heaving player's rod motion: when the heave began and whether the rod was held up then.</summary>
-        private static readonly Dictionary<Humanoid, (float Since, bool Holding)> Poses = new Dictionary<Humanoid, (float, bool)>();
+        /// <summary>Each heaving player's rod motion: when the heave or refused press began, whether the rod was held up then, and whether it is a refusal's twitch.</summary>
+        private static readonly Dictionary<Humanoid, (float Since, bool Holding, bool Twitch)> Poses = new Dictionary<Humanoid, (float, bool, bool)>();
 
         private static readonly AccessTools.FieldRef<Character, ZSyncAnimation> Animation = AccessTools.FieldRefAccess<Character, ZSyncAnimation>("m_zanim");
         private static readonly AccessTools.FieldRef<Humanoid, bool> BlockingShown = AccessTools.FieldRefAccess<Humanoid, bool>("m_internalBlockingState");
@@ -48,7 +48,7 @@ namespace Rodnarok
         /// <summary>
         /// After the game drew a character's block pose, which with a rod is the raised reeling pose that
         /// every game sees: through a heave the rod snaps up for the lift, or, held up already, dips and
-        /// comes back up; then it shows as the game has it again.
+        /// comes back up; a refused press twitches it the same way, shorter; then it shows as the game has it again.
         /// </summary>
         public static void Pose(Humanoid humanoid)
         {
@@ -60,20 +60,31 @@ namespace Rodnarok
                 return;
             }
             var since = Time.time - pose.Since;
-            if (Heave.PoseOver(pose.Holding, since))
+            if (pose.Twitch ? Heave.TwitchOver(since) : Heave.PoseOver(pose.Holding, since))
             {
                 Poses.Remove(humanoid);
                 zanim.SetBool(RaisedHash, InternalBlocking(humanoid));
                 return;
             }
-            var raised = Heave.RodRaised(pose.Holding, since);
+            var raised = pose.Twitch ? Heave.TwitchRaised(pose.Holding, since) : Heave.RodRaised(pose.Holding, since);
             zanim.SetBool(RaisedHash, raised);
-            if (raised) PoseRaisedForTest++;
+            if (pose.Twitch) TwitchFramesForTest++;
+            else if (raised) PoseRaisedForTest++;
         }
 
         /// <summary>How many times a heave's rod motion showed the rod raised, for the self-test.</summary>
         [ForTest]
         public static int PoseRaisedForTest { get; private set; }
+
+        /// <summary>How many frames a refused press's twitch moved the rod, and how many presses were refused, for the self-test.</summary>
+        [ForTest]
+        public static int TwitchFramesForTest { get; private set; }
+
+        [ForTest]
+        public static int RefusedForTest { get; private set; }
+
+        /// <summary>When this game's player last pressed a heave that was refused, by the game's clock; the ring shakes from it.</summary>
+        public static float RefusedAt { get; private set; } = float.NegativeInfinity;
 
         /// <summary>Whether the game has a character's rod held up now, for the self-test.</summary>
         [ForTest]
@@ -126,11 +137,17 @@ namespace Rodnarok
                         if (way.sqrMagnitude < 0.01f) return;
                         player.UseStamina(cost);
                         Lifts[fish] = new Lift { Until = Time.time + Heave.LiftSeconds, Way = way.normalized };
-                        Poses[player] = (Time.time, InternalBlocking(player));
+                        Poses[player] = (Time.time, InternalBlocking(player), false);
                         // The fish answers the heave: its next struggle comes sooner, as the game owning it counts the rest.
                         var fishView = fish.GetComponent<ZNetView>();
                         if (fishView != null && fishView.IsValid() && fishView.IsOwner()) NextEscape(fish) = Heave.ShortenRest(NextEscape(fish), Time.time + Heave.LiftSeconds);
                         LiftedForTest++;
+                        return;
+                    case Heave.Pressed.Refused:
+                        // The press is taken but the slack is not in: the rod twitches and the ring shakes.
+                        Poses[player] = (Time.time, InternalBlocking(player), true);
+                        RefusedAt = Time.time;
+                        RefusedForTest++;
                         return;
                     case Heave.Pressed.Strains:
                         Lines.Strain(ff, Heave.StruggleHeave(Lines.StrainOf(ff)));
@@ -257,6 +274,7 @@ namespace Rodnarok
             Slack.Clear();
             HeaveSlack.Clear();
             Poses.Clear();
+            RefusedAt = float.NegativeInfinity;
         }
     }
 }

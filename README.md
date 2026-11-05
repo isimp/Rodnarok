@@ -22,7 +22,7 @@ When a fish bites, the float goes under and the crosshair ring drains. Hold bloc
 
 A hooked fish takes turns struggling and resting. While it struggles the ring is red, and holding block strains the line until it snaps, so ease off and let the fish run. While it rests the ring is yellow, and holding block reels it in. A still float means the rest goes on a while yet, and a restless float and a line drawn taut mean the fish is about to bolt.
 
-In a rest your secondary attack heaves the fish toward you and leaves slack on the line, which holding block winds in quickly. Slack still out when the fish bolts jolts the line, so wind it in before the next struggle. You can only heave again once the slack is in, and every heave makes the fish bolt sooner.
+In a rest your secondary attack heaves the fish toward you and leaves slack on the line, which holding block winds in quickly. Slack still out when the fish bolts jolts the line, so wind it in before the next struggle. You can only heave again once the slack is in, which the ring shows as it fills back up, and every heave makes the fish bolt sooner.
 
 ## Difficulty
 

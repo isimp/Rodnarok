@@ -121,5 +121,52 @@ namespace Rodnarok.Tests
             Assert.Equal(0f, RingDraw.For(Ring.ForBite(0.3f, 1.5f)).TrackA);
             Assert.Equal(0f, RingDraw.For(Ring.ForFight(struggling: true)).TrackA);
         }
+
+        [Fact]
+        public void RightAfterAHeaveTheRestsTrackIsEmptiedLeavingOnlyAFainterRing()
+        {
+            var draw = RingDraw.For(Ring.ForFight(struggling: false, strain: 0f, wound: 0f));
+            Assert.Equal(0f, draw.TrackFill, 3);
+            Assert.Equal(1f, draw.UnderFill, 3);
+            Assert.True(draw.UnderA > 0f && draw.UnderA < draw.TrackA, "fainter than the track: " + draw.UnderA);
+        }
+
+        [Fact]
+        public void WindingTheHeavesSlackRefillsTheTrackCounterClockwise()
+        {
+            var half = RingDraw.For(Ring.ForFight(struggling: false, strain: 0.2f, wound: 0.4f));
+            Assert.Equal(0.4f, half.TrackFill, 3);
+            Assert.Equal(0.6f, half.UnderFill, 3);
+            Assert.False(half.TrackClockwise);
+            // The strain arc stays as it was, clockwise.
+            Assert.Equal(0.2f, half.Fill, 3);
+            Assert.False(half.ArcCounter);
+        }
+
+        [Fact]
+        public void WoundInTheRestLooksAsEverAndAStruggleIgnoresTheWind()
+        {
+            var ready = RingDraw.For(Ring.ForFight(struggling: false, strain: 0.3f, wound: 1f));
+            var plain = RingDraw.For(Ring.ForFight(struggling: false, strain: 0.3f));
+            Assert.Equal(plain.TrackA, ready.TrackA, 3);
+            Assert.Equal(1f, ready.TrackFill, 3);
+            Assert.Equal(0f, ready.UnderA, 3);
+            var struggle = RingDraw.For(Ring.ForFight(struggling: true, strain: 0.3f, wound: 0f));
+            Assert.Equal(1f, struggle.TrackFill, 3);
+            Assert.Equal(0f, struggle.UnderA, 3);
+        }
+
+        [Fact]
+        public void WithoutTensionTheWholeRestRingRefillsCounterClockwise()
+        {
+            var draw = RingDraw.For(Ring.ForFight(struggling: false, wound: 0.25f));
+            Assert.Equal(0.25f, draw.Fill, 3);
+            Assert.True(draw.ArcCounter);
+            Assert.Equal(0.75f, draw.UnderFill, 3);
+            Assert.True(draw.UnderA > 0f && draw.UnderA < draw.A);
+            var ready = RingDraw.For(Ring.ForFight(struggling: false, wound: 1f));
+            Assert.Equal(1f, ready.Fill, 3);
+            Assert.Equal(0f, ready.UnderA, 3);
+        }
     }
 }

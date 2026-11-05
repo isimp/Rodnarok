@@ -14,7 +14,10 @@ namespace Rodnarok
     /// it hangs slack; holding then winds the slack in at least twice as fast as the game's reel and
     /// costs no more than the hooked drain. A heave late in a rest, left unwound, must jolt the line by
     /// the slack as the struggle starts. A heave into a struggle must lift nothing and strain the line
-    /// a quarter. Switched off, a heave does nothing. Picture: the slack line after a heave. The float
+    /// a quarter. Switched off, a heave does nothing. A second press with the heave's slack out must lift
+    /// nothing, twitch the rod and shake the ring, and the rest's ring track must empty at the heave and
+    /// refill counter-clockwise as the slack is wound in. Pictures: the rod up in the heave, the slack
+    /// line after it, and the track refilling. The float
     /// carries no fish's bait; the fish is let go out in the water, and the fish, float and rod are
     /// taken away again.
     /// </summary>
@@ -162,8 +165,8 @@ namespace Rodnarok
                 // 1. In a rest with time to spare: the lift, its cost and the slack it leaves.
                 var moment = new Moment();
                 // The heave brings the struggle 2 s sooner, so the rest must leave room for the lift and the wind after that.
-                foreach (var frame in WaitFor(player, ff, fish, () => Until(fish) > Heave.RestCut + 1.3f && Until(fish) < 6f, moment)) yield return frame;
-                check.That(moment.Came, "the Perch rests with more than " + F(Heave.RestCut + 1.3f, "0.0") + " s to its next struggle within " + F(WaitSeconds, "0") + " s");
+                foreach (var frame in WaitFor(player, ff, fish, () => Until(fish) > Heave.RestCut + 1.6f && Until(fish) < 6f, moment)) yield return frame;
+                check.That(moment.Came, "the Perch rests with more than " + F(Heave.RestCut + 1.6f, "0.0") + " s to its next struggle within " + F(WaitSeconds, "0") + " s");
                 if (!moment.Came || ff == null) yield break;
                 player.AddStamina(player.GetMaxStamina());
                 var lifted = Heaves.LiftedForTest;
@@ -216,13 +219,35 @@ namespace Rodnarok
                 check.That(spent > cost * 0.9f && spent < cost + drain * (Heave.LiftSeconds + 0.3f) + 1f, "the heave costs " + F(cost, "0.0") + " stamina, the rod's secondary attack as the game charges an attack; spent " + F(spent, "0.0"));
                 if (daylight && SelfTestPictures.Take("heave-slack") is string trouble) check.That(false, "a picture of the slack line is taken: " + trouble);
 
-                // With the slack still out, a second heave lifts nothing: each must be wound in first.
+                // The rest's ring track is emptied by the heave and drawn counter-clockwise.
+                var track = CrosshairRing.TrackForTest;
+                var under = CrosshairRing.UnderForTest;
+                var emptied = track == null || !track.gameObject.activeInHierarchy ? 0f : track.fillAmount;
+                check.That(track != null && under != null && under.gameObject.activeInHierarchy && emptied < 0.2f && !track.fillClockwise,
+                    "the heave empties the rest's ring track, leaving the fainter ring: track " + F(emptied) + " drawn " + (track != null && track.fillClockwise ? "clockwise" : "counter-clockwise")
+                    + ", fainter ring shown " + (under != null && under.gameObject.activeInHierarchy) + ", " + F(Heaves.HeaveSlackOf(fish)) + " m of the heave's slack out");
+
+                // With the slack still out, a second heave lifts nothing: each must be wound in first. The press shows it was taken.
                 var liftedOnce = Heaves.LiftedForTest;
+                var refused = Heaves.RefusedForTest;
+                var twitchFrames = Heaves.TwitchFramesForTest;
                 var staminaSlack = player.GetStamina();
+                var twitchUp = false;
+                var shook = 0f;
                 Press(player);
-                yield return null;
+                for (var waited = 0f; waited < Heave.ShakeSeconds + 0.05f; waited += Time.deltaTime)
+                {
+                    Aim(player, ff);
+                    yield return null;
+                    if (waited < Heave.TwitchSeconds && animator != null && animator.GetBool("blocking")) twitchUp = true;
+                    shook = Mathf.Max(shook, Mathf.Abs(CrosshairRing.ShakeForTest));
+                }
+                if (ff == null || ff.GetCatch() != fish) yield break;
                 check.That(Heaves.LiftedForTest == liftedOnce && !Heaves.IsLifting(fish) && staminaSlack - player.GetStamina() < cost * 0.5f,
                     "with the slack still out a second heave lifts nothing and costs nothing: " + (Heaves.LiftedForTest - liftedOnce).ToString(CultureInfo.InvariantCulture) + " heaves");
+                check.That(Heaves.RefusedForTest == refused + 1 && Heaves.TwitchFramesForTest > twitchFrames && twitchUp && shook > Heave.ShakeAmplitude * 0.5f && Mathf.Abs(CrosshairRing.ShakeForTest) < 0.01f,
+                    "the refused press twitches the rod up and shakes the ring, then both settle: refused " + (Heaves.RefusedForTest - refused).ToString(CultureInfo.InvariantCulture)
+                    + ", twitch frames " + (Heaves.TwitchFramesForTest - twitchFrames).ToString(CultureInfo.InvariantCulture) + ", rod up " + twitchUp + ", ring shook " + F(shook, "0.0") + " aside, now " + F(CrosshairRing.ShakeForTest, "0.0"));
 
                 // 2. Holding winds the slack in fast, for no more than the hooked drain.
                 SelfTestHold.Holding = true;
@@ -230,11 +255,20 @@ namespace Rodnarok
                 var windFrom = LineLength(ff);
                 var windStamina = player.GetStamina();
                 var wound = 0f;
+                var refilling = false;
                 for (; wound < 0.35f && ff != null && ff.GetCatch() == fish && !fish.IsEscaping() && LineLength(ff) - TipToFloat(player, ff) > Heave.SlackFrom + 0.2f; wound += Time.deltaTime)
                 {
                     Aim(player, ff);
                     yield return null;
+                    if (!refilling && track != null && track.gameObject.activeInHierarchy && track.fillAmount > 0.3f && track.fillAmount < 0.9f)
+                    {
+                        refilling = true;
+                        check.That(Mathf.Abs(track.fillAmount - Heave.Wound(Heaves.HeaveSlackOf(fish))) < 0.1f, "the track refills as the heave's slack is wound in: track " + F(track.fillAmount)
+                            + " for " + F(Heaves.HeaveSlackOf(fish)) + " m still out");
+                        if (daylight && SelfTestPictures.Take("heave-track-refilling") is string troubleRefill) check.That(false, "a picture of the track refilling is taken: " + troubleRefill);
+                    }
                 }
+                check.That(refilling, "the ring track was seen refilling while the slack was wound in");
                 SelfTestHold.Holding = false;
                 if (ff == null || ff.GetCatch() != fish) yield break;
                 var windRate = wound > 0f ? (windFrom - LineLength(ff)) / wound : 0f;

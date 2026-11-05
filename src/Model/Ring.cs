@@ -26,11 +26,12 @@ namespace Rodnarok
     /// </summary>
     internal readonly struct Ring
     {
-        private Ring(RingLook look, float open, float? strain)
+        private Ring(RingLook look, float open, float? strain, float wound = 1f)
         {
             Look = look;
             Open = open;
             Strain = strain;
+            Wound = wound;
         }
 
         public RingLook Look { get; }
@@ -40,6 +41,9 @@ namespace Rodnarok
 
         /// <summary>How strained the line is in the fight, from 0 to 1 snapped; none without tension.</summary>
         public float? Strain { get; }
+
+        /// <summary>In a rest, how far the last heave's slack is wound in, 1 with the next heave free (<see cref="Heave.Wound"/>).</summary>
+        public float Wound { get; }
 
         public static Ring Hidden => new Ring(RingLook.Hidden, 0f, null);
 
@@ -51,10 +55,10 @@ namespace Rodnarok
         }
 
         /// <summary>The ring while a fish is hooked, without tension.</summary>
-        public static Ring ForFight(bool struggling) => new Ring(struggling ? RingLook.Struggle : RingLook.Rest, 1f, null);
+        public static Ring ForFight(bool struggling, float wound = 1f) => new Ring(struggling ? RingLook.Struggle : RingLook.Rest, 1f, null, wound);
 
         /// <summary>The ring while a fish is hooked on a line this strained.</summary>
-        public static Ring ForFight(bool struggling, float strain) => new Ring(struggling ? RingLook.Struggle : RingLook.Rest, 1f, strain);
+        public static Ring ForFight(bool struggling, float strain, float wound = 1f) => new Ring(struggling ? RingLook.Struggle : RingLook.Rest, 1f, strain, wound);
 
         /// <summary>The ring while a school is at the float with its fish this far from it across the water, in metres; <see cref="Open"/> carries the distance.</summary>
         public static Ring ForWaiting(float distance) => new Ring(RingLook.Waiting, distance, null);

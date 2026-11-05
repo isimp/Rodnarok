@@ -8,7 +8,9 @@ namespace Rodnarok
     /// The crosshair ring tells the bite and the fight as one ring of one size: after a bite its arc
     /// drains clockwise from full white toward yellow as the hook window runs out; in the fight it
     /// is red while the fish struggles and yellow while it rests, and with tension its arc is the
-    /// line's strain filling clockwise over a faint full track. It is a ring of its own, made from
+    /// line's strain filling clockwise over a faint full track. After a heave the rest's track empties
+    /// and refills counter-clockwise as its slack is wound in, and a heave refused for that slack
+    /// shakes the ring sideways. It is a ring of its own, made from
     /// the game's bow ring beside it, so the bow's ring is left as the game draws it and the two are
     /// never seen at once: while a bow or the rod is drawn this ring is hidden.
     /// </summary>
@@ -21,6 +23,11 @@ namespace Rodnarok
         private static Outline _thickness;
         private static Image _track;
         private static Outline _trackThickness;
+        private static Image _under;
+        private static Outline _underThickness;
+
+        /// <summary>Where the ring sits unshaken, as the game's bow ring sits.</summary>
+        private static Vector2 _at;
 
         /// <summary>How far the outline reaches around the arc's line, in the hud's units.</summary>
         private const float Thickness = 1.5f;
@@ -33,6 +40,14 @@ namespace Rodnarok
         [ForTest]
         public static Image TrackForTest => _track;
 
+        /// <summary>The fainter ring where the rest's track has not refilled yet, for the self-test; null before the first draw.</summary>
+        [ForTest]
+        public static Image UnderForTest => _under;
+
+        /// <summary>How far aside the ring was last drawn, for the self-test.</summary>
+        [ForTest]
+        public static float ShakeForTest { get; private set; }
+
         /// <summary>After the game set the crosshair for this frame, draws the ring for the player's own float.</summary>
         public static void Draw(Hud hud, float bowDrawPercentage)
         {
@@ -43,21 +58,36 @@ namespace Rodnarok
             {
                 if (ring.gameObject.activeSelf) ring.gameObject.SetActive(false);
                 if (_track.gameObject.activeSelf) _track.gameObject.SetActive(false);
+                if (_under.gameObject.activeSelf) _under.gameObject.SetActive(false);
                 return;
             }
+            ShakeForTest = Heave.Shake(Time.time - Heaves.RefusedAt);
+            var at = _at + new Vector2(ShakeForTest, 0f);
             if (!ring.gameObject.activeSelf) ring.gameObject.SetActive(true);
             var scale = new Vector3(draw.Scale, draw.Scale, draw.Scale);
             ring.transform.localScale = scale;
+            ((RectTransform)ring.transform).anchoredPosition = at;
+            ring.fillClockwise = !draw.ArcCounter;
             ring.fillAmount = draw.Fill;
             ring.color = new Color(draw.R, draw.G, draw.B, draw.A);
             if (_thickness != null) _thickness.effectColor = ring.color;
 
-            var trackShown = draw.TrackA > 0f;
-            if (_track.gameObject.activeSelf != trackShown) _track.gameObject.SetActive(trackShown);
-            if (!trackShown) return;
-            _track.transform.localScale = scale;
-            _track.color = new Color(draw.R, draw.G, draw.B, draw.TrackA);
-            if (_trackThickness != null) _trackThickness.effectColor = _track.color;
+            Part(_track, _trackThickness, draw.TrackA, draw.TrackFill, draw.TrackClockwise, draw, scale, at);
+            Part(_under, _underThickness, draw.UnderA, draw.UnderFill, true, draw, scale, at);
+        }
+
+        /// <summary>Draws one of the fainter rings behind the arc in the arc's colour, or hides it at no opacity.</summary>
+        private static void Part(Image image, Outline thickness, float alpha, float fill, bool clockwise, RingDraw draw, Vector3 scale, Vector2 at)
+        {
+            var shown = alpha > 0f && fill > 0f;
+            if (image.gameObject.activeSelf != shown) image.gameObject.SetActive(shown);
+            if (!shown) return;
+            image.transform.localScale = scale;
+            ((RectTransform)image.transform).anchoredPosition = at;
+            image.fillClockwise = clockwise;
+            image.fillAmount = fill;
+            image.color = new Color(draw.R, draw.G, draw.B, alpha);
+            if (thickness != null) thickness.effectColor = image.color;
         }
 
         /// <summary>The ring of this hud and its track behind it, made once from the game's bow ring: its picture, drawn as an arc filled clockwise from the top.</summary>
@@ -65,6 +95,8 @@ namespace Rodnarok
         {
             if (_ring != null) return _ring;
             var bow = hud.m_crosshairBow;
+            _at = ((RectTransform)bow.transform).anchoredPosition;
+            _under = Make(bow, "RodnarokRingUnder", out _underThickness);
             _track = Make(bow, "RodnarokRingTrack", out _trackThickness);
             _ring = Make(bow, "RodnarokRing", out _thickness);
             return _ring;
@@ -98,7 +130,10 @@ namespace Rodnarok
             if (ff == null) return Ring.Hidden;
             var fish = ff.GetCatch();
             if (fish != null)
-                return PlayRules.Now.Tension ? Ring.ForFight(fish.IsEscaping(), Lines.StrainOf(ff)) : Ring.ForFight(fish.IsEscaping());
+            {
+                var wound = Heave.Wound(Heaves.HeaveSlackOf(fish));
+                return PlayRules.Now.Tension ? Ring.ForFight(fish.IsEscaping(), Lines.StrainOf(ff), wound) : Ring.ForFight(fish.IsEscaping(), wound);
+            }
             if (Nibbler(ff) != null)
             {
                 var bite = Ring.ForBite(Time.time - NibbleTime(ff), PlayRules.Now.HookWindow);

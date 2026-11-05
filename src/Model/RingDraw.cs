@@ -6,8 +6,12 @@ namespace Rodnarok
     /// </summary>
     internal readonly struct RingDraw
     {
-        private RingDraw(bool shown, float scale, float fill, float r, float g, float b, float a, float trackA)
+        private RingDraw(bool shown, float scale, float fill, float r, float g, float b, float a, float trackA,
+            float trackFill = 1f, float underA = 0f, bool arcCounter = false)
         {
+            TrackFill = trackFill;
+            UnderA = underA;
+            ArcCounter = arcCounter;
             Shown = shown;
             Scale = scale;
             Fill = fill;
@@ -32,6 +36,21 @@ namespace Rodnarok
         /// <summary>The opacity of the full track drawn behind the arc in the arc's colour; 0 for none.</summary>
         public float TrackA { get; }
 
+        /// <summary>The share of the track drawn, counter-clockwise from the top: in a rest, how far the last heave's slack is wound in; 1 the whole track.</summary>
+        public float TrackFill { get; }
+
+        /// <summary>The track is always drawn counter-clockwise, against the strain's arc.</summary>
+        public bool TrackClockwise => false;
+
+        /// <summary>Whether the arc fills counter-clockwise: without tension, a rest's whole ring refills so after a heave.</summary>
+        public bool ArcCounter { get; }
+
+        /// <summary>The opacity of the fainter ring where the refilling track or arc has not come back yet; 0 for none.</summary>
+        public float UnderA { get; }
+
+        /// <summary>The share of that fainter ring, clockwise from the top: what the refill leaves.</summary>
+        public float UnderFill => 1f - (ArcCounter ? Fill : TrackFill);
+
         /// <summary>
         /// The ring's look: one size throughout. After a bite the arc drains from full white toward
         /// yellow. In the fight it is red while the fish struggles and yellow while it rests; with
@@ -49,7 +68,7 @@ namespace Rodnarok
                 case RingLook.Struggle:
                     return Fight(ring, 1f, RedG, RedB);
                 case RingLook.Rest:
-                    return Fight(ring, 1f, YellowG, YellowB);
+                    return Rest(ring);
                 case RingLook.Waiting:
                     // White as at the bite and its size, growing stronger as the fish comes closer, over a faint track.
                     var strength = ApproachRing.Strength(ring.Open);
@@ -57,6 +76,19 @@ namespace Rodnarok
                 default:
                     return default;
             }
+        }
+
+        /// <summary>
+        /// A rest: yellow, and after a heave the track, or without tension the whole ring, empties and
+        /// refills counter-clockwise as the slack is wound in, over a fainter ring; full, as ever.
+        /// </summary>
+        private static RingDraw Rest(Ring ring)
+        {
+            var wound = Clamp01(ring.Wound);
+            var refilling = wound < 1f;
+            if (ring.Strain.HasValue)
+                return new RingDraw(true, Size, Clamp01(ring.Strain.Value), 1f, YellowG, YellowB, 1f, Track, wound, refilling ? Under : 0f);
+            return new RingDraw(true, Size, wound, 1f, YellowG, YellowB, 1f, 0f, 1f, refilling ? Track : 0f, refilling);
         }
 
         private static RingDraw Fight(Ring ring, float r, float g, float b) =>
@@ -69,6 +101,9 @@ namespace Rodnarok
 
         /// <summary>How strongly the track behind a strain shows.</summary>
         private const float Track = 0.25f;
+
+        /// <summary>How strongly the fainter ring shows where a rest's track has not refilled yet.</summary>
+        private const float Under = 0.06f;
 
         /// <summary>Unity's yellow, as the game's bow ring turns.</summary>
         internal const float YellowG = 0.92f;

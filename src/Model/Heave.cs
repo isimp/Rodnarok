@@ -49,18 +49,47 @@ namespace Rodnarok
             Nothing,
             Lifts,
             Strains,
+
+            /// <summary>In a rest with the last heave's slack still out: nothing lifts, but the rod twitches and the ring shakes, so the press shows it was taken.</summary>
+            Refused,
         }
 
         /// <summary>
         /// What a press does: in a rest, with the slack of the last heave wound in (<see cref="Unwound"/>)
-        /// and the stamina for it, a lift; into a struggle, with the line's strain on, only strain; else nothing.
+        /// and the stamina for it, a lift, and with that slack still out a refusal that shows; into a
+        /// struggle, with the line's strain on, only strain; else nothing.
         /// </summary>
         public static Pressed OnPress(bool on, bool hooked, bool struggling, bool lifting, bool tension, bool staminaEnough, bool slackOut = false)
         {
             if (!on || !hooked || lifting) return Pressed.Nothing;
             if (struggling) return tension ? Pressed.Strains : Pressed.Nothing;
-            return staminaEnough && !slackOut ? Pressed.Lifts : Pressed.Nothing;
+            if (slackOut) return Pressed.Refused;
+            return staminaEnough ? Pressed.Lifts : Pressed.Nothing;
         }
+
+        /// <summary>
+        /// How far the last heave's slack is wound in, from 0 with a whole heave's slack out to 1 once
+        /// no more than <see cref="SlackFrom"/> is left and the next heave is free; the rest's ring track
+        /// refills by it.
+        /// </summary>
+        public static float Wound(float unwound) => 1f - Clamp01((unwound - SlackFrom) / (Metres - SlackFrom));
+
+        /// <summary>How long a refused press twitches the rod, in seconds: shorter than a heave's dip, so it reads as a limp try.</summary>
+        public const float TwitchSeconds = 0.1f;
+
+        /// <summary>Whether the rod shows raised this long into a refused press's twitch: down, it flicks up; held up, it dips.</summary>
+        public static bool TwitchRaised(bool holding, float since) => holding ? since >= TwitchSeconds : since < TwitchSeconds;
+
+        /// <summary>Whether a refused press's twitch is over.</summary>
+        public static bool TwitchOver(float since) => since >= TwitchSeconds;
+
+        /// <summary>How long and how far, in the hud's units, the ring shakes sideways at a refused press.</summary>
+        public const float ShakeSeconds = 0.25f;
+        public const float ShakeAmplitude = 4f;
+
+        /// <summary>How far aside the ring shows this long after a refused press: a quick shake dying away, none outside it.</summary>
+        public static float Shake(float since) =>
+            since <= 0f || since >= ShakeSeconds ? 0f : (float)Math.Sin(since * 60f) * ShakeAmplitude * (1f - since / ShakeSeconds);
 
         /// <summary>How much sooner, in seconds, each heave brings the fish's next struggle.</summary>
         public const float RestCut = 2f;
